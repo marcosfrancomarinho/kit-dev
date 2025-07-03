@@ -1,0 +1,29 @@
+{
+  "name": "create-kit-dev",
+  "version": "1.0.6",
+  "description": "CLI para criar um projeto Node.js moderno com TypeScript, esbuild e estrutura inicial configurada.",
+  "bin": {
+    "create-kit-dev": "index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marcosfrancomarinho/kit-dev.git"
+  },
+  "author": "marcosmarinho",
+  "license": "MIT",
+  "keywords": [
+    "typescript",
+    "cli",
+    "scaffold",
+    "project-generator",
+    "esbuild",
+    "node",
+    "starter-kit"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "start": "node index.js"
+  }
+}

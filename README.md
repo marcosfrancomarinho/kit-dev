@@ -41,7 +41,7 @@ Uma ferramenta de linha de comando (CLI) que automatiza a criação de projetos 
 
 ---
 
-## 📦 Dependências utilizadas
+## 🚀 Comece agora
 
 ```bash
-yarn add typescript tsx esbuild @types/node -D
+yarn create kit-dev

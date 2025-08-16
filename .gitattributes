@@ -1,5 +1,2 @@
-# Force CRLF no Windows, LF no Linux/macOS
-* text=auto
-
-# Forçar LF em scripts executáveis (binários)
-bin/* text eol=lf
+*.js text eol=lf
+*.ts text eol=lf

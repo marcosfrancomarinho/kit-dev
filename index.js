@@ -15,88 +15,72 @@ const colors = {
   gray: '\x1b[90m',
 };
 
+// Ask question in terminal
 function askQuestion(query) {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  return new Promise((resolve) =>
-    rl.question(`${colors.cyan}${query}${colors.reset}`, (answer) => {
-      rl.close();
-      resolve(answer);
-    })
-  );
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise(resolve => rl.question(`${colors.cyan}${query}${colors.reset}`, answer => {
+    rl.close();
+    resolve(answer);
+  }));
 }
 
-function showFinalInstructions() {
-  const projectName = basename(process.cwd());
+// Detect package manager
+function detectPackageManager() {
+  const execPath = process.env.npm_execpath || '';
+  const ua = process.env.npm_config_user_agent || '';
 
-  console.log(`
-${colors.green}✅ Projeto "${projectName}" criado com sucesso!${colors.reset}
+  if (execPath.includes('npm-cli.js') || execPath.includes('npx')) return 'npm';
+  if (ua.startsWith('yarn')) return 'yarn';
+  if (ua.startsWith('pnpm')) return 'pnpm';
 
-📂 Para começar, entre no diretório do projeto:
-  ${colors.bold}cd ${projectName}${colors.reset}
+  try {
+    const version = execSync('yarn --version', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    if (version) return 'yarn';
+  } catch {}
 
-🚀 Comandos disponíveis:
-
-  ${colors.yellow}yarn dev${colors.reset}       ${colors.gray}# Inicia o servidor em modo desenvolvimento (com TSX)${colors.reset}
-  ${colors.yellow}yarn build${colors.reset}     ${colors.gray}# Gera o bundle com o esbuild${colors.reset}
-  ${colors.yellow}yarn start${colors.reset}     ${colors.gray}# Executa o bundle gerado (dist/bundle.js)${colors.reset}
-  ${colors.yellow}yarn type${colors.reset}      ${colors.gray}# Verifica tipos com TypeScript (sem emitir arquivos)${colors.reset}
-
-💡 Dica: use ${colors.bold}"yarn"${colors.reset} para instalar dependências e rodar os scripts acima.
-`);
+  return 'npm';
 }
 
-async function createProject() {
-  console.log(
-    `${colors.cyan}${colors.bold}🚀 Inicializando um novo projeto Node.js com TypeScript e configuração de build...${colors.reset}`
-  );
-  const name = (await askQuestion('Definir nome do projeto: ')).trim();
-  validate(name);
-  const projectPath = join(process.cwd(), name);
-  createFolder(projectPath);
-  process.chdir(projectPath);
-  return projectPath;
-}
-
-function validate(name) {
-  const invalidPattern = /[<>:"/\\|?*\x00-\x1F]/g;
-  const isReserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
-
-  if (
-    !name ||
-    typeof name !== 'string' ||
-    name.trim().length === 0 ||
-    name.length > 255 ||
-    invalidPattern.test(name) ||
-    isReserved.test(name)
-  ) {
-    throw new Error('❌ Nome de pasta inválido. Evite caracteres especiais ou nomes reservados do sistema.');
+// Commands based on manager
+function getCommands(manager) {
+  switch (manager) {
+    case 'yarn': return { install: 'yarn', addDev: 'yarn add -D', run: 'yarn' };
+    case 'pnpm': return { install: 'pnpm install', addDev: 'pnpm add -D', run: 'pnpm' };
+    default: return { install: 'npm install', addDev: 'npm install --save-dev', run: 'npm run' };
   }
 }
 
+// Create folder
 function createFolder(folder) {
   if (!existsSync(folder)) {
     mkdirSync(folder);
-    console.log(`${colors.green}📁 Pasta criada:${colors.reset} ${folder}`);
+    console.log(`${colors.green}📁 Folder created:${colors.reset} ${folder}`);
   } else {
-    throw new Error(`${colors.yellow}⚠️  Pasta já existe:${colors.reset} ${folder}`);
+    throw new Error(`${colors.yellow}⚠️  Folder already exists:${colors.reset} ${folder}`);
   }
 }
 
-function createFile(folder) {
-  const file = join(folder, 'main.ts');
-  const content = "console.log('Hello World!');";
-  writeFileSync(file, content);
-  console.log(`${colors.green}📝 Arquivo criado:${colors.reset} ${file}`);
+// Validate project name
+function validate(name) {
+  const invalidPattern = /[<>:"/\\|?*\x00-\x1F]/g;
+  const isReserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+  if (!name || invalidPattern.test(name) || isReserved.test(name) || name.length > 255) {
+    throw new Error('❌ Invalid project name.');
+  }
 }
 
+// Create main.ts
+function createFile(folder) {
+  const file = join(folder, 'main.ts');
+  writeFileSync(file, "console.log('Hello World!');");
+  console.log(`${colors.green}📝 File created:${colors.reset} ${file}`);
+}
+
+// Create package.json
 function createPackageJson() {
   const packageJson = {
-    name: `${basename(process.cwd())}`,
+    name: basename(process.cwd()),
     version: '1.0.0',
-    description: '',
     main: 'src/main.ts',
     scripts: {
       start: 'node dist/bundle.js',
@@ -104,17 +88,24 @@ function createPackageJson() {
       build: 'node esbuild.config.js',
       type: 'tsc --watch --noEmit',
     },
-    keywords: [],
-    author: '',
+    dependencies: {},      // garante que exista
+    devDependencies: {},   // garante que exista
     license: 'MIT',
-    dependencies: {},
-    devDependencies: {},
   };
-
   writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
-  console.log(`${colors.green}📦 package.json criado${colors.reset}`);
+  console.log(`${colors.green}📦 package.json created${colors.reset}`);
 }
 
+// Ensure dependencies keys exist (for pnpm)
+function ensureDependenciesKeys() {
+  const pkgPath = 'package.json';
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+  if (!pkg.dependencies) pkg.dependencies = {};
+  if (!pkg.devDependencies) pkg.devDependencies = {};
+  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+}
+
+// Create esbuild.config.js
 function createEsbuildConfig() {
   const content = `const { build } = require('esbuild');
 const { dependencies, devDependencies } = require('./package.json');
@@ -130,46 +121,37 @@ build({
   target: ["ES2015"],
 }).catch(() => process.exit(1));
 `;
-
-  writeFileSync('esbuild.config.js', content, { encoding: 'utf-8' });
-  console.log(`${colors.green}🛠 esbuild.config.js criado${colors.reset}`);
+  writeFileSync('esbuild.config.js', content, 'utf-8');
+  console.log(`${colors.green}🛠 esbuild.config.js created${colors.reset}`);
 }
 
+// Create .gitignore
 function createGitignore() {
-  const content = `# Node.js
-node_modules/
+  const content = `node_modules/
 dist/
 .env
-
-# Logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# IDEs
 .vscode/
 .idea/
-
-# MacOS
 .DS_Store
-
-# TypeScript
 *.tsbuildinfo
 `;
-
-  writeFileSync('.gitignore', content, { encoding: 'utf-8' });
-  console.log(`${colors.green}🐙 .gitignore criado${colors.reset}`);
+  writeFileSync('.gitignore', content, 'utf-8');
+  console.log(`${colors.green}🐙 .gitignore created${colors.reset}`);
 }
 
-function install() {
-  console.log(`${colors.magenta}⬇️ Instalando dependências (yarn)...${colors.reset}`);
-  execSync('yarn', { stdio: 'inherit' });
-  execSync('yarn add typescript tsx esbuild @types/node -D', { stdio: 'inherit' });
-  console.log(`${colors.magenta}⚙️ Inicializando tsconfig.json...${colors.reset}`);
-  execSync('yarn tsc --init', { stdio: 'inherit' });
+// Install dependencies
+function install(manager) {
+  const cmds = getCommands(manager);
+  console.log(`${colors.magenta}⬇️ Installing dependencies with ${manager}...${colors.reset}`);
+  execSync(cmds.install, { stdio: 'inherit' });
+  execSync(`${cmds.addDev} typescript tsx esbuild @types/node`, { stdio: 'inherit' });
+
+  console.log(`${colors.magenta}⚙️ Initializing tsconfig.json...${colors.reset}`);
+  execSync('npx tsc --init', { stdio: 'inherit' });
 }
 
+// Edit tsconfig.json
 function editTsconfig() {
   const filePath = 'tsconfig.json';
   let content = readFileSync(filePath, 'utf-8');
@@ -177,21 +159,49 @@ function editTsconfig() {
   writeFileSync(filePath, content);
 }
 
+// Show instructions
+function showFinalInstructions(manager) {
+  const cmds = getCommands(manager);
+  const projectName = basename(process.cwd());
+  console.log(`
+${colors.green}✅ Project "${projectName}" created successfully!${colors.reset}
+
+📂 To get started:
+  ${colors.bold}cd ${projectName}${colors.reset}
+
+🚀 Available commands:
+  ${colors.yellow}${cmds.run} dev${colors.reset}       ${colors.gray}# Start development server${colors.reset}
+  ${colors.yellow}${cmds.run} build${colors.reset}     ${colors.gray}# Build the project${colors.reset}
+  ${colors.yellow}${cmds.run} start${colors.reset}     ${colors.gray}# Run bundled output${colors.reset}
+  ${colors.yellow}${cmds.run} type${colors.reset}      ${colors.gray}# Check TypeScript types${colors.reset}
+`);
+}
+
+// Main
 async function main() {
   try {
-    await createProject();
+    const manager = detectPackageManager();
+    console.log(`${colors.magenta}Using package manager: ${manager}${colors.reset}`);
 
-    const folder = resolve(process.cwd(), 'src');
-    createFolder(folder);
-    createFile(folder);
+    const name = (await askQuestion('Enter project name: ')).trim();
+    validate(name);
+
+    const projectPath = join(process.cwd(), name);
+    createFolder(projectPath);
+    process.chdir(projectPath);
+
+    const srcFolder = resolve(process.cwd(), 'src');
+    createFolder(srcFolder);
+    createFile(srcFolder);
     createPackageJson();
     createEsbuildConfig();
     createGitignore();
-    install();
+    install(manager);
+    ensureDependenciesKeys();  // garante keys vazias no pnpm
     editTsconfig();
-    showFinalInstructions();
-  } catch (error) {
-    console.error(`${colors.red} ❌ Erro ao criar o projeto:${colors.reset} ${error.message}`);
+    showFinalInstructions(manager);
+  } catch (err) {
+    console.error(`${colors.red}❌ Error:${colors.reset} ${err.message}`);
   }
 }
 

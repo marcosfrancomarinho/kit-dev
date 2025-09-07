@@ -145,7 +145,7 @@ function install(manager) {
   const cmds = getCommands(manager);
   console.log(`${colors.magenta}⬇️ Installing dependencies with ${manager}...${colors.reset}`);
   execSync(cmds.install, { stdio: 'inherit' });
-  execSync(`${cmds.addDev} typescript tsx esbuild @types/node`, { stdio: 'inherit' });
+  execSync(`${cmds.addDev} typescript tsx esbuild`, { stdio: 'inherit' });
 
   console.log(`${colors.magenta}⚙️ Initializing tsconfig.json...${colors.reset}`);
   execSync('npx tsc --init', { stdio: 'inherit' });

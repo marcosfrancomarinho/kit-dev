@@ -1,6 +1,6 @@
 {
   "name": "create-kit-dev",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "CLI para criar um projeto Node.js moderno com TypeScript, esbuild e estrutura inicial configurada.",
   "bin": {
     "create-kit-dev": "index.js"

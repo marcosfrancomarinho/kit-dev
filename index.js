@@ -84,7 +84,7 @@ function createPackageJson() {
     type: 'module',
     main: 'src/main.ts',
     scripts: {
-      start: 'node dist/bundle.js',
+      start: 'node dist/bundle.cjs',
       dev: 'tsx --watch src/main.ts',
       build: 'node esbuild.config.cjs',
       type: 'tsc --watch --noEmit',
@@ -115,7 +115,7 @@ const { main } = require('./package.json');
 build({
   entryPoints: [main],
   bundle: true,
-  outfile: './dist/bundle.js',
+  outfile: './dist/bundle.cjs',
   minify: true,
   platform: 'node',
   external: [...Object.keys(dependencies), ...Object.keys(devDependencies)],

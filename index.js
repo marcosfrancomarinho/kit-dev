@@ -18,10 +18,12 @@ const colors = {
 // Ask question in terminal
 function askQuestion(query) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise(resolve => rl.question(`${colors.cyan}${query}${colors.reset}`, answer => {
-    rl.close();
-    resolve(answer);
-  }));
+  return new Promise((resolve) =>
+    rl.question(`${colors.cyan}${query}${colors.reset}`, (answer) => {
+      rl.close();
+      resolve(answer);
+    }),
+  );
 }
 
 // Detect package manager
@@ -33,20 +35,18 @@ function detectPackageManager() {
   if (ua.startsWith('yarn')) return 'yarn';
   if (ua.startsWith('pnpm')) return 'pnpm';
 
-  try {
-    const version = execSync('yarn --version', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
-    if (version) return 'yarn';
-  } catch {}
-
   return 'npm';
 }
 
 // Commands based on manager
 function getCommands(manager) {
   switch (manager) {
-    case 'yarn': return { install: 'yarn', addDev: 'yarn add -D', run: 'yarn' };
-    case 'pnpm': return { install: 'pnpm install', addDev: 'pnpm add -D', run: 'pnpm' };
-    default: return { install: 'npm install', addDev: 'npm install --save-dev', run: 'npm run' };
+    case 'yarn':
+      return { install: 'yarn', addDev: 'yarn add -D', run: 'yarn' };
+    case 'pnpm':
+      return { install: 'pnpm install', addDev: 'pnpm add -D', run: 'pnpm' };
+    default:
+      return { install: 'npm install', addDev: 'npm install --save-dev', run: 'npm run' };
   }
 }
 
@@ -81,15 +81,16 @@ function createPackageJson() {
   const packageJson = {
     name: basename(process.cwd()),
     version: '1.0.0',
+    type: 'module',
     main: 'src/main.ts',
     scripts: {
       start: 'node dist/bundle.js',
       dev: 'tsx --watch src/main.ts',
-      build: 'node esbuild.config.js',
+      build: 'node esbuild.config.cjs',
       type: 'tsc --watch --noEmit',
     },
-    dependencies: {},      // garante que exista
-    devDependencies: {},   // garante que exista
+    dependencies: {}, // garante que exista
+    devDependencies: {}, // garante que exista
     license: 'MIT',
   };
   writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
@@ -121,7 +122,7 @@ build({
   target: ["ES2015"],
 }).catch(() => process.exit(1));
 `;
-  writeFileSync('esbuild.config.js', content, 'utf-8');
+  writeFileSync('esbuild.config.cjs', content, 'utf-8');
   console.log(`${colors.green}🛠 esbuild.config.js created${colors.reset}`);
 }
 
@@ -144,7 +145,6 @@ dist/
 function install(manager) {
   const cmds = getCommands(manager);
   console.log(`${colors.magenta}⬇️ Installing dependencies with ${manager}...${colors.reset}`);
-  execSync(cmds.install, { stdio: 'inherit' });
   execSync(`${cmds.addDev} typescript tsx esbuild`, { stdio: 'inherit' });
 
   console.log(`${colors.magenta}⚙️ Initializing tsconfig.json...${colors.reset}`);
@@ -197,7 +197,7 @@ async function main() {
     createEsbuildConfig();
     createGitignore();
     install(manager);
-    ensureDependenciesKeys();  // garante keys vazias no pnpm
+    ensureDependenciesKeys(); // garante keys vazias no pnpm
     editTsconfig();
     showFinalInstructions(manager);
   } catch (err) {

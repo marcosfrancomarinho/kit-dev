@@ -1,4 +1,4 @@
-# 🚀 CLI - Criador de Projetos Node.js + TypeScript / Node.js + TypeScript Project Creator
+# 🚀 CLI - Criador de Template TypeScript  /  TypeScript Template Creator
 
 | 🇧🇷 Português | 🇬🇧 English |
 |--------------|------------|

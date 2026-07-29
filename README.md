@@ -1,22 +1,70 @@
-# 🚀 CLI - Criador de Template TypeScript  /  TypeScript Template Creator
+<h1 align="center">🚀 kit-dev</h1>
 
-| 🇧🇷 Português | 🇬🇧 English |
-|--------------|------------|
-| Uma ferramenta de linha de comando (CLI) que automatiza a criação de projetos Node.js com suporte completo a **TypeScript**, **build com Esbuild**, **execução com TSX**, e muito mais. | A command-line tool (CLI) that automates the creation of Node.js projects with full support for **TypeScript**, **Esbuild bundling**, **execution with TSX**, and more. |
+<p align="center">
+CLI que cria em segundos um projeto <strong>TypeScript</strong> pronto pra codar — com build, type check e dev já configurados.
+</p>
 
-## ✅ Funcionalidades / Features
+<p align="center">
+<img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white"/>
+<img src="https://img.shields.io/badge/esbuild-FFCF00?style=for-the-badge&logo=esbuild&logoColor=black"/>
+<img src="https://img.shields.io/badge/tsx-000000?style=for-the-badge&logo=nodedotjs&logoColor=white"/>
+<img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge"/>
+</p>
 
-| 🇧🇷 Português | 🇬🇧 English |
-|--------------|------------|
-| **📁 Criação de estrutura de projeto** <br> - Solicita o **nome do projeto** via prompt interativo. <br> - Valida o nome com **Regex**, impedindo nomes inválidos ou reservados (`con`, `nul`, `lpt1`). <br> - Cria a pasta do projeto e muda o diretório (`cd`) automaticamente. | **📁 Project Structure Creation** <br> - Prompts for the **project name** via an interactive CLI. <br> - Validates the name with **Regex**, preventing invalid or reserved names (`con`, `nul`, `lpt1`). <br> - Creates the project folder and automatically changes directory (`cd`) into it. |
-| **📝 Geração automática de arquivos** <br> - `src/main.ts` com um exemplo básico (`console.log('Hello World!')`) <br> - `package.json` completo com scripts úteis <br> - `.gitignore` com regras padrão <br> - `esbuild.config.js` pronto para bundling | **📝 Automatic File Generation** <br> - `src/main.ts` with a basic example (`console.log('Hello World!')`) <br> - Complete `package.json` with useful scripts <br> - `.gitignore` with standard rules <br> - `esbuild.config.js` ready for bundling |
-| **⚙️ Scripts configurados** <br> - `yarn dev` → executa com TSX em modo watch <br> - `yarn build` → gera bundle com esbuild <br> - `yarn start` → roda a aplicação empacotada (`dist/bundle.js`) <br> - `yarn type` → verifica tipos com TypeScript (`--noEmit`) | **⚙️ Preconfigured Scripts** <br> - `yarn dev` → run TSX in watch mode <br> - `yarn build` → generate bundle with esbuild <br> - `yarn start` → run the bundled app (`dist/bundle.js`) <br> - `yarn type` → check TypeScript types (`--noEmit`) |
-| **🧱 Configuração de build com Esbuild** <br> - Usa `esbuild` para gerar o bundle em `dist/bundle.js` <br> - Exclui dependências externas (`external`) automaticamente | **🧱 Esbuild Build Configuration** <br> - Uses `esbuild` to bundle into `dist/bundle.js` <br> - Automatically excludes external dependencies (`external`) |
-| **📦 Instalação de dependências** <br> - Instala automaticamente: `typescript`, `tsx`, `esbuild`, `@types/node` <br> - Gera e edita o `tsconfig.json` com `rootDir: "./src"` | **📦 Dependency Installation** <br> - Automatically installs: `typescript`, `tsx`, `esbuild`, `@types/node` <br> - Generates and edits `tsconfig.json` with `rootDir: "./src"` |
-| **🎨 Terminal interativo com cores** <br> - Mensagens estilizadas com cores ANSI <br> - Ícones para melhor UX (🚀, ✅, 📦 etc) | **🎨 Interactive Terminal with Colors** <br> - Messages styled with ANSI colors <br> - Icons for better CLI UX (🚀, ✅, 📦 etc) |
+<p align="center">
+<img src="https://skillicons.dev/icons?i=npm,yarn,pnpm,nodejs,typescript" height="40"/>
+</p>
+
+---
+
+## 🇧🇷 Português &nbsp;|&nbsp; 🇬🇧 English
+
+<table>
+<tr>
+<td valign="top" width="50%">
+
+### ✅ O que ele faz
+
+- 📁 Pergunta o nome do projeto e cria a estrutura inicial
+- 📝 Gera `package.json`, `tsconfig.json` e `.gitignore` prontos
+- 🧱 Configura build com **esbuild** e execução com **tsx**
+- 📦 Instala tudo sozinho (detecta npm / yarn / pnpm)
+
+</td>
+<td valign="top" width="50%">
+
+### ✅ What it does
+
+- 📁 Asks for the project name and scaffolds the structure
+- 📝 Generates a ready `package.json`, `tsconfig.json` and `.gitignore`
+- 🧱 Sets up build with **esbuild** and execution with **tsx**
+- 📦 Installs everything by itself (detects npm / yarn / pnpm)
+
+</td>
+</tr>
+</table>
+
+---
+
+## ⚙️ Scripts gerados / Generated scripts
+
+<div align="center">
+
+| Comando | Ação | Action |
+|:---:|---|---|
+| `dev` | ▶️ Modo watch com `tsx` | Watch mode with `tsx` |
+| `build` | 📦 Gera o bundle com `esbuild` | Bundles with `esbuild` |
+| `start` | 🚀 Roda o bundle gerado | Runs the generated bundle |
+| `type` | 🔍 Checa os tipos (`tsc --noEmit`) | Type checking (`tsc --noEmit`) |
+
+</div>
+
+---
 
 ## 🚀 Comece agora / Get Started
 
 ```bash
-yarn create kit-dev
+npx create-kit-dev
 ```
+
+<p align="center">⭐ Menos setup, mais código.</p>

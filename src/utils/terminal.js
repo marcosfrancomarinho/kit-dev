@@ -74,6 +74,15 @@ function showFinalInstructions(projectName, runCommand) {
       colors.gray +
       '# Check TypeScript types' +
       colors.reset +
+      '\n  ' +
+      colors.yellow +
+      runCommand +
+      ' di' +
+      colors.reset +
+      '        ' +
+      colors.gray +
+      '# Add optional dependency injection' +
+      colors.reset +
       '\n',
   );
 }

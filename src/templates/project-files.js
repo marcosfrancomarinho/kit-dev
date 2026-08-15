@@ -10,6 +10,7 @@ function createPackageJson(projectName) {
         dev: 'tsx --watch src/main.ts',
         build: 'node esbuild.config.cjs',
         type: 'tsc --watch --noEmit',
+        di: 'node .kit-dev/di.cjs',
       },
       dependencies: {},
       devDependencies: {},

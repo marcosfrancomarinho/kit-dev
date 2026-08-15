@@ -52,6 +52,46 @@ npm run dev
 
 > A CLI detecta automaticamente npm, Yarn ou pnpm. Ao usar pnpm, o `esbuild` é autorizado no próprio comando de instalação com `--allow-build=esbuild`.
 
+## Injeção de dependência opcional
+
+Depois de criar o projeto, você pode adicionar um contêiner completo de injeção de dependência:
+
+```bash
+# npm
+npm run di
+
+# Yarn
+yarn di
+
+# pnpm
+pnpm di
+```
+
+Use somente o comando correspondente ao gerenciador escolhido. Ele:
+
+- cria `src/di/container.ts`;
+- habilita decorators e metadata no `tsconfig.json`;
+- instala `reflect-metadata` como dependência de produção;
+- remove o instalador e o script `di` depois da configuração.
+
+O contêiner inclui `@Injectable`, `@Inject`, `@Singleton`, `@Transient`, tokens para interfaces, providers de classe/valor/factory/alias, detecção de ciclos e descarte de singletons.
+
+Exemplo compatível com `tsx` e `esbuild`:
+
+```ts
+import { Injectable, container } from './di/container.js';
+
+@Injectable()
+class UserRepository {}
+
+@Injectable({ dependencies: [UserRepository] })
+class ListUsers {
+  constructor(private readonly repository: UserRepository) {}
+}
+
+const listUsers = container.resolve(ListUsers);
+```
+
 ## O que é configurado
 
 - Estrutura inicial em `src/`
@@ -64,11 +104,15 @@ npm run dev
 - Criação assíncrona dos arquivos antes da instalação
 - Autorização prévia e restrita do `esbuild` ao usar pnpm
 - Validação do nome do projeto
+- Injeção de dependência opcional pelo comando `di`
 
 ## Estrutura gerada
 
 ```text
 minha-api/
+├── .kit-dev/                 # removido depois de executar o comando di
+│   ├── dependency-injection.ts
+│   └── di.cjs
 ├── src/
 │   └── main.ts
 ├── .gitignore
@@ -86,6 +130,7 @@ minha-api/
 | `npm run build` | Gera o bundle minificado em `dist/bundle.cjs` |
 | `npm start` | Executa o bundle gerado |
 | `npm run type` | Verifica os tipos continuamente, sem emitir arquivos |
+| `npm run di` | Adiciona a configuração opcional de injeção de dependência |
 
 Se estiver usando outro gerenciador, substitua `npm run` pelo comando equivalente do Yarn ou pnpm.
 
@@ -105,6 +150,7 @@ Não é necessário instalar o Kit Dev globalmente.
 | [esbuild](https://esbuild.github.io/) | Geração rápida do bundle |
 | [Node.js](https://nodejs.org/) | Ambiente de execução |
 | [@types/node](https://www.npmjs.com/package/@types/node) | Tipos das APIs do Node.js |
+| [reflect-metadata](https://www.npmjs.com/package/reflect-metadata) | Metadata usada pela DI opcional |
 
 ## Estrutura interna
 
@@ -120,7 +166,10 @@ kit-dev/
     ├── services/
     │   └── package-manager.js
     ├── templates/
-    │   └── project-files.js
+    │   ├── project-files.js
+    │   └── files/
+    │       ├── dependency-injection.ts
+    │       └── di.cjs
     └── utils/
         ├── run-command.js
         ├── terminal.js

@@ -1,4 +1,4 @@
-const { mkdir, writeFile } = require('fs/promises');
+const { copyFile, mkdir, writeFile } = require('fs/promises');
 const { join } = require('path');
 const { colors } = require('../utils/terminal');
 const {
@@ -28,11 +28,19 @@ async function createFile(path, content, message) {
   console.log(colors.green + message + colors.reset);
 }
 
+async function copyTemplateFile(source, destination, message) {
+  await copyFile(source, destination);
+  console.log(colors.green + message + colors.reset);
+}
+
 async function generateProject(projectPath, projectName) {
   const srcPath = join(projectPath, 'src');
+  const kitDevPath = join(projectPath, '.kit-dev');
+  const templateFilesPath = join(__dirname, '..', 'templates', 'files');
 
   await createDirectory(projectPath);
   await createDirectory(srcPath);
+  await createDirectory(kitDevPath);
 
   await Promise.all([
     createFile(join(srcPath, 'main.ts'), mainFile, '📝 src/main.ts created'),
@@ -52,6 +60,16 @@ async function generateProject(projectPath, projectName) {
       '🛠 esbuild.config.cjs created',
     ),
     createFile(join(projectPath, '.gitignore'), gitignore, '🐙 .gitignore created'),
+    copyTemplateFile(
+      join(templateFilesPath, 'di.cjs'),
+      join(kitDevPath, 'di.cjs'),
+      '🧩 Optional DI command prepared',
+    ),
+    copyTemplateFile(
+      join(templateFilesPath, 'dependency-injection.ts'),
+      join(kitDevPath, 'dependency-injection.ts'),
+      '🧩 DI template prepared',
+    ),
   ]);
 }
 

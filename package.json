@@ -1,6 +1,6 @@
 {
   "name": "create-kit-dev",
-  "version": "1.0.21",
+  "version": "1.1.0",
   "description": "CLI para criar um projeto Node.js moderno com TypeScript, esbuild e estrutura inicial configurada.",
   "bin": {
     "create-kit-dev": "index.js"
@@ -16,6 +16,8 @@
     "cli",
     "scaffold",
     "project-generator",
+    "dependency-injection",
+    "decorators",
     "esbuild",
     "node",
     "starter-kit"

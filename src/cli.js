@@ -21,7 +21,7 @@ async function run() {
     await generateProject(projectPath, projectName);
     await installDependencies(manager, projectPath);
 
-    showFinalInstructions(manager, projectName, getRunCommand(manager));
+    showFinalInstructions(projectName, getRunCommand(manager));
   } catch (error) {
     console.error(colors.red + '❌ Error:' + colors.reset + ' ' + error.message);
     process.exitCode = 1;

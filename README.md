@@ -1,19 +1,24 @@
+<p align="center">
+  <a href="./README.md"><strong>English</strong></a> ·
+  <a href="./README.pt-BR.md">Português (Brasil)</a>
+</p>
+
 <h1 align="center">🚀 Kit Dev</h1>
 
 <p align="center">
-  Crie um projeto Node.js com TypeScript pronto para desenvolver, validar e gerar o build.
+  Create a Node.js project with TypeScript, ready for development, type checking, and production builds.
 </p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/create-kit-dev">
-    <img src="https://img.shields.io/npm/v/create-kit-dev?style=flat-square&color=CB3837&logo=npm" alt="Versão no npm">
+    <img src="https://img.shields.io/npm/v/create-kit-dev?style=flat-square&color=CB3837&logo=npm" alt="npm version">
   </a>
   <a href="https://www.npmjs.com/package/create-kit-dev">
-    <img src="https://img.shields.io/npm/dt/create-kit-dev?style=flat-square&color=3178C6" alt="Downloads no npm">
+    <img src="https://img.shields.io/npm/dt/create-kit-dev?style=flat-square&color=3178C6" alt="npm downloads">
   </a>
-  <img src="https://img.shields.io/badge/Node.js-%3E%3D16-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js 16 ou superior">
+  <img src="https://img.shields.io/badge/Node.js-%3E%3D16-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js 16 or later">
   <a href="./LICENSE">
-    <img src="https://img.shields.io/badge/licença-MIT-green?style=flat-square" alt="Licença MIT">
+    <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License">
   </a>
 </p>
 
@@ -23,38 +28,38 @@
 
 ---
 
-## Sobre
+## About
 
-O **Kit Dev** é uma CLI que elimina a configuração repetitiva no início de projetos Node.js com TypeScript.
+**Kit Dev** is a CLI that removes repetitive setup from the start of Node.js projects with TypeScript.
 
-Com um único comando, ela cria a estrutura do projeto, configura o ambiente de desenvolvimento e instala todas as dependências necessárias.
+With a single command, it creates the project structure, configures the development environment, and installs all required dependencies.
 
-## Início rápido
+## Quick start
 
-Execute:
+Run:
 
 ```bash
 npx create-kit-dev
 ```
 
-Informe o nome do projeto quando solicitado:
+Enter the project name when prompted:
 
 ```text
-Enter project name: minha-api
+Enter project name: my-api
 ```
 
-Depois, acesse a pasta criada e inicie o modo de desenvolvimento:
+Then open the generated directory and start development mode:
 
 ```bash
-cd minha-api
+cd my-api
 npm run dev
 ```
 
-> A CLI detecta automaticamente npm, Yarn ou pnpm. Ao usar pnpm, o `esbuild` é autorizado no próprio comando de instalação com `--allow-build=esbuild`.
+> The CLI automatically detects npm, Yarn, or pnpm. When using pnpm, `esbuild` is authorized directly in the installation command with `--allow-build=esbuild`.
 
-## Injeção de dependência opcional
+## Optional dependency injection
 
-Depois de criar o projeto, você pode adicionar um contêiner completo de injeção de dependência:
+After creating the project, you can add a complete dependency injection container:
 
 ```bash
 # npm
@@ -67,15 +72,15 @@ yarn di
 pnpm di
 ```
 
-Use somente o comando correspondente ao gerenciador escolhido. Ele:
+Use only the command that matches your selected package manager. It:
 
-- cria `src/di/container.ts` com o mecanismo de DI;
-- cria `src/di/providers.ts`, o único arquivo usado para registrar providers;
-- remove o instalador e o script `di` depois da configuração.
+- creates `src/di/container.ts` with the DI mechanism;
+- creates `src/di/providers.ts`, the single file used to register providers;
+- removes the installer and the `di` script after setup.
 
-O contêiner é inspirado na configuração de beans do Java Spring, mas sem decorators, reflexão ou pacotes externos. A lógica fica isolada em `container.ts`; no dia a dia, você só edita `providers.ts`.
+The container is inspired by Java Spring bean configuration, but uses no decorators, reflection, or external packages. The implementation stays isolated in `container.ts`; in everyday development, you only edit `providers.ts`.
 
-Exemplo de `src/di/providers.ts`:
+Example `src/di/providers.ts`:
 
 ```ts
 import {
@@ -97,9 +102,9 @@ const providers = new AppConfig()
 export const container = createApplicationContext(providers);
 ```
 
-Classes concretas usam a própria classe como token. Interfaces usam um token explícito para identificar sua implementação, pois não existem em tempo de execução.
+Concrete classes use the class itself as the token. Interfaces use an explicit token to identify their implementation because interfaces do not exist at runtime.
 
-Depois, use o provider onde precisar:
+Then retrieve the provider wherever you need it:
 
 ```ts
 import { container } from './di/providers.js';
@@ -108,25 +113,25 @@ import { UserService } from './services/user-service.js';
 const userService = container.get(UserService);
 ```
 
-## O que é configurado
+## What is configured
 
-- Estrutura inicial em `src/`
-- TypeScript com `tsconfig.json`
-- Execução em modo watch com `tsx`
-- Build rápido e minificado com `esbuild`
-- Saída compatível com Node.js em `dist/bundle.cjs`
-- `.gitignore` com arquivos comuns do ecossistema Node.js
-- Instalação automática de `typescript`, `tsx`, `esbuild` e `@types/node`
-- Criação assíncrona dos arquivos antes da instalação
-- Autorização prévia e restrita do `esbuild` ao usar pnpm
-- Validação do nome do projeto
-- Injeção de dependência opcional pelo comando `di`
+- Initial structure in `src/`
+- TypeScript with `tsconfig.json`
+- Watch mode powered by `tsx`
+- Fast, minified builds with `esbuild`
+- Node.js-compatible output in `dist/bundle.cjs`
+- `.gitignore` with common Node.js ecosystem files
+- Automatic installation of `typescript`, `tsx`, `esbuild`, and `@types/node`
+- Asynchronous file creation before dependency installation
+- Prior, restricted authorization for `esbuild` when using pnpm
+- Project name validation
+- Optional dependency injection through the `di` command
 
-## Estrutura gerada
+## Generated structure
 
 ```text
-minha-api/
-├── .kit-dev/                 # removido depois de executar o comando di
+my-api/
+├── .kit-dev/                 # removed after running the di command
 │   ├── dependency-injection.ts
 │   ├── providers.ts
 │   └── di.cjs
@@ -136,41 +141,41 @@ minha-api/
 ├── esbuild.config.cjs
 ├── package.json
 ├── tsconfig.json
-└── pnpm-workspace.yaml  # criado somente ao usar pnpm
+└── pnpm-workspace.yaml       # created only when using pnpm
 ```
 
-## Scripts disponíveis
+## Available scripts
 
-| Comando | Descrição |
+| Command | Description |
 |---|---|
-| `npm run dev` | Executa `src/main.ts` em modo watch |
-| `npm run build` | Gera o bundle minificado em `dist/bundle.cjs` |
-| `npm start` | Executa o bundle gerado |
-| `npm run type` | Verifica os tipos continuamente, sem emitir arquivos |
-| `npm run di` | Adiciona a configuração opcional de injeção de dependência |
+| `npm run dev` | Runs `src/main.ts` in watch mode |
+| `npm run build` | Generates the minified bundle in `dist/bundle.cjs` |
+| `npm start` | Runs the generated bundle |
+| `npm run type` | Continuously checks types without emitting files |
+| `npm run di` | Adds the optional dependency injection setup |
 
-Se estiver usando outro gerenciador, substitua `npm run` pelo comando equivalente do Yarn ou pnpm.
+If you use another package manager, replace `npm run` with the equivalent Yarn or pnpm command.
 
-## Requisitos
+## Requirements
 
-- [Node.js](https://nodejs.org/) 16 ou superior
-- npm, Yarn ou pnpm
+- [Node.js](https://nodejs.org/) 16 or later
+- npm, Yarn, or pnpm
 
-Não é necessário instalar o Kit Dev globalmente.
+You do not need to install Kit Dev globally.
 
-## Tecnologias
+## Technologies
 
-| Tecnologia | Finalidade |
+| Technology | Purpose |
 |---|---|
-| [TypeScript](https://www.typescriptlang.org/) | Tipagem estática |
-| [tsx](https://tsx.is/) | Execução do TypeScript durante o desenvolvimento |
-| [esbuild](https://esbuild.github.io/) | Geração rápida do bundle |
-| [Node.js](https://nodejs.org/) | Ambiente de execução |
-| [@types/node](https://www.npmjs.com/package/@types/node) | Tipos das APIs do Node.js |
+| [TypeScript](https://www.typescriptlang.org/) | Static typing |
+| [tsx](https://tsx.is/) | Runs TypeScript during development |
+| [esbuild](https://esbuild.github.io/) | Fast bundle generation |
+| [Node.js](https://nodejs.org/) | JavaScript runtime |
+| [@types/node](https://www.npmjs.com/package/@types/node) | Type definitions for Node.js APIs |
 
-## Estrutura interna
+## Internal structure
 
-O código da CLI é separado por responsabilidade:
+The CLI code is organized by responsibility:
 
 ```text
 kit-dev/
@@ -193,21 +198,22 @@ kit-dev/
         └── validate-project-name.js
 ```
 
-| Caminho | Responsabilidade |
+| Path | Responsibility |
 |---|---|
-| `index.js` | Ponto de entrada do executável |
-| `src/cli.js` | Coordena a criação do projeto |
-| `src/generators/` | Cria diretórios e arquivos do template |
-| `src/services/` | Detecta o gerenciador e instala dependências |
-| `src/templates/` | Define o conteúdo dos arquivos gerados |
-| `src/utils/` | Terminal, validação e execução de comandos |
+| `index.js` | Executable entry point |
+| `src/cli.js` | Coordinates project creation |
+| `src/generators/` | Creates template directories and files |
+| `src/services/` | Detects the package manager and installs dependencies |
+| `src/templates/` | Defines the generated file contents |
+| `src/utils/` | Terminal output, validation, and command execution |
 
-Essa organização mantém o fluxo principal pequeno e permite alterar uma responsabilidade sem concentrar toda a lógica em um único arquivo.
-## Contribuindo
+This organization keeps the main flow small and allows each responsibility to evolve without concentrating the entire implementation in a single file.
 
-Contribuições são bem-vindas. Para sugerir melhorias ou relatar problemas, abra uma [issue](https://github.com/marcosfrancomarinho/kit-dev/issues).
+## Contributing
 
-Para contribuir com código:
+Contributions are welcome. To suggest improvements or report problems, open an [issue](https://github.com/marcosfrancomarinho/kit-dev/issues).
+
+To contribute code:
 
 ```bash
 git clone https://github.com/marcosfrancomarinho/kit-dev.git
@@ -215,18 +221,18 @@ cd kit-dev
 npm install
 ```
 
-Depois, crie uma branch, faça suas alterações e envie um pull request.
+Then create a branch, make your changes, and open a pull request.
 
-## Licença
+## License
 
-Distribuído sob a licença MIT.
+Distributed under the MIT License.
 
 ---
 
 <p align="center">
-  Feito por <a href="https://github.com/marcosfrancomarinho">Marcos Franco Marinho</a>
+  Made by <a href="https://github.com/marcosfrancomarinho">Marcos Franco Marinho</a>
 </p>
 
 <p align="center">
-  <strong>Menos configuração. Mais código.</strong>
+  <strong>Less configuration. More code.</strong>
 </p>

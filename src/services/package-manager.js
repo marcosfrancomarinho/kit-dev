@@ -16,7 +16,7 @@ const managers = {
   },
   pnpm: {
     command: 'pnpm',
-    installArgs: ['add', '-D'],
+    installArgs: ['--allow-build=esbuild', 'add', '-D'],
     runCommand: 'pnpm',
   },
 };
@@ -55,15 +55,6 @@ async function installDependencies(manager, projectPath) {
       errorMessage: manager + ' installation failed.',
     },
   );
-
-  if (manager === 'pnpm') {
-    console.log(colors.magenta + '🔐 Approving esbuild binary...' + colors.reset);
-
-    await runCommand('pnpm', ['approve-builds', 'esbuild'], {
-      cwd: projectPath,
-      errorMessage: 'Failed to approve the esbuild build script.',
-    });
-  }
 }
 
 module.exports = {

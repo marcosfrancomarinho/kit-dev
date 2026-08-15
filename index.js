@@ -157,20 +157,10 @@ async function createTsconfig() {
   console.log(`${colors.green}⚙️ tsconfig.json created${colors.reset}`);
 }
 
-// Install dependencies
-function install(manager) {
-  const commands = {
-    npm: { command: 'npm', args: ['install', '--save-dev'] },
-    yarn: { command: 'yarn', args: ['add', '-D'] },
-    pnpm: { command: 'pnpm', args: ['add', '-D'] },
-  };
-  const { command, args } = commands[manager] || commands.npm;
-  const dependencies = ['typescript', 'tsx', 'esbuild', '@types/node'];
-
-  console.log(`${colors.magenta}⬇️ Installing dependencies with ${manager}...${colors.reset}`);
-
+// Run command without blocking the process
+function runCommand(command, args, errorMessage) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, [...args, ...dependencies], {
+    const child = spawn(command, args, {
       stdio: 'inherit',
       shell: process.platform === 'win32',
     });
@@ -181,9 +171,36 @@ function install(manager) {
         resolve();
         return;
       }
-      reject(new Error(`${manager} installation failed with exit code ${code}.`));
+      reject(new Error(`${errorMessage} Exit code: ${code}.`));
     });
   });
+}
+
+// Install dependencies
+async function install(manager) {
+  const commands = {
+    npm: { command: 'npm', args: ['install', '--save-dev'] },
+    yarn: { command: 'yarn', args: ['add', '-D'] },
+    pnpm: { command: 'pnpm', args: ['add', '-D'] },
+  };
+  const { command, args } = commands[manager] || commands.npm;
+  const dependencies = ['typescript', 'tsx', 'esbuild', '@types/node'];
+
+  console.log(`${colors.magenta}⬇️ Installing dependencies with ${manager}...${colors.reset}`);
+  await runCommand(
+    command,
+    [...args, ...dependencies],
+    `${manager} installation failed.`,
+  );
+
+  if (manager === 'pnpm') {
+    console.log(`${colors.magenta}🔐 Approving esbuild binary...${colors.reset}`);
+    await runCommand(
+      'pnpm',
+      ['approve-builds', 'esbuild'],
+      'Failed to approve the esbuild build script.',
+    );
+  }
 }
 
 // Show instructions

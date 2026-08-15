@@ -89,13 +89,52 @@ export class AppConfig {
     return this.bean(token, factory, { scope: "transient" });
   }
 
-  /** Registra uma classe e declara os tokens esperados pelo construtor. */
+  /** Registra uma classe usando a própria classe como token. */
+  useClass<T>(
+    target: Constructor<T>,
+    dependencies?: readonly DependencyToken[],
+    options?: BeanOptions,
+  ): this;
+
+  /** Associa um token, como o de uma interface, a uma classe concreta. */
   useClass<T>(
     token: DependencyToken<T>,
     target: Constructor<T>,
-    dependencies: readonly DependencyToken[] = [],
+    dependencies?: readonly DependencyToken[],
+    options?: BeanOptions,
+  ): this;
+
+  useClass<T>(
+    tokenOrTarget: DependencyToken<T>,
+    targetOrDependencies?: Constructor<T> | readonly DependencyToken[],
+    dependenciesOrOptions?: readonly DependencyToken[] | BeanOptions,
     options: BeanOptions = {},
   ): this {
+    const hasExplicitToken = typeof targetOrDependencies === "function";
+
+    if (!hasExplicitToken && typeof tokenOrTarget !== "function") {
+      throw new DependencyInjectionError(
+        "useClass() precisa receber uma classe ou um token seguido de uma classe.",
+      );
+    }
+
+    const token = tokenOrTarget;
+    const target = (
+      hasExplicitToken ? targetOrDependencies : tokenOrTarget
+    ) as Constructor<T>;
+    const dependencies = hasExplicitToken
+      ? isDependencyList(dependenciesOrOptions)
+        ? dependenciesOrOptions
+        : []
+      : (targetOrDependencies ?? []) as readonly DependencyToken[];
+    const beanOptions = hasExplicitToken
+      ? isDependencyList(dependenciesOrOptions)
+        ? options
+        : dependenciesOrOptions ?? options
+      : isDependencyList(dependenciesOrOptions)
+        ? {}
+        : dependenciesOrOptions ?? {};
+
     return this.bean(
       token,
       (context) => {
@@ -105,7 +144,7 @@ export class AppConfig {
 
         return new target(...resolvedDependencies);
       },
-      options,
+      beanOptions,
     );
   }
 
@@ -311,4 +350,10 @@ function formatToken(token: DependencyToken): string {
   }
 
   return token.name || "Classe anônima";
+}
+
+function isDependencyList(
+  value: readonly DependencyToken[] | BeanOptions | undefined,
+): value is readonly DependencyToken[] {
+  return Array.isArray(value);
 }

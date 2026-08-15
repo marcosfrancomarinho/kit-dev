@@ -81,22 +81,23 @@ Exemplo de `src/di/providers.ts`:
 import {
   AppConfig,
   createApplicationContext,
+  createToken,
 } from './container.js';
-import { UserRepository } from '../repositories/user-repository.js';
+import type { UserRepository } from '../domain/user-repository.js';
+import { InMemoryUserRepository } from '../infrastructure/in-memory-user-repository.js';
 import { UserService } from '../services/user-service.js';
 
-const providers = new AppConfig();
+const USER_REPOSITORY =
+  createToken<UserRepository>('USER_REPOSITORY');
 
-providers.register(UserRepository, () => new UserRepository());
-
-providers.register(
-  UserService,
-  (container) =>
-    new UserService(container.get(UserRepository)),
-);
+const providers = new AppConfig()
+  .useClass(USER_REPOSITORY, InMemoryUserRepository)
+  .useClass(UserService, [USER_REPOSITORY]);
 
 export const container = createApplicationContext(providers);
 ```
+
+Classes concretas usam a própria classe como token. Interfaces usam um token explícito para identificar sua implementação, pois não existem em tempo de execução.
 
 Depois, use o provider onde precisar:
 

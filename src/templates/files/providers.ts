@@ -10,11 +10,11 @@ const providers = new AppConfig();
  *
  * Exemplo:
  *
- * providers.register(UserRepository, () => new UserRepository());
+ * providers.useClass(USER_REPOSITORY, InMemoryUserRepository);
  *
- * providers.register(
+ * providers.useClass(
  *   UserService,
- *   (container) => new UserService(container.get(UserRepository)),
+ *   [USER_REPOSITORY],
  * );
  */
 

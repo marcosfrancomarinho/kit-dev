@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-const { existsSync, writeFileSync, mkdirSync, readFileSync } = require('fs');
+const { mkdir, writeFile } = require('fs/promises');
 const { resolve, join, basename } = require('path');
-const { execSync } = require('child_process');
+const { spawn } = require('child_process');
 const { createInterface } = require('readline');
 
 const colors = {
@@ -51,12 +51,15 @@ function getCommands(manager) {
 }
 
 // Create folder
-function createFolder(folder) {
-  if (!existsSync(folder)) {
-    mkdirSync(folder);
+async function createFolder(folder) {
+  try {
+    await mkdir(folder);
     console.log(`${colors.green}📁 Folder created:${colors.reset} ${folder}`);
-  } else {
-    throw new Error(`${colors.yellow}⚠️  Folder already exists:${colors.reset} ${folder}`);
+  } catch (error) {
+    if (error.code === 'EEXIST') {
+      throw new Error(`${colors.yellow}⚠️  Folder already exists:${colors.reset} ${folder}`);
+    }
+    throw error;
   }
 }
 
@@ -70,14 +73,14 @@ function validate(name) {
 }
 
 // Create main.ts
-function createFile(folder) {
+async function createFile(folder) {
   const file = join(folder, 'main.ts');
-  writeFileSync(file, "console.log('Hello World!');");
+  await writeFile(file, "console.log('Hello World!');");
   console.log(`${colors.green}📝 File created:${colors.reset} ${file}`);
 }
 
 // Create package.json
-function createPackageJson() {
+async function createPackageJson() {
   const packageJson = {
     name: basename(process.cwd()),
     version: '1.0.0',
@@ -89,25 +92,16 @@ function createPackageJson() {
       build: 'node esbuild.config.cjs',
       type: 'tsc --watch --noEmit',
     },
-    dependencies: {}, // garante que exista
-    devDependencies: {}, // garante que exista
+    dependencies: {},
+    devDependencies: {},
     license: 'MIT',
   };
-  writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
+  await writeFile('package.json', JSON.stringify(packageJson, null, 2));
   console.log(`${colors.green}📦 package.json created${colors.reset}`);
 }
 
-// Ensure dependencies keys exist (for pnpm)
-function ensureDependenciesKeys() {
-  const pkgPath = 'package.json';
-  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-  if (!pkg.dependencies) pkg.dependencies = {};
-  if (!pkg.devDependencies) pkg.devDependencies = {};
-  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
-}
-
 // Create esbuild.config.js
-function createEsbuildConfig() {
+async function createEsbuildConfig() {
   const content = `const { build } = require('esbuild');
 const { dependencies, devDependencies } = require('./package.json');
 const { main } = require('./package.json');
@@ -122,12 +116,12 @@ build({
   target: ["ES2015"],
 }).catch(() => process.exit(1));
 `;
-  writeFileSync('esbuild.config.cjs', content, 'utf-8');
+  await writeFile('esbuild.config.cjs', content, 'utf-8');
   console.log(`${colors.green}🛠 esbuild.config.js created${colors.reset}`);
 }
 
 // Create .gitignore
-function createGitignore() {
+async function createGitignore() {
   const content = `node_modules/
 dist/
 .env
@@ -137,26 +131,59 @@ dist/
 .DS_Store
 *.tsbuildinfo
 `;
-  writeFileSync('.gitignore', content, 'utf-8');
+  await writeFile('.gitignore', content, 'utf-8');
   console.log(`${colors.green}🐙 .gitignore created${colors.reset}`);
+}
+
+// Create tsconfig.json
+async function createTsconfig() {
+  const tsconfig = {
+    compilerOptions: {
+      target: 'ES2022',
+      module: 'NodeNext',
+      moduleResolution: 'NodeNext',
+      rootDir: './src',
+      outDir: './dist',
+      strict: true,
+      esModuleInterop: true,
+      skipLibCheck: true,
+      forceConsistentCasingInFileNames: true,
+      types: ['node'],
+    },
+    include: ['src'],
+  };
+
+  await writeFile('tsconfig.json', JSON.stringify(tsconfig, null, 2));
+  console.log(`${colors.green}⚙️ tsconfig.json created${colors.reset}`);
 }
 
 // Install dependencies
 function install(manager) {
-  const cmds = getCommands(manager);
+  const commands = {
+    npm: { command: 'npm', args: ['install', '--save-dev'] },
+    yarn: { command: 'yarn', args: ['add', '-D'] },
+    pnpm: { command: 'pnpm', args: ['add', '-D'] },
+  };
+  const { command, args } = commands[manager] || commands.npm;
+  const dependencies = ['typescript', 'tsx', 'esbuild', '@types/node'];
+
   console.log(`${colors.magenta}⬇️ Installing dependencies with ${manager}...${colors.reset}`);
-  execSync(`${cmds.addDev} typescript tsx esbuild`, { stdio: 'inherit' });
 
-  console.log(`${colors.magenta}⚙️ Initializing tsconfig.json...${colors.reset}`);
-  execSync('npx tsc --init', { stdio: 'inherit' });
-}
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, [...args, ...dependencies], {
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
 
-// Edit tsconfig.json
-function editTsconfig() {
-  const filePath = 'tsconfig.json';
-  let content = readFileSync(filePath, 'utf-8');
-  content = content.replace(/\/\/\s*"rootDir":\s*".*?",?/, '"rootDir": "./src",');
-  writeFileSync(filePath, content);
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`${manager} installation failed with exit code ${code}.`));
+    });
+  });
 }
 
 // Show instructions
@@ -187,18 +214,21 @@ async function main() {
     validate(name);
 
     const projectPath = join(process.cwd(), name);
-    createFolder(projectPath);
+    await createFolder(projectPath);
     process.chdir(projectPath);
 
     const srcFolder = resolve(process.cwd(), 'src');
-    createFolder(srcFolder);
-    createFile(srcFolder);
-    createPackageJson();
-    createEsbuildConfig();
-    createGitignore();
-    install(manager);
-    ensureDependenciesKeys(); // garante keys vazias no pnpm
-    editTsconfig();
+    await createFolder(srcFolder);
+
+    await Promise.all([
+      createFile(srcFolder),
+      createPackageJson(),
+      createEsbuildConfig(),
+      createGitignore(),
+      createTsconfig(),
+    ]);
+
+    await install(manager);
     showFinalInstructions(manager);
   } catch (err) {
     console.error(`${colors.red}❌ Error:${colors.reset} ${err.message}`);

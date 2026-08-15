@@ -50,7 +50,7 @@ cd minha-api
 npm run dev
 ```
 
-> A CLI detecta automaticamente se está sendo executada com npm, Yarn ou pnpm.
+> A CLI detecta automaticamente npm, Yarn ou pnpm. Ao usar pnpm, o script de build do `esbuild` é aprovado automaticamente.
 
 ## O que é configurado
 
@@ -60,7 +60,9 @@ npm run dev
 - Build rápido e minificado com `esbuild`
 - Saída compatível com Node.js em `dist/bundle.cjs`
 - `.gitignore` com arquivos comuns do ecossistema Node.js
-- Instalação automática das dependências de desenvolvimento
+- Instalação automática de `typescript`, `tsx`, `esbuild` e `@types/node`
+- Criação assíncrona dos arquivos antes da instalação
+- Aprovação automática e restrita do `esbuild` ao usar pnpm
 - Validação do nome do projeto
 
 ## Estrutura gerada
@@ -101,7 +103,39 @@ Não é necessário instalar o Kit Dev globalmente.
 | [tsx](https://tsx.is/) | Execução do TypeScript durante o desenvolvimento |
 | [esbuild](https://esbuild.github.io/) | Geração rápida do bundle |
 | [Node.js](https://nodejs.org/) | Ambiente de execução |
+| [@types/node](https://www.npmjs.com/package/@types/node) | Tipos das APIs do Node.js |
 
+## Estrutura interna
+
+O código da CLI é separado por responsabilidade:
+
+```text
+kit-dev/
+├── index.js
+└── src/
+    ├── cli.js
+    ├── generators/
+    │   └── project-generator.js
+    ├── services/
+    │   └── package-manager.js
+    ├── templates/
+    │   └── project-files.js
+    └── utils/
+        ├── run-command.js
+        ├── terminal.js
+        └── validate-project-name.js
+```
+
+| Caminho | Responsabilidade |
+|---|---|
+| `index.js` | Ponto de entrada do executável |
+| `src/cli.js` | Coordena a criação do projeto |
+| `src/generators/` | Cria diretórios e arquivos do template |
+| `src/services/` | Detecta o gerenciador e instala dependências |
+| `src/templates/` | Define o conteúdo dos arquivos gerados |
+| `src/utils/` | Terminal, validação e execução de comandos |
+
+Essa organização mantém o fluxo principal pequeno e permite alterar uma responsabilidade sem concentrar toda a lógica em um único arquivo.
 ## Contribuindo
 
 Contribuições são bem-vindas. Para sugerir melhorias ou relatar problemas, abra uma [issue](https://github.com/marcosfrancomarinho/kit-dev/issues).

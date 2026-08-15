@@ -25,7 +25,7 @@ function askQuestion(query) {
   });
 }
 
-function showFinalInstructions(manager, projectName, runCommand) {
+function showFinalInstructions(projectName, runCommand) {
   console.log(
     '\n' +
       colors.green +

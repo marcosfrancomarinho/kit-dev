@@ -1,4 +1,9 @@
 /**
+ * ATENÇÃO: não edite este arquivo.
+ *
+ * Este arquivo contém a implementação interna do contêiner.
+ * Registre e configure as dependências em `src/di/providers.ts`.
+ *
  * Contêiner de injeção de dependência sem decorators e sem pacotes externos.
  *
  * Recursos:

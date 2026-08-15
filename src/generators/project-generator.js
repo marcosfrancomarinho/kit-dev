@@ -70,6 +70,11 @@ async function generateProject(projectPath, projectName) {
       join(kitDevPath, 'dependency-injection.ts'),
       '🧩 DI template prepared',
     ),
+    copyTemplateFile(
+      join(templateFilesPath, 'providers.ts'),
+      join(kitDevPath, 'providers.ts'),
+      '🧩 DI providers template prepared',
+    ),
   ]);
 }
 

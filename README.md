@@ -69,27 +69,42 @@ pnpm di
 
 Use somente o comando correspondente ao gerenciador escolhido. Ele:
 
-- cria `src/di/container.ts`;
-- habilita decorators e metadata no `tsconfig.json`;
-- instala `reflect-metadata` como dependência de produção;
+- cria `src/di/container.ts` com o mecanismo de DI;
+- cria `src/di/providers.ts`, o único arquivo usado para registrar providers;
 - remove o instalador e o script `di` depois da configuração.
 
-O contêiner inclui `@Injectable`, `@Inject`, `@Singleton`, `@Transient`, tokens para interfaces, providers de classe/valor/factory/alias, detecção de ciclos e descarte de singletons.
+O contêiner é inspirado na configuração de beans do Java Spring, mas sem decorators, reflexão ou pacotes externos. A lógica fica isolada em `container.ts`; no dia a dia, você só edita `providers.ts`.
 
-Exemplo compatível com `tsx` e `esbuild`:
+Exemplo de `src/di/providers.ts`:
 
 ```ts
-import { Injectable, container } from './di/container.js';
+import {
+  AppConfig,
+  createApplicationContext,
+} from './container.js';
+import { UserRepository } from '../repositories/user-repository.js';
+import { UserService } from '../services/user-service.js';
 
-@Injectable()
-class UserRepository {}
+const providers = new AppConfig();
 
-@Injectable({ dependencies: [UserRepository] })
-class ListUsers {
-  constructor(private readonly repository: UserRepository) {}
-}
+providers.register(UserRepository, () => new UserRepository());
 
-const listUsers = container.resolve(ListUsers);
+providers.register(
+  UserService,
+  (container) =>
+    new UserService(container.get(UserRepository)),
+);
+
+export const container = createApplicationContext(providers);
+```
+
+Depois, use o provider onde precisar:
+
+```ts
+import { container } from './di/providers.js';
+import { UserService } from './services/user-service.js';
+
+const userService = container.get(UserService);
 ```
 
 ## O que é configurado
@@ -112,6 +127,7 @@ const listUsers = container.resolve(ListUsers);
 minha-api/
 ├── .kit-dev/                 # removido depois de executar o comando di
 │   ├── dependency-injection.ts
+│   ├── providers.ts
 │   └── di.cjs
 ├── src/
 │   └── main.ts
@@ -150,7 +166,6 @@ Não é necessário instalar o Kit Dev globalmente.
 | [esbuild](https://esbuild.github.io/) | Geração rápida do bundle |
 | [Node.js](https://nodejs.org/) | Ambiente de execução |
 | [@types/node](https://www.npmjs.com/package/@types/node) | Tipos das APIs do Node.js |
-| [reflect-metadata](https://www.npmjs.com/package/reflect-metadata) | Metadata usada pela DI opcional |
 
 ## Estrutura interna
 
@@ -169,6 +184,7 @@ kit-dev/
     │   ├── project-files.js
     │   └── files/
     │       ├── dependency-injection.ts
+    │       ├── providers.ts
     │       └── di.cjs
     └── utils/
         ├── run-command.js

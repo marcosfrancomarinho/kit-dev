@@ -50,7 +50,7 @@ cd minha-api
 npm run dev
 ```
 
-> A CLI detecta automaticamente npm, Yarn ou pnpm. Ao usar pnpm, o script de build do `esbuild` é aprovado automaticamente.
+> A CLI detecta automaticamente npm, Yarn ou pnpm. Ao usar pnpm, o `esbuild` é autorizado no próprio comando de instalação com `--allow-build=esbuild`.
 
 ## O que é configurado
 
@@ -62,7 +62,7 @@ npm run dev
 - `.gitignore` com arquivos comuns do ecossistema Node.js
 - Instalação automática de `typescript`, `tsx`, `esbuild` e `@types/node`
 - Criação assíncrona dos arquivos antes da instalação
-- Aprovação automática e restrita do `esbuild` ao usar pnpm
+- Autorização prévia e restrita do `esbuild` ao usar pnpm
 - Validação do nome do projeto
 
 ## Estrutura gerada
@@ -74,7 +74,8 @@ minha-api/
 ├── .gitignore
 ├── esbuild.config.cjs
 ├── package.json
-└── tsconfig.json
+├── tsconfig.json
+└── pnpm-workspace.yaml  # criado somente ao usar pnpm
 ```
 
 ## Scripts disponíveis

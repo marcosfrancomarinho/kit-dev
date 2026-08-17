@@ -75,10 +75,21 @@ pnpm di
 Use only the command that matches your selected package manager. It:
 
 - creates `src/di/container.ts` with the DI mechanism;
-- creates `src/di/providers.ts`, the single file used to register providers;
+- creates `src/di/tokens.ts` to represent interfaces;
+- creates `src/di/providers.ts` to register dependencies;
 - removes the installer and the `di` script after setup.
 
-The container is inspired by Java Spring bean configuration, but uses no decorators, reflection, or external packages. The implementation stays isolated in `container.ts`; in everyday development, you only edit `providers.ts`.
+The container is inspired by Java Spring bean configuration, but uses no decorators, reflection, or external packages. The implementation stays isolated in `container.ts`; in everyday development, you only edit `tokens.ts` and `providers.ts`.
+
+Example `src/di/tokens.ts`:
+
+```ts
+import { createToken } from './container.js';
+import type { UserRepository } from '../domain/user-repository.js';
+
+export const USER_REPOSITORY =
+  createToken<UserRepository>('USER_REPOSITORY');
+```
 
 Example `src/di/providers.ts`:
 
@@ -86,14 +97,10 @@ Example `src/di/providers.ts`:
 import {
   AppConfig,
   createApplicationContext,
-  createToken,
 } from './container.js';
-import type { UserRepository } from '../domain/user-repository.js';
+import { USER_REPOSITORY } from './tokens.js';
 import { InMemoryUserRepository } from '../infrastructure/in-memory-user-repository.js';
 import { UserService } from '../services/user-service.js';
-
-const USER_REPOSITORY =
-  createToken<UserRepository>('USER_REPOSITORY');
 
 const providers = new AppConfig()
   .useClass(USER_REPOSITORY, InMemoryUserRepository)
@@ -133,6 +140,7 @@ const userService = container.get(UserService);
 my-api/
 ├── .kit-dev/                 # removed after running the di command
 │   ├── dependency-injection.ts
+│   ├── tokens.ts
 │   ├── providers.ts
 │   └── di.cjs
 ├── src/
@@ -190,6 +198,7 @@ kit-dev/
     │   ├── project-files.js
     │   └── files/
     │       ├── dependency-injection.ts
+    │       ├── tokens.ts
     │       ├── providers.ts
     │       └── di.cjs
     └── utils/

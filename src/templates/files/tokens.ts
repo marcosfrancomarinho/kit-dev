@@ -6,11 +6,9 @@ import { createToken } from './container.js';
  *
  * Exemplo:
  *
- * import type { UserRepository } from
- *   '../domain/user-repository.js';
+ * import type { UserRepository } from '../domain/user-repository.js';
  *
- * export const USER_REPOSITORY =
- *   createToken<UserRepository>('USER_REPOSITORY');
+ * export const USER_REPOSITORY = createToken<UserRepository>('USER_REPOSITORY');
  *
  * Em `providers.ts`, ligue o token à classe que implementa a interface.
  */

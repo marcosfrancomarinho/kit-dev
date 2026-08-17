@@ -87,8 +87,7 @@ Exemplo de `src/di/tokens.ts`:
 import { createToken } from './container.js';
 import type { UserRepository } from '../domain/user-repository.js';
 
-export const USER_REPOSITORY =
-  createToken<UserRepository>('USER_REPOSITORY');
+export const USER_REPOSITORY = createToken<UserRepository>('USER_REPOSITORY');
 ```
 
 Exemplo de `src/di/providers.ts`:

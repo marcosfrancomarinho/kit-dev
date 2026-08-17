@@ -71,6 +71,11 @@ async function generateProject(projectPath, projectName) {
       '🧩 DI template prepared',
     ),
     copyTemplateFile(
+      join(templateFilesPath, 'tokens.ts'),
+      join(kitDevPath, 'tokens.ts'),
+      '🧩 DI tokens template prepared',
+    ),
+    copyTemplateFile(
       join(templateFilesPath, 'providers.ts'),
       join(kitDevPath, 'providers.ts'),
       '🧩 DI providers template prepared',

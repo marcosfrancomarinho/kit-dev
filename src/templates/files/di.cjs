@@ -102,6 +102,11 @@ async function run() {
       displayPath: 'src/di/container.ts',
     },
     {
+      source: join(__dirname, 'tokens.ts'),
+      destination: join(projectPath, 'src', 'di', 'tokens.ts'),
+      displayPath: 'src/di/tokens.ts',
+    },
+    {
       source: join(__dirname, 'providers.ts'),
       destination: join(projectPath, 'src', 'di', 'providers.ts'),
       displayPath: 'src/di/providers.ts',

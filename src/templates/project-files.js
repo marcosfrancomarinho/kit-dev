@@ -47,7 +47,7 @@ const mainFile = "console.log('Hello World!');";
 
 const esbuildConfig = [
   "const { build } = require('esbuild');",
-  "const { dependencies, devDependencies, main } = require('./package.json');",
+  "const { dependencies = {}, devDependencies = {}, main } = require('./package.json');",
   '',
   'build({',
   '  entryPoints: [main],',
@@ -56,7 +56,7 @@ const esbuildConfig = [
   '  minify: true,',
   "  platform: 'node',",
   '  external: [...Object.keys(dependencies), ...Object.keys(devDependencies)],',
-  '  target: ["ES2015"],',
+  '  target: ["node22"],',
   '}).catch(() => process.exit(1));',
   '',
 ].join('\n');

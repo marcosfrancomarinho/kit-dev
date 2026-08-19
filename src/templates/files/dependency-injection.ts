@@ -16,7 +16,12 @@
  */
 
 export type Constructor<T = unknown> = new (...args: any[]) => T;
-export type DependencyToken<T = unknown> = Constructor<T> | string | symbol;
+export type AbstractConstructor<T = unknown> = abstract new (...args: any[]) => T;
+export type DependencyToken<T = unknown> =
+  | Constructor<T>
+  | AbstractConstructor<T>
+  | string
+  | symbol;
 export type Scope = "singleton" | "transient";
 
 export interface BeanOptions {

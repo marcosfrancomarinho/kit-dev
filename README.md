@@ -82,41 +82,30 @@ src/di/
 
 > Register dependencies in `providers.ts`. You normally do not need to edit `container.ts`.
 
+### Using the class itself as a token
+
+When the dependency is a concrete class, you do not need to create a separate token. The class itself is the token:
+
+```ts
+class EmailService {}
+
+providers.useClass(EmailService);
+
+const emailService = container.get(EmailService);
+```
+
 ### Abstract class as a token
 
 ```ts
-abstract class UserRepository {
-  abstract save(): void;
-}
+abstract class UserRepository { abstract save(): void; }
 
-class InMemoryUserRepository extends UserRepository {
-  save(): void {
-    console.log('saving');
-  }
-}
+class InMemoryUserRepository extends UserRepository { save(): void { console.log('saving'); } }
 ```
 
-Register the implementation:
-
 ```ts
-providers.useClass(
-  UserRepository,
-  InMemoryUserRepository,
-);
-```
+providers.useClass(UserRepository, InMemoryUserRepository);
+providers.useClass(UserService, [UserRepository]);
 
-Inject it into another class:
-
-```ts
-providers.useClass(
-  UserService,
-  [UserRepository],
-);
-```
-
-Resolve the dependency:
-
-```ts
 const service = container.get(UserService);
 ```
 
@@ -125,16 +114,11 @@ const service = container.get(UserService);
 TypeScript interfaces do not exist at runtime, so use `createToken`:
 
 ```ts
-export const USER_REPOSITORY =
-  createToken<UserRepository>('USER_REPOSITORY');
-
-providers.useClass(
-  USER_REPOSITORY,
-  InMemoryUserRepository,
-);
+export const USER_REPOSITORY = createToken<UserRepository>('USER_REPOSITORY');
+providers.useClass(USER_REPOSITORY, InMemoryUserRepository);
 ```
 
-Tokens can be **concrete classes, abstract classes, strings, or Symbols**.
+Tokens can be **concrete classes, abstract classes, strings, or Symbols**. If you use the class itself, you do not need to create a token manually.
 
 ## Generated structure
 

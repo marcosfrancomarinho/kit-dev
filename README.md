@@ -19,7 +19,7 @@
 
 ## About
 
-**Kit Dev** is a CLI that creates the base of a Node.js TypeScript project, configures development with `tsx`, production builds with `esbuild`, and installs the required dependencies.
+**Kit Dev** is a CLI that creates the base of a Node.js TypeScript project, configures development with `tsx` — or esbuild watch mode when DI is active —, creates production builds with `esbuild`, and installs the required dependencies.
 
 ## Quick start
 
@@ -46,7 +46,8 @@ The CLI automatically detects npm, Yarn, or pnpm.
 ## Included setup
 
 - TypeScript with `tsconfig.json`;
-- `tsx` watch mode;
+- `tsx` watch mode before DI is installed;
+- esbuild watch mode after DI is installed;
 - minified builds with `esbuild`;
 - output in `dist/bundle.cjs`;
 - `.gitignore`;
@@ -65,87 +66,177 @@ The CLI automatically detects npm, Yarn, or pnpm.
 
 ## Dependency injection
 
-DI is optional and uses no decorators or `reflect-metadata`. Kit Dev analyzes
-types before esbuild to create interface tokens and constructor dependencies
-automatically.
+DI is optional, uses no decorators or `reflect-metadata`, and keeps the internal
+container outside `src`. During the build, Kit Dev analyzes TypeScript types,
+creates interface tokens, and discovers constructor dependencies.
+
+### Installation
 
 ```bash
 npm run di
 ```
 
-It creates:
+The command installs DI once, removes the `di` script, and switches development
+to the esbuild runner. After installation, always use `npm run dev` or
+`npm run build`, because esbuild applies the transformer.
+
+Installed structure:
 
 ```text
 .kit-dev/
 ├── container.js
-└── container.d.ts
+├── container.d.ts
+├── dev.cjs
+└── di-transformer.cjs
 src/
 └── di/
     └── providers.ts
 ```
 
-> The container stays isolated in `.kit-dev`. Register dependencies only in `src/di/providers.ts`.
+`.kit-dev/container.js` contains the runtime, while `.kit-dev/container.d.ts`
+provides TypeScript types. Configure the application only in
+`src/di/providers.ts`.
+
+### Complete interface example
+
+#### 1. Declare the contract
+
+```ts
+// src/domain/repositories/user-repository.ts
+export interface UserRepository {
+  save(name: string): Promise<void>;
+}
+```
+
+#### 2. Implement the interface
+
+```ts
+// src/infra/repositories/user-repository-memory.ts
+import type { UserRepository } from '../../domain/repositories/user-repository.js';
+
+export class UserRepositoryMemory implements UserRepository {
+  async save(name: string): Promise<void> {
+    console.log(`User ${name} saved`);
+  }
+}
+```
+
+#### 3. Receive the dependency through the constructor
+
+```ts
+// src/application/use-cases/create-user.ts
+import type { UserRepository } from '../../domain/repositories/user-repository.js';
+
+export class CreateUser {
+  constructor(private readonly repository: UserRepository) {}
+
+  execute(name: string): Promise<void> {
+    return this.repository.save(name);
+  }
+}
+```
+
+#### 4. Register the providers
+
+```ts
+// src/di/providers.ts
+import {
+  AppConfig,
+  createApplicationContext,
+} from '../../.kit-dev/container.js';
+import { CreateUser } from '../application/use-cases/create-user.js';
+import type { UserRepository } from '../domain/repositories/user-repository.js';
+import { UserRepositoryMemory } from '../infra/repositories/user-repository-memory.js';
+
+const providers = new AppConfig();
+
+providers.useClass<UserRepository>(UserRepositoryMemory);
+providers.useClass(CreateUser);
+
+export const container = createApplicationContext(providers);
+```
+
+`useClass<UserRepository>()` maps the interface to its implementation without a
+manual token. When `CreateUser` is registered, Kit Dev reads its constructor
+type and injects `UserRepositoryMemory` automatically.
+
+#### 5. Resolve the root class
+
+```ts
+// src/main.ts
+import { CreateUser } from './application/use-cases/create-user.js';
+import { container } from './di/providers.js';
+
+const createUser = container.get(CreateUser);
+await createUser.execute('Marcos');
+```
+
+Resolve a concrete class such as `CreateUser`. Do not call
+`container.get(UserRepository)`, because TypeScript interfaces do not exist at
+runtime.
 
 ### Using the class itself as a token
 
-When the dependency is a concrete class, you do not need to create a separate token. The class itself is the token:
+Concrete classes need no separate token. Register them and declare them in
+another class's constructor:
 
 ```ts
 class EmailService {}
 
-providers.useClass(EmailService);
+class SendWelcomeEmail {
+  constructor(private readonly emailService: EmailService) {}
+}
 
-const emailService = container.get(EmailService);
+providers.useClass(EmailService);
+providers.useClass(SendWelcomeEmail);
+
+const useCase = container.get(SendWelcomeEmail);
 ```
 
 ### Abstract class as a token
 
 ```ts
-abstract class UserRepository { abstract save(): void; }
+abstract class UserRepository {
+  abstract save(): void;
+}
 
-class InMemoryUserRepository extends UserRepository { save(): void { console.log('saving'); } }
-```
+class InMemoryUserRepository extends UserRepository {
+  save(): void {
+    console.log('saving');
+  }
+}
 
-```ts
+class UserService {
+  constructor(private readonly repository: UserRepository) {}
+}
+
 providers.useClass(UserRepository, InMemoryUserRepository);
-providers.useClass(UserService, [UserRepository]);
-
-const service = container.get(UserService);
-```
-
-### Interfaces without manual tokens
-
-Declare the interface normally:
-
-```ts
-export interface UserRepository { save(): void; }
-```
-
-Implement the contract:
-
-```ts
-class InMemoryUserRepository implements UserRepository { save(): void { console.log('saving'); } }
-```
-
-Register the interface as a generic argument:
-
-```ts
-providers.useClass<UserRepository>(InMemoryUserRepository);
-```
-
-Dependencies are discovered from constructor types:
-
-```ts
-class UserService { constructor(private readonly repository: UserRepository) {} }
-
 providers.useClass(UserService);
-
-const service = container.get(UserService);
 ```
 
-Use `import type` for interfaces. Concrete classes, abstract classes, strings,
-and Symbols remain supported as tokens. For values such as `string` and
-`number`, provide the dependency list explicitly.
+### Strings, numbers, and configuration
+
+TypeScript cannot distinguish primitive values from their types alone. For
+these values, register a token and provide the dependency explicitly:
+
+```ts
+const APP_NAME = 'APP_NAME';
+
+class ConfigService {
+  constructor(readonly appName: string) {}
+}
+
+providers.value(APP_NAME, 'Kit Dev');
+providers.useClass(ConfigService, [APP_NAME]);
+```
+
+### Important rules
+
+- Import interfaces with `import type`.
+- Import concrete and abstract classes with a regular import.
+- Register every provider before calling `createApplicationContext`.
+- The default scope is singleton: repeated `container.get()` calls return the same instance.
+- Use explicit dependencies for `string`, `number`, `boolean`, and other values that do not exist as runtime tokens.
 
 ## Generated structure
 

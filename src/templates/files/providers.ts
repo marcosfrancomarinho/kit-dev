@@ -6,24 +6,60 @@ import {
 const providers = new AppConfig();
 
 /**
- * Registre aqui as dependências da aplicação.
+ * COMPOSIÇÃO DAS DEPENDÊNCIAS
  *
- * 1. Associe a interface à implementação sem criar token manual:
+ * Importe interfaces com `import type` e classes com import normal:
  *
- * providers.useClass<UserRepository>(InMemoryUserRepository);
+ * import type { UserRepository } from '../domain/user-repository.js';
+ * import { UserRepositoryMemory } from '../infra/user-repository-memory.js';
+ * import { CreateUser } from '../application/create-user.js';
  *
- * 2. Registre as classes concretas normalmente:
+ * 1. Interface -> implementação
  *
- * providers.useClass(UserService);
+ * O argumento genérico representa a interface. O Kit Dev cria o token interno
+ * automaticamente, portanto você não precisa declarar Symbol nem string:
  *
- * O build identifica os tipos do construtor e injeta as dependências
- * automaticamente, sem decorators e sem reflect-metadata.
+ * providers.useClass<UserRepository>(UserRepositoryMemory);
  *
- * 3. Recupere a classe raiz onde precisar:
+ * 2. Classes concretas
  *
- * container.get(UserService);
+ * Registre cada classe que será criada pelo container usando a própria classe
+ * como token:
  *
- * Use `import type` para importar interfaces e import normal para classes.
+ * providers.useClass(EmailService);
+ * providers.useClass(CreateUser);
+ *
+ * As dependências são declaradas normalmente no construtor:
+ *
+ * class CreateUser {
+ *   constructor(
+ *     private readonly repository: UserRepository,
+ *     private readonly emailService: EmailService,
+ *   ) {}
+ * }
+ *
+ * O transformer identifica esses tipos e injeta as instâncias. Não é necessário
+ * passar `[UserRepository, EmailService]`.
+ *
+ * 3. Strings, números e outros valores primitivos
+ *
+ * Valores primitivos precisam de um token e de uma lista explícita:
+ *
+ * const APP_NAME = 'APP_NAME';
+ * providers.value(APP_NAME, 'Kit Dev');
+ * providers.useClass(ConfigService, [APP_NAME]);
+ *
+ * 4. Resolução
+ *
+ * Em `src/main.ts`, recupere uma classe concreta:
+ *
+ * const createUser = container.get(CreateUser);
+ * await createUser.execute('Marcos');
+ *
+ * Não use `container.get(UserRepository)`: interfaces existem somente durante
+ * a análise TypeScript. O escopo padrão de todos os providers é singleton.
+ *
+ * IMPORTANTE: mantenha todos os registros acima da criação do contexto abaixo.
  */
 
 export const container = createApplicationContext(providers);

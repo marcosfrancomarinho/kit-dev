@@ -307,9 +307,62 @@ class ConfigService {
   constructor(readonly appName: string) {}
 }
 
-providers.value(APP_NAME, 'Kit Dev');
+providers.useValue(APP_NAME, 'Kit Dev');
 providers.useClass(ConfigService, [APP_NAME]);
 ```
+
+### Factories e escopos
+
+Use `useFactory()` quando a criação precisar de lógica própria. A factory
+recebe o contexto e pode resolver outros providers:
+
+```ts
+providers.useValue(DATABASE_URL, process.env.DATABASE_URL!);
+
+providers.useFactory(Database, (context) => {
+  const url = context.get(DATABASE_URL);
+  return new Database(url);
+});
+```
+
+O escopo padrão é singleton. Para criar uma instância a cada resolução:
+
+```ts
+providers.useFactory(RequestContext, () => new RequestContext(), {
+  scope: 'transient',
+});
+```
+
+Classes também aceitam configuração de escopo. Quando não houver dependências
+explícitas, passe uma lista vazia antes das opções:
+
+```ts
+providers.useClass(RequestContext, [], { scope: 'transient' });
+```
+
+### Provider existente
+
+`useExisting()` cria um segundo token para um provider já registrado sem criar
+outra instância:
+
+```ts
+providers.useClass(Database);
+providers.useExisting(PRIMARY_DATABASE, Database);
+```
+
+### API da DI
+
+| Método | Uso |
+|---|---|
+| `useClass()` | Registra uma classe |
+| `useFactory()` | Registra uma factory singleton ou transient |
+| `useValue()` | Registra um valor pronto |
+| `useExisting()` | Aponta um token para outro provider |
+| `imports()` | Combina configurações menores |
+| `has()` | Verifica se um provider foi registrado |
+
+O container expõe somente `get()`, `getOptional()`, `has()`,
+`clearInstances()` e `close()`.
 
 ### Regras importantes
 
@@ -334,7 +387,7 @@ minha-api/
 
 ## Requisitos
 
-- Node.js 16.20+
+- Node.js 22+
 - npm, Yarn ou pnpm
 
 Não é necessário instalar o Kit Dev globalmente.

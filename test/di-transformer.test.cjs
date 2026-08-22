@@ -70,12 +70,17 @@ test('instala o container interno fora de src', async (context) => {
       }),
     ),
     ...[
-      'di.cjs',
-      'dependency-injection.ts',
-      'dependency-injection.d.ts',
-      'providers.ts',
-    ].map((file) =>
-      copyFile(join(templateFilesPath, file), join(kitDevPath, file)),
+      ['di.cjs', 'di.cjs'],
+      ['dependency-injection.ts', 'dependency-injection.ts'],
+      ['dependency-injection.d.ts', 'dependency-injection.d.ts'],
+      ['di-dev.cjs', 'dev.cjs'],
+      ['di-transformer.cjs', 'di-transformer.cjs'],
+      ['providers.ts', 'providers.ts'],
+    ].map(([source, destination]) =>
+      copyFile(
+        join(templateFilesPath, source),
+        join(kitDevPath, destination),
+      ),
     ),
   ]);
 
@@ -95,6 +100,8 @@ test('instala o container interno fora de src', async (context) => {
   assert.deepEqual((await readdir(kitDevPath)).sort(), [
     'container.d.ts',
     'container.js',
+    'dev.cjs',
+    'di-transformer.cjs',
   ]);
 
   const providers = await readFile(
@@ -127,7 +134,7 @@ import { UserService } from '../application/user-service.js';
 const providers = new AppConfig();
 
 providers.useClass<UserRepository>(UserRepositoryMemory);
-providers.value('APP_NAME', 'Kit Dev');
+providers.useValue('APP_NAME', 'Kit Dev');
 providers.useClass(ConfigService, ['APP_NAME']);
 providers.useClass(UserService);
 
@@ -144,6 +151,194 @@ export const container = createApplicationContext(providers);
 
   assert.equal(execution.status, 0, execution.stderr);
   assert.equal(execution.stdout.trim(), 'Kit Dev user: Marcos');
+});
+
+test('injeta classe registrada por factory', async (context) => {
+  const projectPath = await createFixture();
+  context.after(() => rm(projectPath, { recursive: true, force: true }));
+
+  await Promise.all([
+    writeProjectFile(
+      projectPath,
+      'src/infra/database.ts',
+      `
+export class Database {
+  constructor(readonly status: string) {}
+}
+
+export class Logger {
+  constructor(readonly status: string) {}
+}
+`,
+    ),
+    writeProjectFile(
+      projectPath,
+      'src/application/database-service.ts',
+      `
+import { Database, Logger } from '../infra/database.js';
+
+export class DatabaseService {
+  constructor(
+    private readonly database: Database,
+    private readonly logger: Logger,
+  ) {}
+
+  execute(): string {
+    return this.database.status + ':' + this.logger.status;
+  }
+}
+`,
+    ),
+    writeProjectFile(
+      projectPath,
+      'src/di/providers.ts',
+      `
+import { AppConfig, createApplicationContext } from '../../.kit-dev/container.js';
+import { DatabaseService } from '../application/database-service.js';
+import { Database, Logger } from '../infra/database.js';
+
+const providers = new AppConfig();
+providers.useFactory(Database, () => new Database('factory-ok'));
+providers.useValue(Logger, new Logger('value-ok'));
+providers.useClass(DatabaseService);
+
+export const container = createApplicationContext(providers);
+`,
+    ),
+    writeProjectFile(
+      projectPath,
+      'src/main.ts',
+      `
+import { DatabaseService } from './application/database-service.js';
+import { container } from './di/providers.js';
+
+console.log(container.get(DatabaseService).execute());
+`,
+    ),
+  ]);
+
+  await buildFixture(projectPath);
+
+  const execution = spawnSync(process.execPath, ['dist/bundle.cjs'], {
+    cwd: projectPath,
+    encoding: 'utf-8',
+  });
+
+  assert.equal(execution.status, 0, execution.stderr);
+  assert.equal(execution.stdout.trim(), 'factory-ok:value-ok');
+});
+
+test('usa classe abstrata como token', async (context) => {
+  const projectPath = await createFixture();
+  context.after(() => rm(projectPath, { recursive: true, force: true }));
+
+  await Promise.all([
+    writeProjectFile(
+      projectPath,
+      'src/domain/repository.ts',
+      `
+export abstract class Repository {
+  abstract getName(): string;
+}
+`,
+    ),
+    writeProjectFile(
+      projectPath,
+      'src/infra/repository-memory.ts',
+      `
+import { Repository } from '../domain/repository.js';
+
+export class RepositoryMemory extends Repository {
+  getName(): string {
+    return 'abstract-ok';
+  }
+}
+`,
+    ),
+    writeProjectFile(
+      projectPath,
+      'src/application/repository-service.ts',
+      `
+import { Repository } from '../domain/repository.js';
+
+export class RepositoryService {
+  constructor(private readonly repository: Repository) {}
+
+  execute(): string {
+    return this.repository.getName();
+  }
+}
+`,
+    ),
+    writeProjectFile(
+      projectPath,
+      'src/di/providers.ts',
+      `
+import { AppConfig, createApplicationContext } from '../../.kit-dev/container.js';
+import { RepositoryService } from '../application/repository-service.js';
+import { Repository } from '../domain/repository.js';
+import { RepositoryMemory } from '../infra/repository-memory.js';
+
+const providers = new AppConfig();
+providers.useClass(Repository, RepositoryMemory);
+providers.useClass(RepositoryService);
+
+export const container = createApplicationContext(providers);
+`,
+    ),
+    writeProjectFile(
+      projectPath,
+      'src/main.ts',
+      `
+import { RepositoryService } from './application/repository-service.js';
+import { container } from './di/providers.js';
+
+console.log(container.get(RepositoryService).execute());
+`,
+    ),
+  ]);
+
+  await buildFixture(projectPath);
+
+  const execution = spawnSync(process.execPath, ['dist/bundle.cjs'], {
+    cwd: projectPath,
+    encoding: 'utf-8',
+  });
+
+  assert.equal(execution.status, 0, execution.stderr);
+  assert.equal(execution.stdout.trim(), 'abstract-ok');
+});
+
+test('ignora outra classe chamada AppConfig', async (context) => {
+  const projectPath = await createFixture();
+  context.after(() => rm(projectPath, { recursive: true, force: true }));
+
+  await writeProjectFile(
+    projectPath,
+    'src/main.ts',
+    `
+class AppConfig {
+  useClass<T>(target: T): T {
+    return target;
+  }
+}
+
+class Unrelated {}
+
+const result = new AppConfig().useClass(Unrelated);
+console.log(result === Unrelated ? 'untouched' : 'changed');
+`,
+  );
+
+  await buildFixture(projectPath);
+
+  const execution = spawnSync(process.execPath, ['dist/bundle.cjs'], {
+    cwd: projectPath,
+    encoding: 'utf-8',
+  });
+
+  assert.equal(execution.status, 0, execution.stderr);
+  assert.equal(execution.stdout.trim(), 'untouched');
 });
 
 test('orienta dependência explícita para tipos primitivos', async (context) => {

@@ -2,6 +2,12 @@ const { existsSync } = require('fs');
 const { dirname, relative, resolve } = require('path');
 
 const CONTRACT_PREFIX = 'kit-dev:';
+const PROVIDER_METHODS = new Set([
+  'useClass',
+  'useExisting',
+  'useFactory',
+  'useValue',
+]);
 
 function kitDevDiPlugin(options = {}) {
   let compiler;
@@ -13,13 +19,20 @@ function kitDevDiPlugin(options = {}) {
       const projectRoot = resolve(
         build.initialOptions.absWorkingDir || process.cwd(),
       );
+      const containerPath = resolve(
+        projectRoot,
+        options.container || '.kit-dev/container.js',
+      );
+      const containerTypesPath = resolve(
+        projectRoot,
+        options.containerTypes ||
+          containerPath.replace(/\.[cm]?js$/, '.d.ts'),
+      );
 
       build.onStart(async () => {
         try {
           if (compiler) compiler.dispose();
-          enabled = existsSync(
-            resolve(projectRoot, options.container || '.kit-dev/container.js'),
-          );
+          enabled = existsSync(containerPath);
 
           if (!enabled) {
             compiler = undefined;
@@ -53,6 +66,7 @@ function kitDevDiPlugin(options = {}) {
           sourceFile,
           compiler,
           projectRoot,
+          containerTypesPath,
         );
 
         if (transformed.errors.length > 0) {
@@ -203,17 +217,37 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
   };
 }
 
-function transformSourceFile(sourceFile, compiler, projectRoot) {
+function transformSourceFile(
+  sourceFile,
+  compiler,
+  projectRoot,
+  containerTypesPath,
+) {
   const records = [];
   const errors = [];
 
   function visit(node) {
-    if (
-      compiler.ast.isCallExpression(node) &&
-      isUseClassCall(node, compiler)
-    ) {
+    if (compiler.ast.isCallExpression(node)) {
+      const method = getAppConfigMethod(
+        node,
+        compiler,
+        containerTypesPath,
+      );
+
+      if (!method) {
+        node.forEachChild(visit);
+        return;
+      }
+
       try {
-        records.push(analyzeUseClassCall(node, compiler, projectRoot));
+        const record = analyzeProviderCall(
+          method,
+          node,
+          compiler,
+          projectRoot,
+        );
+
+        if (record) records.push(record);
       } catch (error) {
         errors.push({ node, message: formatError(error) });
       }
@@ -269,10 +303,13 @@ function transformSourceFile(sourceFile, compiler, projectRoot) {
   function renderRecord(record) {
     const expression = renderNode(record.node.expression);
     const args = record.node.arguments.map(renderNode);
-    const dependencies = formatDependencies(record.dependencies);
     let call;
 
-    if (record.kind === 'contract') {
+    if (record.kind === 'class-token-provider') {
+      call = `${expression}(${args.join(', ')})`;
+      call += `.useExisting(${formatToken(record.classTokenId)}, ${args[0]})`;
+    } else if (record.kind === 'contract') {
+      const dependencies = formatDependencies(record.dependencies);
       const transformedArgs = [
         formatToken(record.contractId),
         args[0],
@@ -280,20 +317,22 @@ function transformSourceFile(sourceFile, compiler, projectRoot) {
       ];
       call = `${expression}(${transformedArgs.join(', ')})`;
     } else if (record.kind === 'runtime-token') {
+      const dependencies = formatDependencies(record.dependencies);
       const transformedArgs = record.hasExplicitDependencies
         ? args
         : [args[0], args[1], dependencies];
       call = `${expression}(${transformedArgs.join(', ')})`;
 
       if (record.runtimeTokenId) {
-        call += `.alias(${formatToken(record.runtimeTokenId)}, ${args[0]})`;
+        call += `.useExisting(${formatToken(record.runtimeTokenId)}, ${args[0]})`;
       }
     } else {
+      const dependencies = formatDependencies(record.dependencies);
       const transformedArgs = record.hasExplicitDependencies
         ? args
         : [args[0], dependencies];
       call = `${expression}(${transformedArgs.join(', ')})`;
-      call += `.alias(${formatToken(record.classTokenId)}, ${args[0]})`;
+      call += `.useExisting(${formatToken(record.classTokenId)}, ${args[0]})`;
     }
 
     return call;
@@ -321,7 +360,24 @@ function transformSourceFile(sourceFile, compiler, projectRoot) {
   return { code, errors };
 }
 
-function analyzeUseClassCall(node, compiler, projectRoot) {
+function analyzeProviderCall(method, node, compiler, projectRoot) {
+  if (method !== 'useClass') {
+    if (node.arguments.length === 0) return undefined;
+
+    const classToken = resolveNamedClassToken(
+      node.arguments[0],
+      compiler,
+      projectRoot,
+    );
+
+    if (!classToken) return undefined;
+
+    return createRecord(node, {
+      kind: 'class-token-provider',
+      classTokenId: classToken.id,
+    });
+  }
+
   const typeArguments = node.typeArguments || [];
 
   if (typeArguments.length > 0) {
@@ -398,12 +454,12 @@ function createRecord(node, values) {
   };
 }
 
-function isUseClassCall(node, compiler) {
+function getAppConfigMethod(node, compiler, containerTypesPath) {
   if (
     !compiler.ast.isPropertyAccessExpression(node.expression) ||
-    node.expression.name.text !== 'useClass'
+    !PROVIDER_METHODS.has(node.expression.name.text)
   ) {
-    return false;
+    return undefined;
   }
 
   const signature = compiler.checker.getResolvedSignature(node);
@@ -414,15 +470,25 @@ function isUseClassCall(node, compiler) {
     if (
       compiler.ast.isClassDeclaration(current) &&
       current.name &&
-      current.name.text === 'AppConfig'
+      current.name.text === 'AppConfig' &&
+      isSamePath(current.getSourceFile().fileName, containerTypesPath)
     ) {
-      return true;
+      return node.expression.name.text;
     }
 
     current = current.parent;
   }
 
-  return false;
+  return undefined;
+}
+
+function isSamePath(left, right) {
+  const resolvedLeft = resolve(left);
+  const resolvedRight = resolve(right);
+
+  return process.platform === 'win32'
+    ? resolvedLeft.toLowerCase() === resolvedRight.toLowerCase()
+    : resolvedLeft === resolvedRight;
 }
 
 function resolveContract(typeNode, compiler, projectRoot) {

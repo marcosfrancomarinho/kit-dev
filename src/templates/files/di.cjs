@@ -9,6 +9,7 @@ const {
   writeFile,
 } = require('fs/promises');
 const { dirname, join } = require('path');
+const { transform } = require('esbuild');
 
 const colors = {
   reset: '\x1b[0m',
@@ -53,6 +54,32 @@ async function createDiFile(templatePath, destinationPath, displayPath) {
 
   await mkdir(dirname(destinationPath), { recursive: true });
   await copyFile(templatePath, destinationPath, constants.COPYFILE_EXCL);
+
+  console.log(colors.green + `🧩 ${displayPath} criado.` + colors.reset);
+}
+
+async function createDiRuntime(templatePath, destinationPath, displayPath) {
+  if (await fileExists(destinationPath)) {
+    console.log(
+      colors.yellow +
+        `⚠️  ${displayPath} já existe e foi preservado.` +
+        colors.reset,
+    );
+    return;
+  }
+
+  const source = await readFile(templatePath, 'utf-8');
+  const result = await transform(source, {
+    loader: 'ts',
+    format: 'esm',
+    target: 'es2022',
+  });
+
+  await mkdir(dirname(destinationPath), { recursive: true });
+  await writeFile(destinationPath, result.code, {
+    encoding: 'utf-8',
+    flag: 'wx',
+  });
 
   console.log(colors.green + `🧩 ${displayPath} criado.` + colors.reset);
 }
@@ -106,11 +133,16 @@ async function removeInstaller(templatePaths) {
 async function run() {
   const projectPath = process.cwd();
   const packageJsonPath = join(projectPath, 'package.json');
+  const runtimeTemplate = {
+    source: join(__dirname, 'dependency-injection.ts'),
+    destination: join(__dirname, 'container.js'),
+    displayPath: '.kit-dev/container.js',
+  };
   const templates = [
     {
-      source: join(__dirname, 'dependency-injection.ts'),
-      destination: join(projectPath, 'src', 'di', 'container.ts'),
-      displayPath: 'src/di/container.ts',
+      source: join(__dirname, 'dependency-injection.d.ts'),
+      destination: join(__dirname, 'container.d.ts'),
+      displayPath: '.kit-dev/container.d.ts',
     },
     {
       source: join(__dirname, 'providers.ts'),
@@ -123,6 +155,12 @@ async function run() {
     throw new Error('Execute o comando di na raiz do projeto criado pelo Kit Dev.');
   }
 
+  await createDiRuntime(
+    runtimeTemplate.source,
+    runtimeTemplate.destination,
+    runtimeTemplate.displayPath,
+  );
+
   for (const template of templates) {
     await createDiFile(
       template.source,
@@ -134,7 +172,10 @@ async function run() {
   const commandRemoved = await updatePackageScripts(packageJsonPath);
 
   if (commandRemoved) {
-    await removeInstaller(templates.map((template) => template.source));
+    await removeInstaller([
+      runtimeTemplate.source,
+      ...templates.map((template) => template.source),
+    ]);
   }
 
   console.log(

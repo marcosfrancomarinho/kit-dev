@@ -18,7 +18,7 @@ function kitDevDiPlugin(options = {}) {
         try {
           if (compiler) compiler.dispose();
           enabled = existsSync(
-            resolve(projectRoot, options.container || 'src/di/container.ts'),
+            resolve(projectRoot, options.container || '.kit-dev/container.js'),
           );
 
           if (!enabled) {

@@ -71,6 +71,11 @@ async function generateProject(projectPath, projectName) {
       '🧩 DI template prepared',
     ),
     copyTemplateFile(
+      join(templateFilesPath, 'dependency-injection.d.ts'),
+      join(kitDevPath, 'dependency-injection.d.ts'),
+      '🧩 DI types prepared',
+    ),
+    copyTemplateFile(
       join(templateFilesPath, 'di-transformer.cjs'),
       join(kitDevPath, 'di-transformer.cjs'),
       '🧩 DI transformer prepared',

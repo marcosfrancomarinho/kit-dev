@@ -76,12 +76,15 @@ npm run di
 Isso cria:
 
 ```text
-src/di/
-├── container.ts
-└── providers.ts
+.kit-dev/
+├── container.js
+└── container.d.ts
+src/
+└── di/
+    └── providers.ts
 ```
 
-> Registre suas dependências em `providers.ts`. Normalmente não é necessário editar `container.ts`.
+> O container fica isolado em `.kit-dev`. Registre suas dependências somente em `src/di/providers.ts`.
 
 ### Usando a própria classe como token
 

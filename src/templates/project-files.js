@@ -48,8 +48,10 @@ const mainFile = "console.log('Hello World!');";
 const esbuildConfig = [
   "const { build } = require('esbuild');",
   "const { dependencies = {}, devDependencies = {}, main } = require('./package.json');",
+  "const { kitDevDiPlugin } = require('./.kit-dev/di-transformer.cjs');",
   '',
-  'build({',
+  'const buildOptions = {',
+  '  absWorkingDir: __dirname,',
   '  entryPoints: [main],',
   '  bundle: true,',
   "  outfile: './dist/bundle.cjs',",
@@ -57,7 +59,14 @@ const esbuildConfig = [
   "  platform: 'node',",
   '  external: [...Object.keys(dependencies), ...Object.keys(devDependencies)],',
   '  target: ["node22"],',
-  '}).catch(() => process.exit(1));',
+  '  plugins: [kitDevDiPlugin()],',
+  '};',
+  '',
+  'if (require.main === module) {',
+  '  build(buildOptions).catch(() => process.exit(1));',
+  '}',
+  '',
+  'module.exports = { buildOptions };',
   '',
 ].join('\n');
 
@@ -70,6 +79,7 @@ const gitignore = [
   '.idea/',
   '.DS_Store',
   '*.tsbuildinfo',
+  '.kit-dev/.cache/',
   '',
 ].join('\n');
 

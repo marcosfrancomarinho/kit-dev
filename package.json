@@ -23,11 +23,16 @@
     "starter-kit"
   ],
   "engines": {
-    "node": ">=16"
+    "node": ">=16.20"
   },
   "scripts": {
     "start": "node index.js",
+    "test": "node --test",
     "prepare": "node normalize-eol.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
   },
   "files": [
     "index.js",

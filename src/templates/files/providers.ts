@@ -8,19 +8,22 @@ const providers = new AppConfig();
 /**
  * Registre aqui as dependências da aplicação.
  *
- * 1. Ligue o token à sua implementação:
+ * 1. Associe a interface à implementação sem criar token manual:
  *
- * providers.useClass(USER_REPOSITORY, InMemoryUserRepository);
+ * providers.useClass<UserRepository>(InMemoryUserRepository);
  *
- * 2. Informe as dependências do construtor, na mesma ordem:
+ * 2. Registre as classes concretas normalmente:
  *
- * providers.useClass(UserService, [USER_REPOSITORY]);
+ * providers.useClass(UserService);
  *
- * 3. Recupere a classe onde precisar:
+ * O build identifica os tipos do construtor e injeta as dependências
+ * automaticamente, sem decorators e sem reflect-metadata.
+ *
+ * 3. Recupere a classe raiz onde precisar:
  *
  * container.get(UserService);
  *
- * Importe os tokens de `tokens.ts` e as classes antes de registrá-los.
+ * Use `import type` para importar interfaces e import normal para classes.
  */
 
 export const container = createApplicationContext(providers);

@@ -18,6 +18,8 @@ const colors = {
 };
 
 const DI_SCRIPT = 'node .kit-dev/di.cjs';
+const DEFAULT_DEV_SCRIPT = 'tsx --watch src/main.ts';
+const DI_DEV_SCRIPT = 'node .kit-dev/dev.cjs';
 
 async function readPackageJson(path) {
   const content = await readFile(path, 'utf-8');
@@ -55,22 +57,31 @@ async function createDiFile(templatePath, destinationPath, displayPath) {
   console.log(colors.green + `🧩 ${displayPath} criado.` + colors.reset);
 }
 
-async function removeDiCommand(packageJsonPath) {
+async function updatePackageScripts(packageJsonPath) {
   const packageJson = await readPackageJson(packageJsonPath);
+  let changed = false;
+  let commandRemoved = false;
 
-  if (packageJson.scripts?.di !== DI_SCRIPT) {
-    return false;
+  if (packageJson.scripts?.di === DI_SCRIPT) {
+    delete packageJson.scripts.di;
+    changed = true;
+    commandRemoved = true;
   }
 
-  delete packageJson.scripts.di;
+  if (packageJson.scripts?.dev === DEFAULT_DEV_SCRIPT) {
+    packageJson.scripts.dev = DI_DEV_SCRIPT;
+    changed = true;
+  }
 
-  await writeFile(
-    packageJsonPath,
-    JSON.stringify(packageJson, null, 2) + '\n',
-    'utf-8',
-  );
+  if (changed) {
+    await writeFile(
+      packageJsonPath,
+      JSON.stringify(packageJson, null, 2) + '\n',
+      'utf-8',
+    );
+  }
 
-  return true;
+  return commandRemoved;
 }
 
 async function removeInstaller(templatePaths) {
@@ -102,11 +113,6 @@ async function run() {
       displayPath: 'src/di/container.ts',
     },
     {
-      source: join(__dirname, 'tokens.ts'),
-      destination: join(projectPath, 'src', 'di', 'tokens.ts'),
-      displayPath: 'src/di/tokens.ts',
-    },
-    {
       source: join(__dirname, 'providers.ts'),
       destination: join(projectPath, 'src', 'di', 'providers.ts'),
       displayPath: 'src/di/providers.ts',
@@ -125,7 +131,7 @@ async function run() {
     );
   }
 
-  const commandRemoved = await removeDiCommand(packageJsonPath);
+  const commandRemoved = await updatePackageScripts(packageJsonPath);
 
   if (commandRemoved) {
     await removeInstaller(templates.map((template) => template.source));

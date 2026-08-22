@@ -9,7 +9,7 @@
  * Recursos:
  * - configuração centralizada pelo AppConfig;
  * - beans singleton e transient;
- * - tokens para interfaces;
+ * - tokens automáticos para interfaces durante o build;
  * - factories, classes, valores e aliases;
  * - detecção de dependências circulares;
  * - descarte opcional de recursos.
@@ -99,7 +99,10 @@ export class AppConfig {
     return this.bean(token, factory, { scope: "transient" });
   }
 
-  /** Registra uma classe usando a própria classe como token. */
+  /**
+   * Registra uma classe usando a própria classe como token. O transformador
+   * também permite `useClass<Interface>(Implementacao)` sem token manual.
+   */
   useClass<T>(
     target: Constructor<T>,
     dependencies?: readonly DependencyToken[],

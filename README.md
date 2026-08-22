@@ -65,7 +65,9 @@ The CLI automatically detects npm, Yarn, or pnpm.
 
 ## Dependency injection
 
-DI is optional and uses no decorators, reflection, or external packages.
+DI is optional and uses no decorators or `reflect-metadata`. Kit Dev analyzes
+types before esbuild to create interface tokens and constructor dependencies
+automatically.
 
 ```bash
 npm run di
@@ -76,8 +78,7 @@ It creates:
 ```text
 src/di/
 ├── container.ts
-├── providers.ts
-└── tokens.ts
+└── providers.ts
 ```
 
 > Register dependencies in `providers.ts`. You normally do not need to edit `container.ts`.
@@ -109,22 +110,45 @@ providers.useClass(UserService, [UserRepository]);
 const service = container.get(UserService);
 ```
 
-### Interfaces
+### Interfaces without manual tokens
 
-TypeScript interfaces do not exist at runtime, so use `createToken`:
+Declare the interface normally:
 
 ```ts
-export const USER_REPOSITORY = createToken<UserRepository>('USER_REPOSITORY');
-providers.useClass(USER_REPOSITORY, InMemoryUserRepository);
+export interface UserRepository { save(): void; }
 ```
 
-Tokens can be **concrete classes, abstract classes, strings, or Symbols**. If you use the class itself, you do not need to create a token manually.
+Implement the contract:
+
+```ts
+class InMemoryUserRepository implements UserRepository { save(): void { console.log('saving'); } }
+```
+
+Register the interface as a generic argument:
+
+```ts
+providers.useClass<UserRepository>(InMemoryUserRepository);
+```
+
+Dependencies are discovered from constructor types:
+
+```ts
+class UserService { constructor(private readonly repository: UserRepository) {} }
+
+providers.useClass(UserService);
+
+const service = container.get(UserService);
+```
+
+Use `import type` for interfaces. Concrete classes, abstract classes, strings,
+and Symbols remain supported as tokens. For values such as `string` and
+`number`, provide the dependency list explicitly.
 
 ## Generated structure
 
 ```text
 my-api/
-├── .kit-dev/        # optional DI installer
+├── .kit-dev/        # DI installer and transformer
 ├── src/
 │   └── main.ts
 ├── .gitignore
@@ -142,7 +166,7 @@ npm start
 
 ## Requirements
 
-- Node.js 16+
+- Node.js 16.20+
 - npm, Yarn, or pnpm
 
 No global Kit Dev installation is required.

@@ -11,7 +11,7 @@
  * - configuração centralizada pelo AppConfig;
  * - beans singleton e transient;
  * - tokens automáticos para interfaces durante o build;
- * - factories, classes, valores e aliases;
+ * - classes, factories, valores e providers existentes;
  * - detecção de dependências circulares;
  * - descarte opcional de recursos.
  */
@@ -46,6 +46,11 @@ type BeanDefinition =
       existingToken: DependencyToken;
     };
 
+const definitionsByConfig = new WeakMap<
+  object,
+  Map<DependencyToken, BeanDefinition>
+>();
+
 interface DisposableResource {
   dispose?: () => void | Promise<void>;
   close?: () => void | Promise<void>;
@@ -72,32 +77,21 @@ export function createToken<T = unknown>(description: string): DependencyToken<T
  * seguindo a ideia de um AppConfig do Spring, mas sem decorators.
  */
 export class AppConfig {
-  private readonly definitions = new Map<DependencyToken, BeanDefinition>();
-
-  /** Registra um provider singleton. */
-  register<T>(token: DependencyToken<T>, factory: BeanFactory<T>): this {
-    return this.bean(token, factory);
+  constructor() {
+    definitionsByConfig.set(this, new Map());
   }
 
   /** Registra uma factory. O escopo padrão é singleton. */
-  bean<T>(
+  useFactory<T>(
     token: DependencyToken<T>,
     factory: BeanFactory<T>,
     options: BeanOptions = {},
   ): this {
-    return this.addDefinition(token, {
+    return addDefinition(this, token, {
       kind: "factory",
       factory: factory as BeanFactory<unknown>,
       scope: options.scope ?? "singleton",
     });
-  }
-
-  singleton<T>(token: DependencyToken<T>, factory: BeanFactory<T>): this {
-    return this.bean(token, factory, { scope: "singleton" });
-  }
-
-  transient<T>(token: DependencyToken<T>, factory: BeanFactory<T>): this {
-    return this.bean(token, factory, { scope: "transient" });
   }
 
   /**
@@ -149,11 +143,11 @@ export class AppConfig {
         ? {}
         : dependenciesOrOptions ?? {};
 
-    return this.bean(
+    return this.useFactory(
       token,
       (context) => {
         const resolvedDependencies = dependencies.map((dependency) =>
-          context.getBean(dependency),
+          context.get(dependency),
         );
 
         return new target(...resolvedDependencies);
@@ -162,18 +156,18 @@ export class AppConfig {
     );
   }
 
-  value<T>(token: DependencyToken<T>, value: T): this {
-    return this.addDefinition(token, {
+  useValue<T>(token: DependencyToken<T>, value: T): this {
+    return addDefinition(this, token, {
       kind: "value",
       value,
     });
   }
 
-  alias<T>(
+  useExisting<T>(
     token: DependencyToken<T>,
     existingToken: DependencyToken<T>,
   ): this {
-    return this.addDefinition(token, {
+    return addDefinition(this, token, {
       kind: "alias",
       existingToken,
     });
@@ -182,8 +176,8 @@ export class AppConfig {
   /** Importa beans de outras configurações menores. */
   imports(...configs: AppConfig[]): this {
     for (const config of configs) {
-      for (const [token, definition] of config.getDefinitions()) {
-        this.addDefinition(token, definition);
+      for (const [token, definition] of getDefinitions(config)) {
+        addDefinition(this, token, definition);
       }
     }
 
@@ -191,26 +185,7 @@ export class AppConfig {
   }
 
   has(token: DependencyToken): boolean {
-    return this.definitions.has(token);
-  }
-
-  getDefinitions(): ReadonlyMap<DependencyToken, BeanDefinition> {
-    return new Map(this.definitions);
-  }
-
-  private addDefinition(
-    token: DependencyToken,
-    definition: BeanDefinition,
-  ): this {
-    if (this.definitions.has(token)) {
-      throw new DependencyInjectionError(
-        `Já existe um bean registrado para ${formatToken(token)}.`,
-      );
-    }
-
-    this.definitions.set(token, definition);
-
-    return this;
+    return getDefinitions(this).has(token);
   }
 }
 
@@ -220,21 +195,11 @@ export class ApplicationContext {
   private readonly instances = new Map<DependencyToken, unknown>();
   private readonly resolutionStack: DependencyToken[] = [];
 
-  private constructor(config: AppConfig) {
-    this.definitions = config.getDefinitions();
+  constructor(config: AppConfig) {
+    this.definitions = new Map(getDefinitions(config));
   }
 
-  static run(config: AppConfig): ApplicationContext {
-    if (!(config instanceof AppConfig)) {
-      throw new DependencyInjectionError(
-        "ApplicationContext.run() precisa receber uma instância de AppConfig.",
-      );
-    }
-
-    return new ApplicationContext(config);
-  }
-
-  getBean<T>(token: DependencyToken<T>): T {
+  get<T>(token: DependencyToken<T>): T {
     if (this.instances.has(token)) {
       return this.instances.get(token) as T;
     }
@@ -263,7 +228,7 @@ export class ApplicationContext {
 
     try {
       if (definition.kind === "alias") {
-        return this.getBean(definition.existingToken) as T;
+        return this.get(definition.existingToken) as T;
       }
 
       const instance =
@@ -281,19 +246,15 @@ export class ApplicationContext {
     }
   }
 
-  get<T>(token: DependencyToken<T>): T {
-    return this.getBean(token);
-  }
-
   getOptional<T>(token: DependencyToken<T>): T | undefined {
     if (!this.definitions.has(token)) {
       return undefined;
     }
 
-    return this.getBean(token);
+    return this.get(token);
   }
 
-  hasBean(token: DependencyToken): boolean {
+  has(token: DependencyToken): boolean {
     return this.definitions.has(token);
   }
 
@@ -351,7 +312,13 @@ export class ApplicationContext {
 }
 
 export function createApplicationContext(config: AppConfig): ApplicationContext {
-  return ApplicationContext.run(config);
+  if (!(config instanceof AppConfig)) {
+    throw new DependencyInjectionError(
+      "createApplicationContext() precisa receber uma instância de AppConfig.",
+    );
+  }
+
+  return new ApplicationContext(config);
 }
 
 function formatToken(token: DependencyToken): string {
@@ -364,6 +331,38 @@ function formatToken(token: DependencyToken): string {
   }
 
   return token.name || "Classe anônima";
+}
+
+function getDefinitions(
+  config: AppConfig,
+): ReadonlyMap<DependencyToken, BeanDefinition> {
+  const definitions = definitionsByConfig.get(config);
+
+  if (!definitions) {
+    throw new DependencyInjectionError(
+      "Configuração de providers inválida.",
+    );
+  }
+
+  return definitions;
+}
+
+function addDefinition(
+  config: AppConfig,
+  token: DependencyToken,
+  definition: BeanDefinition,
+): AppConfig {
+  const definitions = getDefinitions(config);
+
+  if (definitions.has(token)) {
+    throw new DependencyInjectionError(
+      `Já existe um bean registrado para ${formatToken(token)}.`,
+    );
+  }
+
+  definitionsByConfig.get(config)!.set(token, definition);
+
+  return config;
 }
 
 function isDependencyList(

@@ -1,7 +1,12 @@
 const { colors } = require('../utils/terminal');
 const { runCommand } = require('../utils/run-command');
 
-const dependencies = ['typescript', 'tsx', 'esbuild', '@types/node'];
+const dependencies = [
+  'typescript@7.0.2',
+  'tsx@4.23.12',
+  'esbuild@0.28.2',
+  '@types/node@22',
+];
 
 const managers = {
   npm: {

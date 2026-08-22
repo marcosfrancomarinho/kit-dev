@@ -46,10 +46,25 @@ const providers = new AppConfig();
  * Valores primitivos precisam de um token e de uma lista explícita:
  *
  * const APP_NAME = 'APP_NAME';
- * providers.value(APP_NAME, 'Kit Dev');
+ * providers.useValue(APP_NAME, 'Kit Dev');
  * providers.useClass(ConfigService, [APP_NAME]);
  *
- * 4. Resolução
+ * 4. Factories e providers existentes
+ *
+ * providers.useFactory(Database, (context) => {
+ *   const url = context.get(DATABASE_URL);
+ *   return new Database(url);
+ * });
+ *
+ * providers.useExisting(PRIMARY_DATABASE, Database);
+ *
+ * O escopo padrão é singleton. Para uma factory transient:
+ *
+ * providers.useFactory(RequestContext, () => new RequestContext(), {
+ *   scope: 'transient',
+ * });
+ *
+ * 5. Resolução
  *
  * Em `src/main.ts`, recupere uma classe concreta:
  *

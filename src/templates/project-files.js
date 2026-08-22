@@ -14,6 +14,9 @@ function createPackageJson(projectName) {
       },
       dependencies: {},
       devDependencies: {},
+      engines: {
+        node: '>=22',
+      },
       license: 'MIT',
     },
     null,

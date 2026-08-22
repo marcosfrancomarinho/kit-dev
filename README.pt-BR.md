@@ -54,15 +54,96 @@ A CLI detecta automaticamente npm, Yarn ou pnpm.
 - `typescript`, `tsx`, `esbuild` e `@types/node`;
 - injeção de dependência opcional.
 
-## Scripts
+## Comandos do projeto
 
-| Comando | Descrição |
-|---|---|
-| `npm run dev` | Executa o projeto em modo watch |
-| `npm run type` | Verifica os tipos |
-| `npm run build` | Gera `dist/bundle.cjs` |
-| `npm start` | Executa o build |
-| `npm run di` | Instala o container de DI opcional |
+Os comandos são criados automaticamente no `package.json`. Os exemplos abaixo
+usam npm, mas há um equivalente para cada gerenciador:
+
+| Ação | npm | pnpm | Yarn |
+|---|---|---|---|
+| Criar projeto | `npx create-kit-dev` | `pnpm create kit-dev` | `yarn create kit-dev` |
+| Desenvolvimento | `npm run dev` | `pnpm dev` | `yarn dev` |
+| Verificar tipos | `npm run type` | `pnpm type` | `yarn type` |
+| Gerar build | `npm run build` | `pnpm build` | `yarn build` |
+| Executar build | `npm start` | `pnpm start` | `yarn start` |
+| Instalar DI | `npm run di` | `pnpm di` | `yarn di` |
+
+### `npm run dev` — desenvolvimento
+
+Inicia a aplicação e observa alterações nos arquivos. Antes da DI, o comando
+usa `tsx`. Depois de executar `npm run di`, ele passa a usar esbuild em modo
+watch para aplicar o transformer e reiniciar a aplicação automaticamente.
+
+```bash
+npm run dev
+```
+
+Use este comando durante o desenvolvimento. Ele não gera o bundle minificado
+de produção em `dist`.
+
+### `npm run type` — verificação de tipos
+
+Executa o TypeScript em modo watch sem gerar JavaScript:
+
+```bash
+npm run type
+```
+
+Esse processo permanece ativo e mostra novos erros sempre que um arquivo é
+alterado. Use `Ctrl+C` para encerrá-lo.
+
+### `npm run build` — build de produção
+
+Compila a entrada definida em `package.json`, agrupa o projeto com esbuild,
+minifica o código e gera:
+
+```text
+dist/bundle.cjs
+```
+
+```bash
+npm run build
+```
+
+Dependências listadas em `dependencies` e `devDependencies` permanecem externas
+ao bundle. Se houver erro de build ou de transformação da DI, o comando é
+interrompido.
+
+### `npm start` — executar o build
+
+Executa `dist/bundle.cjs` com Node.js:
+
+```bash
+npm start
+```
+
+Execute `npm run build` antes. O comando `start` não recompila o projeto nem
+observa alterações.
+
+### `npm run di` — instalar a DI opcional
+
+Instala o container e o transformer da DI. É um comando de configuração usado
+uma única vez; após a instalação, ele é removido do `package.json`.
+
+```bash
+npm run di
+```
+
+A seção seguinte mostra a estrutura criada e o uso completo.
+
+### Fluxo recomendado
+
+```bash
+# Terminal 1: executar e reiniciar a aplicação durante o desenvolvimento
+npm run dev
+
+# Terminal 2: acompanhar erros de tipos
+npm run type
+
+# Antes de executar em produção
+npm run build
+npm start
+```
 
 ## Injeção de dependência
 
@@ -249,13 +330,6 @@ minha-api/
 ├── esbuild.config.cjs
 ├── package.json
 └── tsconfig.json
-```
-
-## Build
-
-```bash
-npm run build
-npm start
 ```
 
 ## Requisitos

@@ -301,7 +301,9 @@ O TypeScript não consegue distinguir valores primitivos apenas pelo tipo. Para
 eles, registre um token e informe a dependência explicitamente:
 
 ```ts
-const APP_NAME = 'APP_NAME';
+import { createToken } from '../../.kit-dev/container.js';
+
+const APP_NAME = createToken<string>('APP_NAME');
 
 class ConfigService {
   constructor(readonly appName: string) {}
@@ -350,19 +352,94 @@ providers.useClass(Database);
 providers.useExisting(PRIMARY_DATABASE, Database);
 ```
 
-### API da DI
+### API completa da DI
 
-| Método | Uso |
+O `AppConfig` registra os providers. O `ApplicationContext`, retornado por
+`createApplicationContext()`, resolve as dependências e controla o ciclo de
+vida das instâncias.
+
+#### Métodos de `AppConfig`
+
+| Método | O que faz |
 |---|---|
-| `useClass()` | Registra uma classe |
-| `useFactory()` | Registra uma factory singleton ou transient |
-| `useValue()` | Registra um valor pronto |
-| `useExisting()` | Aponta um token para outro provider |
-| `imports()` | Combina configurações menores |
-| `has()` | Verifica se um provider foi registrado |
+| `useClass(target, dependencies?, options?)` | Registra uma classe concreta usando a própria classe como token |
+| `useClass(token, target, dependencies?, options?)` | Associa um token ou classe abstrata a uma implementação concreta |
+| `useClass<Contrato>(Implementacao)` | Associa uma interface à implementação; o transformer cria o token automaticamente |
+| `useFactory(token, factory, options?)` | Registra uma factory; recebe o contexto e usa escopo singleton por padrão |
+| `useValue(token, value)` | Registra um valor ou objeto já criado |
+| `useExisting(token, existingToken)` | Cria um alias para outro provider sem duplicar a instância |
+| `imports(...configs)` | Importa os providers de uma ou mais configurações |
+| `has(token)` | Informa se o token já está registrado nessa configuração |
 
-O container expõe somente `get()`, `getOptional()`, `has()`,
-`clearInstances()` e `close()`.
+Todos os métodos de registro retornam o próprio `AppConfig`, permitindo
+encadeamento:
+
+```ts
+const providers = new AppConfig()
+  .useValue(APP_NAME, 'Kit Dev')
+  .useClass(ConfigService, [APP_NAME])
+  .useClass(CreateUser);
+```
+
+Use `imports()` para separar a composição em módulos menores:
+
+```ts
+const databaseProviders = new AppConfig().useClass(Database);
+const providers = new AppConfig().imports(databaseProviders).useClass(UserService);
+
+console.log(providers.has(Database)); // true
+```
+
+Um token não pode ser registrado duas vezes, inclusive por `imports()`.
+
+#### Métodos de `ApplicationContext`
+
+| Método | Retorno | O que faz |
+|---|---|---|
+| `get<T>(token)` | `T` | Resolve o provider; lança `DependencyInjectionError` se ele não existir ou não puder ser criado |
+| `getOptional<T>(token)` | `T \| undefined` | Resolve o provider ou retorna `undefined` quando o token não foi registrado |
+| `has(token)` | `boolean` | Informa se o token existe no contexto já criado |
+| `clearInstances()` | `void` | Limpa o cache sem chamar `dispose()` ou `close()`; o próximo `get()` recria os singletons |
+| `close()` | `Promise<void>` | Chama `dispose()` ou `close()` nas instâncias armazenadas e depois limpa o cache |
+
+```ts
+const container = createApplicationContext(providers);
+const userService = container.get(UserService);
+const logger = container.getOptional(LOGGER);
+
+console.log(container.has(UserService)); // true
+```
+
+`clearInstances()` é útil principalmente para isolar testes. Para encerrar a
+aplicação e liberar recursos, use `close()`:
+
+```ts
+await container.close();
+```
+
+O descarte ocorre uma única vez por instância. Se ela implementar os dois
+métodos, `dispose()` tem prioridade sobre `close()`. Instâncias transient não
+ficam armazenadas pelo container e, por isso, não são descartadas por
+`container.close()`.
+
+#### Funções e erros
+
+| API | O que faz |
+|---|---|
+| `createToken<T>(description)` | Cria um `Symbol` tipado para uso manual como token |
+| `createApplicationContext(config)` | Valida o `AppConfig` e cria o `ApplicationContext` |
+| `DependencyInjectionError` | Erro lançado para token ausente ou duplicado, ciclo de dependências, configuração inválida ou falha de factory |
+
+Na associação automática `useClass<Contrato>(Implementacao)`, você não precisa
+de `createToken()`. Ele é útil quando um contrato precisa ser registrado ou
+resolvido manualmente:
+
+```ts
+const LOGGER = createToken<Logger>('LOGGER');
+providers.useValue(LOGGER, new ConsoleLogger());
+
+const logger = container.get(LOGGER);
+```
 
 ### Regras importantes
 

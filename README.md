@@ -300,7 +300,9 @@ TypeScript cannot distinguish primitive values from their types alone. For
 these values, register a token and provide the dependency explicitly:
 
 ```ts
-const APP_NAME = 'APP_NAME';
+import { createToken } from '../../.kit-dev/container.js';
+
+const APP_NAME = createToken<string>('APP_NAME');
 
 class ConfigService {
   constructor(readonly appName: string) {}
@@ -349,19 +351,93 @@ providers.useClass(Database);
 providers.useExisting(PRIMARY_DATABASE, Database);
 ```
 
-### DI API
+### Complete DI API
 
-| Method | Usage |
+`AppConfig` registers providers. `ApplicationContext`, returned by
+`createApplicationContext()`, resolves dependencies and manages instance
+lifecycles.
+
+#### `AppConfig` methods
+
+| Method | What it does |
 |---|---|
-| `useClass()` | Registers a class |
-| `useFactory()` | Registers a singleton or transient factory |
-| `useValue()` | Registers an existing value |
-| `useExisting()` | Points a token to another provider |
-| `imports()` | Combines smaller configurations |
-| `has()` | Checks whether a provider is registered |
+| `useClass(target, dependencies?, options?)` | Registers a concrete class using the class itself as its token |
+| `useClass(token, target, dependencies?, options?)` | Maps a token or abstract class to a concrete implementation |
+| `useClass<Contract>(Implementation)` | Maps an interface to its implementation; the transformer creates the token automatically |
+| `useFactory(token, factory, options?)` | Registers a factory; it receives the context and defaults to singleton scope |
+| `useValue(token, value)` | Registers an existing value or object |
+| `useExisting(token, existingToken)` | Creates an alias for another provider without duplicating its instance |
+| `imports(...configs)` | Imports providers from one or more configurations |
+| `has(token)` | Reports whether the token is already registered in this configuration |
 
-The container exposes only `get()`, `getOptional()`, `has()`,
-`clearInstances()`, and `close()`.
+Every registration method returns the same `AppConfig`, so calls can be
+chained:
+
+```ts
+const providers = new AppConfig()
+  .useValue(APP_NAME, 'Kit Dev')
+  .useClass(ConfigService, [APP_NAME])
+  .useClass(CreateUser);
+```
+
+Use `imports()` to split composition into smaller modules:
+
+```ts
+const databaseProviders = new AppConfig().useClass(Database);
+const providers = new AppConfig().imports(databaseProviders).useClass(UserService);
+
+console.log(providers.has(Database)); // true
+```
+
+A token cannot be registered twice, including through `imports()`.
+
+#### `ApplicationContext` methods
+
+| Method | Return | What it does |
+|---|---|---|
+| `get<T>(token)` | `T` | Resolves a provider; throws `DependencyInjectionError` when it is missing or cannot be created |
+| `getOptional<T>(token)` | `T \| undefined` | Resolves a provider or returns `undefined` when the token is not registered |
+| `has(token)` | `boolean` | Reports whether the token exists in the context that was already created |
+| `clearInstances()` | `void` | Clears the cache without calling `dispose()` or `close()`; the next `get()` recreates singletons |
+| `close()` | `Promise<void>` | Calls `dispose()` or `close()` on stored instances, then clears the cache |
+
+```ts
+const container = createApplicationContext(providers);
+const userService = container.get(UserService);
+const logger = container.getOptional(LOGGER);
+
+console.log(container.has(UserService)); // true
+```
+
+`clearInstances()` is mainly useful for test isolation. To shut down the
+application and release resources, use `close()`:
+
+```ts
+await container.close();
+```
+
+Each instance is disposed only once. If it implements both methods,
+`dispose()` takes precedence over `close()`. Transient instances are not stored
+by the container, so `container.close()` does not dispose them.
+
+#### Functions and errors
+
+| API | What it does |
+|---|---|
+| `createToken<T>(description)` | Creates a typed `Symbol` for manual use as a token |
+| `createApplicationContext(config)` | Validates the `AppConfig` and creates the `ApplicationContext` |
+| `DependencyInjectionError` | Error thrown for missing or duplicate tokens, dependency cycles, invalid configuration, or factory failures |
+
+With automatic `useClass<Contract>(Implementation)` mapping, you do not need
+`createToken()`. It is useful when a contract must be registered or resolved
+manually:
+
+```ts
+const LOGGER = createToken<Logger>('LOGGER');
+providers.useValue(LOGGER, new ConsoleLogger());
+
+const logger = container.get(LOGGER);
+```
 
 ### Important rules
 

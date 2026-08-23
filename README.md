@@ -146,9 +146,9 @@ npm start
 
 ## Dependency injection
 
-DI is optional, uses no decorators or `reflect-metadata`, and keeps the internal
-container outside `src`. During the build, Kit Dev analyzes TypeScript types,
-creates interface tokens, and discovers constructor dependencies.
+DI is optional and uses no decorators, `reflect-metadata`, or external
+packages. Kit Dev analyzes TypeScript types and injects constructor
+dependencies during the build.
 
 ### Installation
 
@@ -156,9 +156,8 @@ creates interface tokens, and discovers constructor dependencies.
 npm run di
 ```
 
-The command installs DI once, removes the `di` script, and switches development
-to the esbuild runner. After installation, always use `npm run dev` or
-`npm run build`, because esbuild applies the transformer.
+The command installs DI once and removes the `di` script. Then use
+`npm run dev` or `npm run build`, because esbuild applies the transformer.
 
 Installed structure:
 
@@ -173,24 +172,20 @@ src/
     └── providers.ts
 ```
 
-`.kit-dev/container.js` contains the runtime, while `.kit-dev/container.d.ts`
-provides TypeScript types. Configure the application only in
-`src/di/providers.ts`.
+`.kit-dev` contains the runtime and transformer. `src/di/providers.ts` is the
+composition root; smaller configurations can live in other `src/di` files and
+be combined with `imports()`.
 
-### Complete interface example
+### Basic flow
 
-#### 1. Declare the contract
+#### 1. Create the contract, implementation, and use case
 
 ```ts
 // src/domain/repositories/user-repository.ts
 export interface UserRepository {
   save(name: string): Promise<void>;
 }
-```
 
-#### 2. Implement the interface
-
-```ts
 // src/infra/repositories/user-repository-memory.ts
 import type { UserRepository } from '../../domain/repositories/user-repository.js';
 
@@ -199,11 +194,7 @@ export class UserRepositoryMemory implements UserRepository {
     console.log(`User ${name} saved`);
   }
 }
-```
 
-#### 3. Receive the dependency through the constructor
-
-```ts
 // src/application/use-cases/create-user.ts
 import type { UserRepository } from '../../domain/repositories/user-repository.js';
 
@@ -216,14 +207,11 @@ export class CreateUser {
 }
 ```
 
-#### 4. Register the providers
+#### 2. Register the providers
 
 ```ts
 // src/di/providers.ts
-import {
-  AppConfig,
-  createApplicationContext,
-} from '../../.kit-dev/container.js';
+import { AppConfig, createApplicationContext } from '../../.kit-dev/container.js';
 import { CreateUser } from '../application/use-cases/create-user.js';
 import type { UserRepository } from '../domain/repositories/user-repository.js';
 import { UserRepositoryMemory } from '../infra/repositories/user-repository-memory.js';
@@ -236,11 +224,10 @@ providers.useClass(CreateUser);
 export const container = createApplicationContext(providers);
 ```
 
-`useClass<UserRepository>()` maps the interface to its implementation without a
-manual token. When `CreateUser` is registered, Kit Dev reads its constructor
-type and injects `UserRepositoryMemory` automatically.
+The transformer creates the interface token and discovers that `CreateUser`
+depends on `UserRepository`.
 
-#### 5. Resolve the root class
+#### 3. Resolve the root class
 
 ```ts
 // src/main.ts
@@ -251,53 +238,27 @@ const createUser = container.get(CreateUser);
 await createUser.execute('Marcos');
 ```
 
-Resolve a concrete class such as `CreateUser`. Do not call
-`container.get(UserRepository)`, because TypeScript interfaces do not exist at
+Resolve a concrete class. Interfaces exist only during TypeScript analysis and
+cannot be used in `container.get()`.
+
+### `AppConfig` methods
+
+Registration methods return the same `AppConfig` and can be chained.
+
+#### `useClass()` — register classes
+
+```ts
+providers.useClass(EmailService); // concrete class as token
+providers.useClass<UserRepository>(UserRepositoryMemory); // interface
+providers.useClass(UserRepositoryBase, UserRepositoryMemory); // abstract class
+providers.useClass(RequestContext, [], { scope: 'transient' }); // new instance on each get()
+```
+
+The default scope is `singleton`. Class dependencies are discovered from the
+constructor; provide a manual list only for tokens that do not exist at
 runtime.
 
-### Using the class itself as a token
-
-Concrete classes need no separate token. Register them and declare them in
-another class's constructor:
-
-```ts
-class EmailService {}
-
-class SendWelcomeEmail {
-  constructor(private readonly emailService: EmailService) {}
-}
-
-providers.useClass(EmailService);
-providers.useClass(SendWelcomeEmail);
-
-const useCase = container.get(SendWelcomeEmail);
-```
-
-### Abstract class as a token
-
-```ts
-abstract class UserRepository {
-  abstract save(): void;
-}
-
-class InMemoryUserRepository extends UserRepository {
-  save(): void {
-    console.log('saving');
-  }
-}
-
-class UserService {
-  constructor(private readonly repository: UserRepository) {}
-}
-
-providers.useClass(UserRepository, InMemoryUserRepository);
-providers.useClass(UserService);
-```
-
-### Strings, numbers, and configuration
-
-TypeScript cannot distinguish primitive values from their types alone. For
-these values, register a token and provide the dependency explicitly:
+#### `useValue()` — register an existing value
 
 ```ts
 import { createToken } from '../../.kit-dev/container.js';
@@ -312,140 +273,90 @@ providers.useValue(APP_NAME, 'Kit Dev');
 providers.useClass(ConfigService, [APP_NAME]);
 ```
 
-### Factories and scopes
-
-Use `useFactory()` when creation requires custom logic. The factory receives
-the context and can resolve other providers:
+#### `useFactory()` — control creation
 
 ```ts
+const DATABASE_URL = createToken<string>('DATABASE_URL');
+
 providers.useValue(DATABASE_URL, process.env.DATABASE_URL!);
-
-providers.useFactory(Database, (context) => {
-  const url = context.get(DATABASE_URL);
-  return new Database(url);
-});
+providers.useFactory(Database, (context) => new Database(context.get(DATABASE_URL)));
 ```
 
-The default scope is singleton. To create an instance on every resolution:
+A factory receives the container. It also accepts `{ scope: 'transient' }` as
+its third argument.
+
+#### `useExisting()` — create an alias
 
 ```ts
-providers.useFactory(RequestContext, () => new RequestContext(), {
-  scope: 'transient',
-});
-```
+const PRIMARY_DATABASE = createToken<Database>('PRIMARY_DATABASE');
 
-Classes also accept scope options. When there are no explicit dependencies,
-pass an empty list before the options:
-
-```ts
-providers.useClass(RequestContext, [], { scope: 'transient' });
-```
-
-### Existing provider
-
-`useExisting()` creates another token for an already registered provider
-without creating another instance:
-
-```ts
 providers.useClass(Database);
 providers.useExisting(PRIMARY_DATABASE, Database);
 ```
 
-### Complete DI API
+Both tokens resolve to the same instance.
 
-`AppConfig` registers providers. `ApplicationContext`, returned by
-`createApplicationContext()`, resolves dependencies and manages instance
-lifecycles.
+#### `imports()` — combine configurations
 
-#### `AppConfig` methods
-
-| Method | What it does |
-|---|---|
-| `useClass(target, dependencies?, options?)` | Registers a concrete class using the class itself as its token |
-| `useClass(token, target, dependencies?, options?)` | Maps a token or abstract class to a concrete implementation |
-| `useClass<Contract>(Implementation)` | Maps an interface to its implementation; the transformer creates the token automatically |
-| `useFactory(token, factory, options?)` | Registers a factory; it receives the context and defaults to singleton scope |
-| `useValue(token, value)` | Registers an existing value or object |
-| `useExisting(token, existingToken)` | Creates an alias for another provider without duplicating its instance |
-| `imports(...configs)` | Imports providers from one or more configurations |
-| `has(token)` | Reports whether the token is already registered in this configuration |
-
-Every registration method returns the same `AppConfig`, so calls can be
-chained:
+Split providers by module and import them into the composition root:
 
 ```ts
-const providers = new AppConfig()
-  .useValue(APP_NAME, 'Kit Dev')
-  .useClass(ConfigService, [APP_NAME])
-  .useClass(CreateUser);
+// src/di/database-providers.ts
+import { AppConfig } from '../../.kit-dev/container.js';
+import { Database } from '../infra/database.js';
+
+export const databaseProviders = new AppConfig().useClass(Database);
 ```
 
-Use `imports()` to split composition into smaller modules:
+```ts
+// src/di/providers.ts
+import { AppConfig, createApplicationContext } from '../../.kit-dev/container.js';
+import { CreateUser } from '../application/use-cases/create-user.js';
+import { databaseProviders } from './database-providers.js';
+
+const providers = new AppConfig();
+providers.imports(databaseProviders);
+providers.useClass(CreateUser);
+
+export const container = createApplicationContext(providers);
+```
+
+`imports(configA, configB)` accepts multiple configurations. If two register
+the same token, Kit Dev throws `DependencyInjectionError`.
+
+#### `has()` — check a registration
 
 ```ts
-const databaseProviders = new AppConfig().useClass(Database);
-const providers = new AppConfig().imports(databaseProviders).useClass(UserService);
-
 console.log(providers.has(Database)); // true
 ```
 
-A token cannot be registered twice, including through `imports()`.
+### Container methods
 
-#### `ApplicationContext` methods
-
-| Method | Return | What it does |
-|---|---|---|
-| `get<T>(token)` | `T` | Resolves a provider; throws `DependencyInjectionError` when it is missing or cannot be created |
-| `getOptional<T>(token)` | `T \| undefined` | Resolves a provider or returns `undefined` when the token is not registered |
-| `has(token)` | `boolean` | Reports whether the token exists in the context that was already created |
-| `clearInstances()` | `void` | Clears the cache without calling `dispose()` or `close()`; the next `get()` recreates singletons |
-| `close()` | `Promise<void>` | Calls `dispose()` or `close()` on stored instances, then clears the cache |
+Create the container only after registering and importing every provider:
 
 ```ts
 const container = createApplicationContext(providers);
-const userService = container.get(UserService);
-const logger = container.getOptional(LOGGER);
-
-console.log(container.has(UserService)); // true
 ```
 
-`clearInstances()` is mainly useful for test isolation. To shut down the
-application and release resources, use `close()`:
+| Method | Example | Usage |
+|---|---|---|
+| `get()` | `const service = container.get(CreateUser);` | Resolves a provider or throws an error |
+| `getOptional()` | `const logger = container.getOptional(LOGGER);` | Returns the provider or `undefined` |
+| `has()` | `container.has(CreateUser);` | Checks whether the token exists in the context |
+| `clearInstances()` | `container.clearInstances();` | Clears the cache without disposing resources; useful in tests |
+| `close()` | `await container.close();` | Calls `dispose()` or `close()`, then clears the cache |
 
-```ts
-await container.close();
-```
+`close()` does not manage transient instances because the container does not
+store them.
 
-Each instance is disposed only once. If it implements both methods,
-`dispose()` takes precedence over `close()`. Transient instances are not stored
-by the container, so `container.close()` does not dispose them.
+### Quick rules
 
-#### Functions and errors
-
-| API | What it does |
-|---|---|
-| `createToken<T>(description)` | Creates a typed `Symbol` for manual use as a token |
-| `createApplicationContext(config)` | Validates the `AppConfig` and creates the `ApplicationContext` |
-| `DependencyInjectionError` | Error thrown for missing or duplicate tokens, dependency cycles, invalid configuration, or factory failures |
-
-With automatic `useClass<Contract>(Implementation)` mapping, you do not need
-`createToken()`. It is useful when a contract must be registered or resolved
-manually:
-
-```ts
-const LOGGER = createToken<Logger>('LOGGER');
-providers.useValue(LOGGER, new ConsoleLogger());
-
-const logger = container.get(LOGGER);
-```
-
-### Important rules
-
-- Import interfaces with `import type`.
-- Import concrete and abstract classes with a regular import.
-- Register every provider before calling `createApplicationContext`.
-- The default scope is singleton: repeated `container.get()` calls return the same instance.
-- Use explicit dependencies for `string`, `number`, `boolean`, and other values that do not exist as runtime tokens.
+- Use `import type` for interfaces and a regular import for classes.
+- Concrete classes use themselves as tokens.
+- Use `createToken<T>()` for primitive values and manual tokens.
+- The default scope is `singleton`; use `{ scope: 'transient' }` when needed.
+- Register everything before calling `createApplicationContext()`.
+- Missing or duplicate tokens and dependency cycles throw `DependencyInjectionError`.
 
 ## Generated structure
 

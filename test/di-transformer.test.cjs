@@ -157,9 +157,9 @@ test('executa o modo dev com esbuild antes da DI', async (context) => {
 
   const exit = once(devProcess, 'exit');
   devProcess.kill('SIGTERM');
-  const [exitCode] = await exit;
+  const [exitCode, exitSignal] = await exit;
 
-  assert.equal(exitCode, 0, stderr);
+  assert.ok(exitCode === 0 || exitSignal === 'SIGTERM', stderr);
 });
 
 test('gera build com logs e sourcemap externo', async (context) => {

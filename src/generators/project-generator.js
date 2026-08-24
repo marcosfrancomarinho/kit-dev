@@ -81,9 +81,9 @@ async function generateProject(projectPath, projectName) {
       '🧩 DI transformer prepared',
     ),
     copyTemplateFile(
-      join(templateFilesPath, 'di-dev.cjs'),
+      join(templateFilesPath, 'dev.cjs'),
       join(kitDevPath, 'dev.cjs'),
-      '🧩 DI development runner prepared',
+      '⚡ esbuild development runner prepared',
     ),
     copyTemplateFile(
       join(templateFilesPath, 'providers.ts'),

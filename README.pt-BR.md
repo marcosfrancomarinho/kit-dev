@@ -13,13 +13,13 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/licença-MIT-green?style=flat-square" alt="Licença MIT"></a>
 </p>
 
-<p align="center"><strong>TypeScript</strong> · <strong>tsx</strong> · <strong>esbuild</strong> · <strong>npm</strong> · <strong>Yarn</strong> · <strong>pnpm</strong></p>
+<p align="center"><strong>TypeScript</strong> · <strong>esbuild</strong> · <strong>npm</strong> · <strong>Yarn</strong> · <strong>pnpm</strong></p>
 
 ---
 
 ## Sobre
 
-O **Kit Dev** é uma CLI que cria a base de um projeto Node.js com TypeScript, configura desenvolvimento com `tsx` — ou esbuild em modo watch quando a DI está ativa —, build com `esbuild` e instala as dependências necessárias.
+O **Kit Dev** é uma CLI que cria a base de um projeto Node.js com TypeScript, usa `esbuild` no desenvolvimento e no build de produção e instala as dependências necessárias.
 
 ## Início rápido
 
@@ -46,12 +46,11 @@ A CLI detecta automaticamente npm, Yarn ou pnpm.
 ## O que vem configurado
 
 - TypeScript com `tsconfig.json`;
-- `tsx` em modo watch antes da instalação da DI;
-- esbuild em modo watch depois da instalação da DI;
+- desenvolvimento com esbuild em modo watch e reinício automático do Node.js;
 - build minificado com `esbuild`;
 - saída em `dist/bundle.cjs`;
 - `.gitignore`;
-- `typescript`, `tsx`, `esbuild` e `@types/node`;
+- `typescript`, `esbuild` e `@types/node`;
 - injeção de dependência opcional.
 
 ## Comandos do projeto
@@ -70,9 +69,9 @@ usam npm, mas há um equivalente para cada gerenciador:
 
 ### `npm run dev` — desenvolvimento
 
-Inicia a aplicação e observa alterações nos arquivos. Antes da DI, o comando
-usa `tsx`. Depois de executar `npm run di`, ele passa a usar esbuild em modo
-watch para aplicar o transformer e reiniciar a aplicação automaticamente.
+Inicia a aplicação com esbuild em modo watch. Cada recompilação bem-sucedida
+reinicia automaticamente o processo do Node.js. Quando a DI está instalada, o
+mesmo comando também aplica o transformer.
 
 ```bash
 npm run dev
@@ -363,7 +362,7 @@ container.
 
 ```text
 minha-api/
-├── .kit-dev/        # instalador e transformador da DI
+├── .kit-dev/        # runner do esbuild e DI opcional
 ├── src/
 │   └── main.ts
 ├── .gitignore

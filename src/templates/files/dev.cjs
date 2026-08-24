@@ -109,7 +109,7 @@ async function run() {
   });
 
   await buildContext.watch();
-  console.log('Kit Dev: observando alterações...');
+  console.log('Kit Dev: watching for changes...');
 }
 
 async function handleSignal() {

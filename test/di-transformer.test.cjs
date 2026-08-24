@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
-const { spawnSync } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
+const { once } = require('node:events');
 const {
   copyFile,
   mkdtemp,
@@ -16,6 +17,11 @@ const { build, transform } = require('esbuild');
 const {
   kitDevDiPlugin,
 } = require('../src/templates/files/di-transformer.cjs');
+const {
+  createPackageJson,
+  createTsconfig,
+  esbuildConfig,
+} = require('../src/templates/project-files');
 
 const templateFilesPath = join(
   __dirname,
@@ -29,6 +35,75 @@ const containerTypesTemplate = join(
   templateFilesPath,
   'dependency-injection.d.ts',
 );
+
+test('configura o desenvolvimento somente com esbuild', () => {
+  const packageJson = JSON.parse(createPackageJson('my-api'));
+
+  assert.equal(packageJson.scripts.dev, 'node .kit-dev/dev.cjs');
+  assert.doesNotMatch(JSON.stringify(packageJson), /\btsx\b/);
+});
+
+test('executa o modo dev com esbuild antes da DI', async (context) => {
+  const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-watch-test-'));
+  const kitDevPath = join(projectPath, '.kit-dev');
+  let devProcess;
+
+  context.after(async () => {
+    if (
+      devProcess &&
+      devProcess.exitCode === null &&
+      devProcess.signalCode === null
+    ) {
+      const exit = once(devProcess, 'exit');
+      devProcess.kill('SIGTERM');
+      await exit;
+    }
+
+    await rm(projectPath, { recursive: true, force: true });
+  });
+
+  await mkdir(kitDevPath, { recursive: true });
+  await Promise.all([
+    writeProjectFile(projectPath, 'package.json', createPackageJson('my-api')),
+    writeProjectFile(projectPath, 'tsconfig.json', createTsconfig()),
+    writeProjectFile(projectPath, 'esbuild.config.cjs', esbuildConfig),
+    writeProjectFile(
+      projectPath,
+      'src/main.ts',
+      "console.log('Hello from esbuild');\n",
+    ),
+    copyFile(join(templateFilesPath, 'dev.cjs'), join(kitDevPath, 'dev.cjs')),
+    copyFile(
+      join(templateFilesPath, 'di-transformer.cjs'),
+      join(kitDevPath, 'di-transformer.cjs'),
+    ),
+  ]);
+
+  let stderr = '';
+  devProcess = spawn(process.execPath, ['.kit-dev/dev.cjs'], {
+    cwd: projectPath,
+    env: {
+      ...process.env,
+      NODE_PATH: join(__dirname, '..', 'node_modules'),
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  devProcess.stderr.setEncoding('utf-8');
+  devProcess.stderr.on('data', (chunk) => {
+    stderr += chunk;
+  });
+
+  await waitForOutput(devProcess.stdout, [
+    'Hello from esbuild',
+    'Kit Dev: watching for changes...',
+  ]);
+
+  const exit = once(devProcess, 'exit');
+  devProcess.kill('SIGTERM');
+  const [exitCode] = await exit;
+
+  assert.equal(exitCode, 0, stderr);
+});
 
 test('mantém o build normal quando a DI não foi instalada', async (context) => {
   const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-build-test-'));
@@ -64,7 +139,7 @@ test('instala o container interno fora de src', async (context) => {
       JSON.stringify({
         type: 'module',
         scripts: {
-          dev: 'tsx --watch src/main.ts',
+          dev: 'node .kit-dev/dev.cjs',
           di: 'node .kit-dev/di.cjs',
         },
       }),
@@ -73,7 +148,7 @@ test('instala o container interno fora de src', async (context) => {
       ['di.cjs', 'di.cjs'],
       ['dependency-injection.ts', 'dependency-injection.ts'],
       ['dependency-injection.d.ts', 'dependency-injection.d.ts'],
-      ['di-dev.cjs', 'dev.cjs'],
+      ['dev.cjs', 'dev.cjs'],
       ['di-transformer.cjs', 'di-transformer.cjs'],
       ['providers.ts', 'providers.ts'],
     ].map(([source, destination]) =>
@@ -485,5 +560,41 @@ function buildFixture(projectPath) {
     target: ['node22'],
     plugins: [kitDevDiPlugin()],
     logLevel: 'silent',
+  });
+}
+
+function waitForOutput(stream, expected, timeout = 5000) {
+  return new Promise((resolveOutput, rejectOutput) => {
+    let output = '';
+    const timer = setTimeout(() => {
+      cleanup();
+      rejectOutput(
+        new Error(`Timed out waiting for: ${expected.join(', ')}\n${output}`),
+      );
+    }, timeout);
+
+    function cleanup() {
+      clearTimeout(timer);
+      stream.off('data', onData);
+      stream.off('error', onError);
+    }
+
+    function onData(chunk) {
+      output += chunk;
+
+      if (expected.every((text) => output.includes(text))) {
+        cleanup();
+        resolveOutput(output);
+      }
+    }
+
+    function onError(error) {
+      cleanup();
+      rejectOutput(error);
+    }
+
+    stream.setEncoding('utf-8');
+    stream.on('data', onData);
+    stream.on('error', onError);
   });
 }

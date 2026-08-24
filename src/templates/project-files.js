@@ -7,7 +7,7 @@ function createPackageJson(projectName) {
       main: 'src/main.ts',
       scripts: {
         start: 'node dist/bundle.cjs',
-        dev: 'tsx --watch src/main.ts',
+        dev: 'node .kit-dev/dev.cjs',
         build: 'node esbuild.config.cjs',
         type: 'tsc --watch --noEmit',
         di: 'node .kit-dev/di.cjs',

@@ -13,13 +13,13 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT License"></a>
 </p>
 
-<p align="center"><strong>TypeScript</strong> · <strong>tsx</strong> · <strong>esbuild</strong> · <strong>npm</strong> · <strong>Yarn</strong> · <strong>pnpm</strong></p>
+<p align="center"><strong>TypeScript</strong> · <strong>esbuild</strong> · <strong>npm</strong> · <strong>Yarn</strong> · <strong>pnpm</strong></p>
 
 ---
 
 ## About
 
-**Kit Dev** is a CLI that creates the base of a Node.js TypeScript project, configures development with `tsx` — or esbuild watch mode when DI is active —, creates production builds with `esbuild`, and installs the required dependencies.
+**Kit Dev** is a CLI that creates the base of a Node.js TypeScript project, uses `esbuild` for development and production builds, and installs the required dependencies.
 
 ## Quick start
 
@@ -46,12 +46,11 @@ The CLI automatically detects npm, Yarn, or pnpm.
 ## Included setup
 
 - TypeScript with `tsconfig.json`;
-- `tsx` watch mode before DI is installed;
-- esbuild watch mode after DI is installed;
+- development with esbuild watch mode and automatic Node.js restart;
 - minified builds with `esbuild`;
 - output in `dist/bundle.cjs`;
 - `.gitignore`;
-- `typescript`, `tsx`, `esbuild`, and `@types/node`;
+- `typescript`, `esbuild`, and `@types/node`;
 - optional dependency injection.
 
 ## Project commands
@@ -70,9 +69,9 @@ npm, with an equivalent for each package manager:
 
 ### `npm run dev` — development
 
-Starts the application and watches file changes. Before DI, this command uses
-`tsx`. After `npm run di`, it uses esbuild watch mode to apply the transformer
-and restart the application automatically.
+Starts the application with esbuild watch mode. Each successful rebuild
+automatically restarts the Node.js process. When DI is installed, the same
+command also applies its transformer.
 
 ```bash
 npm run dev
@@ -362,7 +361,7 @@ store them.
 
 ```text
 my-api/
-├── .kit-dev/        # DI installer and transformer
+├── .kit-dev/        # esbuild runner and optional DI
 ├── src/
 │   └── main.ts
 ├── .gitignore

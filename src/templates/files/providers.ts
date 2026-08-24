@@ -8,18 +8,12 @@ const providers = new AppConfig();
 /**
  * Register providers before creating the context.
  *
- * providers.useClass(Service); // concrete class
- * providers.useClass<Repository>(RepositoryMemory); // interface
- * providers.useClass(AbstractRepository, RepositoryMemory); // abstract class
- * providers.useValue(APP_NAME, 'Kit Dev'); // value
- * providers.useClass(ConfigService, [APP_NAME]); // explicit token
- * providers.useFactory(Database, (context) => new Database(context.get(DATABASE_URL))); // factory
- * providers.useExisting(PRIMARY_DATABASE, Database); // alias
- * providers.imports(databaseProviders); // another configuration
+ * Interface example:
+ * providers.useClass<Repository>(RepositoryMemory);
  *
- * Constructor dependencies are inferred. Pass tokens explicitly only for
- * primitive values. Providers are singleton by default. Resolve concrete
- * classes with `container.get(Service)`.
+ * Learn more:
+ * npm: https://www.npmjs.com/package/create-kit-dev
+ * GitHub: https://github.com/marcosfrancomarinho/kit-dev
  */
 
 export const container = createApplicationContext(providers);

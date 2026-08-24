@@ -1,7 +1,7 @@
 import {
   AppConfig,
   createApplicationContext,
-} from '../../.kit-dev/container.js';
+} from '../../kit-dev/di/container.js';
 
 const providers = new AppConfig();
 

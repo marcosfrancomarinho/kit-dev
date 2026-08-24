@@ -21,7 +21,7 @@ function kitDevDiPlugin(options = {}) {
       );
       const containerPath = resolve(
         projectRoot,
-        options.container || '.kit-dev/container.js',
+        options.container || 'kit-dev/di/container.js',
       );
       const containerTypesPath = resolve(
         projectRoot,

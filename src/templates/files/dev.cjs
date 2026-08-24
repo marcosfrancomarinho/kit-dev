@@ -1,9 +1,9 @@
 const { spawn } = require('child_process');
 const { resolve } = require('path');
 const { context } = require('esbuild');
-const { buildOptions } = require('../esbuild.config.cjs');
+const { buildOptions } = require('./esbuild.config.cjs');
 
-const projectRoot = resolve(__dirname, '..');
+const projectRoot = resolve(__dirname, '..', '..');
 const outputFile = resolve(__dirname, '.cache', 'dev-bundle.cjs');
 const stopTimeout = 3000;
 let child;
@@ -50,7 +50,7 @@ async function restartChild() {
 
   if (shuttingDown) return;
 
-  const nextChild = spawn(process.execPath, [outputFile], {
+  const nextChild = spawn(process.execPath, ['--enable-source-maps', outputFile], {
     cwd: projectRoot,
     stdio: 'inherit',
   });
@@ -104,7 +104,7 @@ async function run() {
     ...buildOptions,
     outfile: outputFile,
     minify: false,
-    sourcemap: 'inline',
+    sourcemap: true,
     plugins: [...(buildOptions.plugins || []), restartPlugin],
   });
 

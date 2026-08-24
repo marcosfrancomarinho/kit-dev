@@ -48,7 +48,8 @@ The CLI automatically detects npm, Yarn, or pnpm.
 - TypeScript with `tsconfig.json`;
 - development with esbuild watch mode and automatic Node.js restart;
 - minified builds with `esbuild`;
-- output in `dist/bundle.cjs`;
+- build logs and external source maps;
+- output in `dist/bundle.cjs` and `dist/bundle.cjs.map`;
 - `.gitignore`;
 - `typescript`, `esbuild`, and `@types/node`;
 - optional dependency injection.
@@ -78,7 +79,8 @@ npm run dev
 ```
 
 Use this command during development. It does not generate the minified
-production bundle in `dist`.
+production bundle in `dist`. Temporary bundles and source maps stay in
+`kit-dev/build/.cache`.
 
 ### `npm run type` — type checking
 
@@ -94,10 +96,11 @@ The process stays active and displays new errors whenever a file changes. Use
 ### `npm run build` — production build
 
 Compiles the entry point defined in `package.json`, bundles the project with
-esbuild, minifies the code, and generates:
+esbuild, displays the output summary, minifies the code, and generates:
 
 ```text
 dist/bundle.cjs
+dist/bundle.cjs.map
 ```
 
 ```bash
@@ -109,7 +112,7 @@ bundle. A build or DI transformation error stops the command.
 
 ### `npm start` — run the build
 
-Runs `dist/bundle.cjs` with Node.js:
+Runs `dist/bundle.cjs` with Node.js and enables source-map support:
 
 ```bash
 npm start
@@ -161,19 +164,23 @@ The command installs DI once and removes the `di` script. Then use
 Installed structure:
 
 ```text
-.kit-dev/
-├── container.js
-├── container.d.ts
-├── dev.cjs
-└── di-transformer.cjs
+kit-dev/
+├── build/
+│   ├── dev.cjs
+│   └── esbuild.config.cjs
+└── di/
+    ├── container.js
+    ├── container.d.ts
+    └── transformer.cjs
 src/
 └── di/
     └── providers.ts
 ```
 
-`.kit-dev` contains the runtime and transformer. `src/di/providers.ts` is the
-composition root; smaller configurations can live in other `src/di` files and
-be combined with `imports()`.
+`kit-dev/build` contains the esbuild configuration and development runner.
+`kit-dev/di` contains the DI runtime and transformer. `src/di/providers.ts` is
+the composition root; smaller configurations can live in other `src/di` files
+and be combined with `imports()`.
 
 ### Basic flow
 
@@ -210,7 +217,7 @@ export class CreateUser {
 
 ```ts
 // src/di/providers.ts
-import { AppConfig, createApplicationContext } from '../../.kit-dev/container.js';
+import { AppConfig, createApplicationContext } from '../../kit-dev/di/container.js';
 import { CreateUser } from '../application/use-cases/create-user.js';
 import type { UserRepository } from '../domain/repositories/user-repository.js';
 import { UserRepositoryMemory } from '../infra/repositories/user-repository-memory.js';
@@ -260,7 +267,7 @@ runtime.
 #### `useValue()` — register an existing value
 
 ```ts
-import { createToken } from '../../.kit-dev/container.js';
+import { createToken } from '../../kit-dev/di/container.js';
 
 const APP_NAME = createToken<string>('APP_NAME');
 
@@ -301,7 +308,7 @@ Split providers by module and import them into the composition root:
 
 ```ts
 // src/di/database-providers.ts
-import { AppConfig } from '../../.kit-dev/container.js';
+import { AppConfig } from '../../kit-dev/di/container.js';
 import { Database } from '../infra/database.js';
 
 export const databaseProviders = new AppConfig().useClass(Database);
@@ -309,7 +316,7 @@ export const databaseProviders = new AppConfig().useClass(Database);
 
 ```ts
 // src/di/providers.ts
-import { AppConfig, createApplicationContext } from '../../.kit-dev/container.js';
+import { AppConfig, createApplicationContext } from '../../kit-dev/di/container.js';
 import { CreateUser } from '../application/use-cases/create-user.js';
 import { databaseProviders } from './database-providers.js';
 
@@ -361,11 +368,19 @@ store them.
 
 ```text
 my-api/
-├── .kit-dev/        # esbuild runner and optional DI
+├── kit-dev/
+│   ├── build/
+│   │   ├── dev.cjs
+│   │   └── esbuild.config.cjs
+│   └── di/
+│       ├── container.d.ts
+│       ├── container.ts
+│       ├── install.cjs
+│       ├── providers.ts
+│       └── transformer.cjs
 ├── src/
 │   └── main.ts
 ├── .gitignore
-├── esbuild.config.cjs
 ├── package.json
 └── tsconfig.json
 ```

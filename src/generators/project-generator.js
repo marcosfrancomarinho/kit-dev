@@ -35,12 +35,16 @@ async function copyTemplateFile(source, destination, message) {
 
 async function generateProject(projectPath, projectName) {
   const srcPath = join(projectPath, 'src');
-  const kitDevPath = join(projectPath, '.kit-dev');
+  const kitDevPath = join(projectPath, 'kit-dev');
+  const buildPath = join(kitDevPath, 'build');
+  const diPath = join(kitDevPath, 'di');
   const templateFilesPath = join(__dirname, '..', 'templates', 'files');
 
   await createDirectory(projectPath);
   await createDirectory(srcPath);
   await createDirectory(kitDevPath);
+  await createDirectory(buildPath);
+  await createDirectory(diPath);
 
   await Promise.all([
     createFile(join(srcPath, 'main.ts'), mainFile, '📝 src/main.ts created'),
@@ -55,39 +59,39 @@ async function generateProject(projectPath, projectName) {
       '⚙️ tsconfig.json created',
     ),
     createFile(
-      join(projectPath, 'esbuild.config.cjs'),
+      join(buildPath, 'esbuild.config.cjs'),
       esbuildConfig,
-      '🛠 esbuild.config.cjs created',
+      '🛠 kit-dev/build/esbuild.config.cjs created',
     ),
     createFile(join(projectPath, '.gitignore'), gitignore, '🐙 .gitignore created'),
     copyTemplateFile(
       join(templateFilesPath, 'di.cjs'),
-      join(kitDevPath, 'di.cjs'),
+      join(diPath, 'install.cjs'),
       '🧩 Optional DI command prepared',
     ),
     copyTemplateFile(
       join(templateFilesPath, 'dependency-injection.ts'),
-      join(kitDevPath, 'dependency-injection.ts'),
+      join(diPath, 'container.ts'),
       '🧩 DI template prepared',
     ),
     copyTemplateFile(
       join(templateFilesPath, 'dependency-injection.d.ts'),
-      join(kitDevPath, 'dependency-injection.d.ts'),
+      join(diPath, 'container.d.ts'),
       '🧩 DI types prepared',
     ),
     copyTemplateFile(
       join(templateFilesPath, 'di-transformer.cjs'),
-      join(kitDevPath, 'di-transformer.cjs'),
+      join(diPath, 'transformer.cjs'),
       '🧩 DI transformer prepared',
     ),
     copyTemplateFile(
       join(templateFilesPath, 'dev.cjs'),
-      join(kitDevPath, 'dev.cjs'),
+      join(buildPath, 'dev.cjs'),
       '⚡ esbuild development runner prepared',
     ),
     copyTemplateFile(
       join(templateFilesPath, 'providers.ts'),
-      join(kitDevPath, 'providers.ts'),
+      join(diPath, 'providers.ts'),
       '🧩 DI providers template prepared',
     ),
   ]);

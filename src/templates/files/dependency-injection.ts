@@ -1,7 +1,7 @@
 /**
  * ATENÇÃO: não edite este arquivo.
  *
- * Este arquivo é compilado para `.kit-dev/container.js` durante a instalação.
+ * Este arquivo é compilado para `kit-dev/di/container.js` durante a instalação.
  * A implementação gerada é interna ao Kit Dev.
  * Registre e configure as dependências em `src/di/providers.ts`.
  *

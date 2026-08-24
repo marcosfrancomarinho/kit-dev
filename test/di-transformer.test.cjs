@@ -17,6 +17,7 @@ const { build, transform } = require('esbuild');
 const {
   kitDevDiPlugin,
 } = require('../src/templates/files/di-transformer.cjs');
+const { generateProject } = require('../src/generators/project-generator');
 const {
   createPackageJson,
   createTsconfig,
@@ -39,13 +40,57 @@ const containerTypesTemplate = join(
 test('configura o desenvolvimento somente com esbuild', () => {
   const packageJson = JSON.parse(createPackageJson('my-api'));
 
-  assert.equal(packageJson.scripts.dev, 'node .kit-dev/dev.cjs');
+  assert.equal(packageJson.scripts.dev, 'node kit-dev/build/dev.cjs');
+  assert.equal(
+    packageJson.scripts.start,
+    'node --enable-source-maps dist/bundle.cjs',
+  );
+  assert.equal(
+    packageJson.scripts.build,
+    'node kit-dev/build/esbuild.config.cjs',
+  );
+  assert.equal(packageJson.scripts.di, 'node kit-dev/di/install.cjs');
   assert.doesNotMatch(JSON.stringify(packageJson), /\btsx\b/);
+});
+
+test('gera as pastas visíveis de build e DI', async (context) => {
+  const parentPath = await mkdtemp(join(tmpdir(), 'kit-dev-generator-test-'));
+  const projectPath = join(parentPath, 'my-api');
+  context.after(() => rm(parentPath, { recursive: true, force: true }));
+
+  await generateProject(projectPath, 'my-api');
+
+  assert.deepEqual((await readdir(join(projectPath, 'kit-dev'))).sort(), [
+    'build',
+    'di',
+  ]);
+  assert.deepEqual(
+    (await readdir(join(projectPath, 'kit-dev', 'build'))).sort(),
+    ['dev.cjs', 'esbuild.config.cjs'],
+  );
+  assert.deepEqual(
+    (await readdir(join(projectPath, 'kit-dev', 'di'))).sort(),
+    [
+      'container.d.ts',
+      'container.ts',
+      'install.cjs',
+      'providers.ts',
+      'transformer.cjs',
+    ],
+  );
+  await assert.rejects(
+    readFile(join(projectPath, 'esbuild.config.cjs'), 'utf-8'),
+    { code: 'ENOENT' },
+  );
+  await assert.rejects(readdir(join(projectPath, '.kit-dev')), {
+    code: 'ENOENT',
+  });
 });
 
 test('executa o modo dev com esbuild antes da DI', async (context) => {
   const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-watch-test-'));
-  const kitDevPath = join(projectPath, '.kit-dev');
+  const buildPath = join(projectPath, 'kit-dev', 'build');
+  const diPath = join(projectPath, 'kit-dev', 'di');
   let devProcess;
 
   context.after(async () => {
@@ -62,25 +107,32 @@ test('executa o modo dev com esbuild antes da DI', async (context) => {
     await rm(projectPath, { recursive: true, force: true });
   });
 
-  await mkdir(kitDevPath, { recursive: true });
+  await Promise.all([
+    mkdir(buildPath, { recursive: true }),
+    mkdir(diPath, { recursive: true }),
+  ]);
   await Promise.all([
     writeProjectFile(projectPath, 'package.json', createPackageJson('my-api')),
     writeProjectFile(projectPath, 'tsconfig.json', createTsconfig()),
-    writeProjectFile(projectPath, 'esbuild.config.cjs', esbuildConfig),
+    writeProjectFile(
+      projectPath,
+      'kit-dev/build/esbuild.config.cjs',
+      esbuildConfig,
+    ),
     writeProjectFile(
       projectPath,
       'src/main.ts',
       "console.log('Hello from esbuild');\n",
     ),
-    copyFile(join(templateFilesPath, 'dev.cjs'), join(kitDevPath, 'dev.cjs')),
+    copyFile(join(templateFilesPath, 'dev.cjs'), join(buildPath, 'dev.cjs')),
     copyFile(
       join(templateFilesPath, 'di-transformer.cjs'),
-      join(kitDevPath, 'di-transformer.cjs'),
+      join(diPath, 'transformer.cjs'),
     ),
   ]);
 
   let stderr = '';
-  devProcess = spawn(process.execPath, ['.kit-dev/dev.cjs'], {
+  devProcess = spawn(process.execPath, ['kit-dev/build/dev.cjs'], {
     cwd: projectPath,
     env: {
       ...process.env,
@@ -98,11 +150,67 @@ test('executa o modo dev com esbuild antes da DI', async (context) => {
     'Kit Dev: watching for changes...',
   ]);
 
+  const sourceMap = JSON.parse(
+    await readFile(join(buildPath, '.cache', 'dev-bundle.cjs.map'), 'utf-8'),
+  );
+  assert.ok(sourceMap.sources.some((source) => source.endsWith('src/main.ts')));
+
   const exit = once(devProcess, 'exit');
   devProcess.kill('SIGTERM');
   const [exitCode] = await exit;
 
   assert.equal(exitCode, 0, stderr);
+});
+
+test('gera build com logs e sourcemap externo', async (context) => {
+  const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-config-test-'));
+  const buildPath = join(projectPath, 'kit-dev', 'build');
+  const diPath = join(projectPath, 'kit-dev', 'di');
+  context.after(() => rm(projectPath, { recursive: true, force: true }));
+
+  await Promise.all([
+    mkdir(buildPath, { recursive: true }),
+    mkdir(diPath, { recursive: true }),
+  ]);
+  await Promise.all([
+    writeProjectFile(projectPath, 'package.json', createPackageJson('my-api')),
+    writeProjectFile(
+      projectPath,
+      'kit-dev/build/esbuild.config.cjs',
+      esbuildConfig,
+    ),
+    writeProjectFile(
+      projectPath,
+      'src/main.ts',
+      "console.log('Production build');\n",
+    ),
+    copyFile(
+      join(templateFilesPath, 'di-transformer.cjs'),
+      join(diPath, 'transformer.cjs'),
+    ),
+  ]);
+
+  const productionBuild = spawnSync(
+    process.execPath,
+    ['kit-dev/build/esbuild.config.cjs'],
+    {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      env: {
+        ...process.env,
+        NODE_PATH: join(__dirname, '..', 'node_modules'),
+      },
+    },
+  );
+
+  assert.equal(productionBuild.status, 0, productionBuild.stderr);
+  assert.match(productionBuild.stderr, /bundle\.cjs/);
+  assert.match(productionBuild.stderr, /bundle\.cjs\.map/);
+
+  const sourceMap = JSON.parse(
+    await readFile(join(projectPath, 'dist', 'bundle.cjs.map'), 'utf-8'),
+  );
+  assert.ok(sourceMap.sources.some((source) => source.endsWith('src/main.ts')));
 });
 
 test('mantém o build normal quando a DI não foi instalada', async (context) => {
@@ -128,10 +236,14 @@ test('mantém o build normal quando a DI não foi instalada', async (context) =>
 
 test('instala o container interno fora de src', async (context) => {
   const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-di-installer-test-'));
-  const kitDevPath = join(projectPath, '.kit-dev');
+  const buildPath = join(projectPath, 'kit-dev', 'build');
+  const diPath = join(projectPath, 'kit-dev', 'di');
   context.after(() => rm(projectPath, { recursive: true, force: true }));
 
-  await mkdir(kitDevPath, { recursive: true });
+  await Promise.all([
+    mkdir(buildPath, { recursive: true }),
+    mkdir(diPath, { recursive: true }),
+  ]);
   await Promise.all([
     writeProjectFile(
       projectPath,
@@ -139,27 +251,38 @@ test('instala o container interno fora de src', async (context) => {
       JSON.stringify({
         type: 'module',
         scripts: {
-          dev: 'node .kit-dev/dev.cjs',
-          di: 'node .kit-dev/di.cjs',
+          dev: 'node kit-dev/build/dev.cjs',
+          build: 'node kit-dev/build/esbuild.config.cjs',
+          di: 'node kit-dev/di/install.cjs',
         },
       }),
     ),
-    ...[
-      ['di.cjs', 'di.cjs'],
-      ['dependency-injection.ts', 'dependency-injection.ts'],
-      ['dependency-injection.d.ts', 'dependency-injection.d.ts'],
-      ['dev.cjs', 'dev.cjs'],
-      ['di-transformer.cjs', 'di-transformer.cjs'],
-      ['providers.ts', 'providers.ts'],
-    ].map(([source, destination]) =>
-      copyFile(
-        join(templateFilesPath, source),
-        join(kitDevPath, destination),
-      ),
+    writeProjectFile(
+      projectPath,
+      'kit-dev/build/esbuild.config.cjs',
+      esbuildConfig,
+    ),
+    copyFile(join(templateFilesPath, 'di.cjs'), join(diPath, 'install.cjs')),
+    copyFile(
+      join(templateFilesPath, 'dependency-injection.ts'),
+      join(diPath, 'container.ts'),
+    ),
+    copyFile(
+      join(templateFilesPath, 'dependency-injection.d.ts'),
+      join(diPath, 'container.d.ts'),
+    ),
+    copyFile(join(templateFilesPath, 'dev.cjs'), join(buildPath, 'dev.cjs')),
+    copyFile(
+      join(templateFilesPath, 'di-transformer.cjs'),
+      join(diPath, 'transformer.cjs'),
+    ),
+    copyFile(
+      join(templateFilesPath, 'providers.ts'),
+      join(diPath, 'providers.ts'),
     ),
   ]);
 
-  const installation = spawnSync(process.execPath, ['.kit-dev/di.cjs'], {
+  const installation = spawnSync(process.execPath, ['kit-dev/di/install.cjs'], {
     cwd: projectPath,
     encoding: 'utf-8',
     env: {
@@ -172,24 +295,31 @@ test('instala o container interno fora de src', async (context) => {
   assert.deepEqual(await readdir(join(projectPath, 'src', 'di')), [
     'providers.ts',
   ]);
-  assert.deepEqual((await readdir(kitDevPath)).sort(), [
+  assert.deepEqual((await readdir(buildPath)).sort(), [
+    'dev.cjs',
+    'esbuild.config.cjs',
+  ]);
+  assert.deepEqual((await readdir(diPath)).sort(), [
     'container.d.ts',
     'container.js',
-    'dev.cjs',
-    'di-transformer.cjs',
+    'transformer.cjs',
   ]);
 
   const providers = await readFile(
     join(projectPath, 'src', 'di', 'providers.ts'),
     'utf-8',
   );
-  assert.match(providers, /\.\.\/\.\.\/\.kit-dev\/container\.js/);
+  assert.match(providers, /\.\.\/\.\.\/kit-dev\/di\/container\.js/);
 
   const packageJson = JSON.parse(
     await readFile(join(projectPath, 'package.json'), 'utf-8'),
   );
   assert.equal(packageJson.scripts.di, undefined);
-  assert.equal(packageJson.scripts.dev, 'node .kit-dev/dev.cjs');
+  assert.equal(packageJson.scripts.dev, 'node kit-dev/build/dev.cjs');
+  assert.equal(
+    packageJson.scripts.build,
+    'node kit-dev/build/esbuild.config.cjs',
+  );
 });
 
 test('injeta interface e classe concreta sem decorators', async (context) => {
@@ -200,7 +330,7 @@ test('injeta interface e classe concreta sem decorators', async (context) => {
     projectPath,
     'src/di/providers.ts',
     `
-import { AppConfig, createApplicationContext } from '../../.kit-dev/container.js';
+import { AppConfig, createApplicationContext } from '../../kit-dev/di/container.js';
 import type { UserRepository } from '../domain/user-repository.js';
 import { UserRepositoryMemory } from '../infra/user-repository-memory.js';
 import { ConfigService } from '../application/config-service.js';
@@ -268,7 +398,7 @@ export class DatabaseService {
       projectPath,
       'src/di/providers.ts',
       `
-import { AppConfig, createApplicationContext } from '../../.kit-dev/container.js';
+import { AppConfig, createApplicationContext } from '../../kit-dev/di/container.js';
 import { DatabaseService } from '../application/database-service.js';
 import { Database, Logger } from '../infra/database.js';
 
@@ -349,7 +479,7 @@ export class RepositoryService {
       projectPath,
       'src/di/providers.ts',
       `
-import { AppConfig, createApplicationContext } from '../../.kit-dev/container.js';
+import { AppConfig, createApplicationContext } from '../../kit-dev/di/container.js';
 import { RepositoryService } from '../application/repository-service.js';
 import { Repository } from '../domain/repository.js';
 import { RepositoryMemory } from '../infra/repository-memory.js';
@@ -424,7 +554,7 @@ test('orienta dependência explícita para tipos primitivos', async (context) =>
     projectPath,
     'src/di/providers.ts',
     `
-import { AppConfig, createApplicationContext } from '../../.kit-dev/container.js';
+import { AppConfig, createApplicationContext } from '../../kit-dev/di/container.js';
 import { ConfigService } from '../application/config-service.js';
 
 const providers = new AppConfig();
@@ -473,8 +603,16 @@ async function createFixture() {
         include: ['src'],
       }),
     ),
-    writeProjectFile(projectPath, '.kit-dev/container.js', container.code),
-    writeProjectFile(projectPath, '.kit-dev/container.d.ts', containerTypes),
+    writeProjectFile(
+      projectPath,
+      'kit-dev/di/container.js',
+      container.code,
+    ),
+    writeProjectFile(
+      projectPath,
+      'kit-dev/di/container.d.ts',
+      containerTypes,
+    ),
     writeProjectFile(
       projectPath,
       'src/domain/user-repository.ts',

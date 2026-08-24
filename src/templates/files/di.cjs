@@ -18,7 +18,7 @@ const colors = {
   red: '\x1b[31m',
 };
 
-const DI_SCRIPT = 'node .kit-dev/di.cjs';
+const DI_SCRIPT = 'node kit-dev/di/install.cjs';
 
 async function readPackageJson(path) {
   const content = await readFile(path, 'utf-8');
@@ -120,16 +120,11 @@ async function run() {
   const projectPath = process.cwd();
   const packageJsonPath = join(projectPath, 'package.json');
   const runtimeTemplate = {
-    source: join(__dirname, 'dependency-injection.ts'),
+    source: join(__dirname, 'container.ts'),
     destination: join(__dirname, 'container.js'),
-    displayPath: '.kit-dev/container.js',
+    displayPath: 'kit-dev/di/container.js',
   };
   const templates = [
-    {
-      source: join(__dirname, 'dependency-injection.d.ts'),
-      destination: join(__dirname, 'container.d.ts'),
-      displayPath: '.kit-dev/container.d.ts',
-    },
     {
       source: join(__dirname, 'providers.ts'),
       destination: join(projectPath, 'src', 'di', 'providers.ts'),

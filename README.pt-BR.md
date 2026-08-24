@@ -48,7 +48,8 @@ A CLI detecta automaticamente npm, Yarn ou pnpm.
 - TypeScript com `tsconfig.json`;
 - desenvolvimento com esbuild em modo watch e reinício automático do Node.js;
 - build minificado com `esbuild`;
-- saída em `dist/bundle.cjs`;
+- logs do build e sourcemaps externos;
+- saída em `dist/bundle.cjs` e `dist/bundle.cjs.map`;
 - `.gitignore`;
 - `typescript`, `esbuild` e `@types/node`;
 - injeção de dependência opcional.
@@ -78,7 +79,8 @@ npm run dev
 ```
 
 Use este comando durante o desenvolvimento. Ele não gera o bundle minificado
-de produção em `dist`.
+de produção em `dist`. Bundles e sourcemaps temporários ficam em
+`kit-dev/build/.cache`.
 
 ### `npm run type` — verificação de tipos
 
@@ -94,10 +96,11 @@ alterado. Use `Ctrl+C` para encerrá-lo.
 ### `npm run build` — build de produção
 
 Compila a entrada definida em `package.json`, agrupa o projeto com esbuild,
-minifica o código e gera:
+mostra o resumo da saída, minifica o código e gera:
 
 ```text
 dist/bundle.cjs
+dist/bundle.cjs.map
 ```
 
 ```bash
@@ -110,7 +113,7 @@ interrompido.
 
 ### `npm start` — executar o build
 
-Executa `dist/bundle.cjs` com Node.js:
+Executa `dist/bundle.cjs` com Node.js e habilita o suporte a sourcemaps:
 
 ```bash
 npm start
@@ -162,19 +165,23 @@ O comando instala a DI uma vez e remove o script `di`. Depois, use
 Estrutura instalada:
 
 ```text
-.kit-dev/
-├── container.js
-├── container.d.ts
-├── dev.cjs
-└── di-transformer.cjs
+kit-dev/
+├── build/
+│   ├── dev.cjs
+│   └── esbuild.config.cjs
+└── di/
+    ├── container.js
+    ├── container.d.ts
+    └── transformer.cjs
 src/
 └── di/
     └── providers.ts
 ```
 
-`.kit-dev` contém o runtime e o transformer. `src/di/providers.ts` é a raiz de
-composição; configurações menores podem ficar em outros arquivos de `src/di` e
-ser reunidas com `imports()`.
+`kit-dev/build` contém a configuração do esbuild e o runner de desenvolvimento.
+`kit-dev/di` contém o runtime e o transformer da DI. `src/di/providers.ts` é a
+raiz de composição; configurações menores podem ficar em outros arquivos de
+`src/di` e ser reunidas com `imports()`.
 
 ### Fluxo básico
 
@@ -211,7 +218,7 @@ export class CreateUser {
 
 ```ts
 // src/di/providers.ts
-import { AppConfig, createApplicationContext } from '../../.kit-dev/container.js';
+import { AppConfig, createApplicationContext } from '../../kit-dev/di/container.js';
 import { CreateUser } from '../application/use-cases/create-user.js';
 import type { UserRepository } from '../domain/repositories/user-repository.js';
 import { UserRepositoryMemory } from '../infra/repositories/user-repository-memory.js';
@@ -261,7 +268,7 @@ runtime.
 #### `useValue()` — registrar um valor pronto
 
 ```ts
-import { createToken } from '../../.kit-dev/container.js';
+import { createToken } from '../../kit-dev/di/container.js';
 
 const APP_NAME = createToken<string>('APP_NAME');
 
@@ -302,7 +309,7 @@ Separe providers por módulo e importe-os na raiz de composição:
 
 ```ts
 // src/di/database-providers.ts
-import { AppConfig } from '../../.kit-dev/container.js';
+import { AppConfig } from '../../kit-dev/di/container.js';
 import { Database } from '../infra/database.js';
 
 export const databaseProviders = new AppConfig().useClass(Database);
@@ -310,7 +317,7 @@ export const databaseProviders = new AppConfig().useClass(Database);
 
 ```ts
 // src/di/providers.ts
-import { AppConfig, createApplicationContext } from '../../.kit-dev/container.js';
+import { AppConfig, createApplicationContext } from '../../kit-dev/di/container.js';
 import { CreateUser } from '../application/use-cases/create-user.js';
 import { databaseProviders } from './database-providers.js';
 
@@ -362,11 +369,19 @@ container.
 
 ```text
 minha-api/
-├── .kit-dev/        # runner do esbuild e DI opcional
+├── kit-dev/
+│   ├── build/
+│   │   ├── dev.cjs
+│   │   └── esbuild.config.cjs
+│   └── di/
+│       ├── container.d.ts
+│       ├── container.ts
+│       ├── install.cjs
+│       ├── providers.ts
+│       └── transformer.cjs
 ├── src/
 │   └── main.ts
 ├── .gitignore
-├── esbuild.config.cjs
 ├── package.json
 └── tsconfig.json
 ```

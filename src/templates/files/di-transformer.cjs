@@ -1,6 +1,6 @@
 const { createHash } = require('crypto');
 const { existsSync, readFileSync, statSync } = require('fs');
-const { dirname, relative, resolve } = require('path');
+const { dirname, isAbsolute, relative, resolve } = require('path');
 
 const CONTRACT_PREFIX = 'kit-dev:';
 const PROVIDER_METHODS = new Set([
@@ -155,7 +155,7 @@ function createLegacyCompiler(ts, projectRoot, customTsconfig) {
       ...program
         .getSourceFiles()
         .map((sourceFile) => sourceFile.fileName)
-        .filter((fileName) => fileName.startsWith(projectRoot)),
+        .filter((fileName) => isProjectFile(fileName, projectRoot)),
     ];
   }
 
@@ -194,7 +194,7 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
     import('typescript/unstable/ast'),
   ]);
   const tsconfigPath = resolve(projectRoot, customTsconfig || 'tsconfig.json');
-  let api = new API({ cwd: projectRoot });
+  const api = new API({ cwd: projectRoot });
   let snapshot;
   let project;
   let checker;
@@ -219,25 +219,11 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
       tsconfigPath,
       ...project.program
         .getSourceFileNames()
-        .filter((fileName) => fileName.startsWith(projectRoot)),
+        .filter((fileName) => isProjectFile(fileName, projectRoot)),
     ];
     fileState = captureFileState(watchFiles);
 
     if (previousSnapshot) previousSnapshot.dispose();
-  }
-
-  function restartNativeCompiler() {
-    if (snapshot) snapshot.dispose();
-    api.close();
-
-    api = new API({ cwd: projectRoot });
-    snapshot = undefined;
-    project = undefined;
-    checker = undefined;
-    watchFiles = [];
-    fileState = new Map();
-
-    replaceSnapshot({ openProjects: [tsconfigPath] });
   }
 
   try {
@@ -275,11 +261,6 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
       const fileChanges = detectFileChanges(watchFiles, fileState);
 
       if (!hasFileChanges(fileChanges)) return;
-
-      if (process.platform === 'win32') {
-        restartNativeCompiler();
-        return;
-      }
 
       replaceSnapshot({ fileChanges });
     },
@@ -347,6 +328,18 @@ function hasFileChanges(fileChanges) {
     fileChanges.changed.length > 0 ||
     fileChanges.created.length > 0 ||
     fileChanges.deleted.length > 0
+  );
+}
+
+function isProjectFile(fileName, projectRoot) {
+  const relativePath = relative(projectRoot, fileName);
+
+  return (
+    relativePath === '' ||
+    (relativePath !== '..' &&
+      !relativePath.startsWith('../') &&
+      !relativePath.startsWith('..\\') &&
+      !isAbsolute(relativePath))
   );
 }
 

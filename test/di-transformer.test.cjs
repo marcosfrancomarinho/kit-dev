@@ -176,6 +176,20 @@ test('gera build com logs e sourcemap externo', async (context) => {
     writeProjectFile(projectPath, 'package.json', createPackageJson('my-api')),
     writeProjectFile(
       projectPath,
+      'tsconfig.json',
+      JSON.stringify({
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
+          strict: true,
+          skipLibCheck: true,
+        },
+        include: ['src'],
+      }),
+    ),
+    writeProjectFile(
+      projectPath,
       'kit-dev/build/esbuild.config.cjs',
       esbuildConfig,
     ),

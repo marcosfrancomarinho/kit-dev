@@ -128,45 +128,88 @@ npm start
 
 You **do not need DI** to use Kit Dev.
 
-If you want it, run this once:
+To install DI, run this once:
 
 ```bash
 npm run di
 ```
 
-The command installs the container and transformer. After that, the `di` script is removed from `package.json`, and DI works automatically with both `dev` and `build`.
+The command creates the container and enables the transformer. After that, the `di` script is removed from `package.json`, and DI works automatically with both `npm run dev` and `npm run build`.
 
-Kit Dev DI does not use decorators, `reflect-metadata`, or external DI libraries.
+Kit Dev DI does not use decorators, `reflect-metadata`, or external dependency injection libraries.
 
-### Basic example
+### How DI works
+
+There are three main parts:
+
+1. `AppConfig` registers dependencies;
+2. the transformer analyzes TypeScript types and discovers constructor dependencies when possible;
+3. `ApplicationContext` creates and provides instances at runtime.
+
+The flow is:
+
+```text
+AppConfig
+   ↓
+registered providers
+   ↓
+createApplicationContext()
+   ↓
+container.get(...)
+```
+
+The configuration normally lives in `src/di/providers.ts`.
+
+### Complete interface example
+
+Contract:
 
 ```ts
-interface UserRepository {
+// src/domain/repositories/user-repository.ts
+export interface UserRepository {
   save(name: string): Promise<void>;
 }
+```
 
-class UserRepositoryMemory implements UserRepository {
+Implementation:
+
+```ts
+// src/infra/repositories/user-repository-memory.ts
+import type { UserRepository } from '../../domain/repositories/user-repository.js';
+
+export class UserRepositoryMemory implements UserRepository {
   async save(name: string): Promise<void> {
     console.log(`User ${name} saved`);
   }
 }
+```
 
-class CreateUser {
+Use case:
+
+```ts
+// src/application/use-cases/create-user.ts
+import type { UserRepository } from '../../domain/repositories/user-repository.js';
+
+export class CreateUser {
   constructor(private readonly repository: UserRepository) {}
 
-  execute(name: string) {
+  execute(name: string): Promise<void> {
     return this.repository.save(name);
   }
 }
 ```
 
-Register the classes in `src/di/providers.ts`:
+Registration:
 
 ```ts
+// src/di/providers.ts
 import {
   AppConfig,
   createApplicationContext,
 } from '../../kit-dev/di/container.js';
+import { CreateUser } from '../application/use-cases/create-user.js';
+import type { UserRepository } from '../domain/repositories/user-repository.js';
+import { UserRepositoryMemory } from '../infra/repositories/user-repository-memory.js';
 
 const providers = new AppConfig();
 
@@ -176,64 +219,481 @@ providers.useClass(CreateUser);
 export const container = createApplicationContext(providers);
 ```
 
-The transformer detects that `CreateUser` depends on `UserRepository` and creates the dependency link automatically.
-
-Then resolve the class that starts your flow:
+Usage:
 
 ```ts
+// src/main.ts
+import { CreateUser } from './application/use-cases/create-user.js';
+import { container } from './di/providers.js';
+
 const createUser = container.get(CreateUser);
 await createUser.execute('Marcos');
 ```
 
-### Registering dependencies
+The transformer sees that `CreateUser` receives `UserRepository` in its constructor and automatically connects the contract to `UserRepositoryMemory`.
 
-| Method | Usage |
-|---|---|
-| `useClass()` | Concrete classes, interfaces, and abstract classes |
-| `useValue()` | Existing values such as configuration |
-| `useFactory()` | Custom dependency creation |
-| `useExisting()` | Alias for an existing provider |
-| `imports()` | Combines provider configurations |
-| `has()` | Checks whether a token is registered |
+Interfaces do not exist at runtime. That is why you register an interface with `useClass<Interface>(Implementation)`, while you normally resolve a **concrete class** with `container.get()`.
 
-Quick examples:
+## All ways to register dependencies
+
+### `useClass()` — classes
+
+`useClass()` is the most common registration method and can be used in several ways.
+
+#### 1. Concrete class
+
+When the class itself can be used as the token:
 
 ```ts
+class EmailService {}
+
 providers.useClass(EmailService);
+```
+
+Then:
+
+```ts
+const emailService = container.get(EmailService);
+```
+
+If the class has constructor dependencies, Kit Dev tries to infer them automatically:
+
+```ts
+class SendEmail {
+  constructor(private readonly emailService: EmailService) {}
+}
+
+providers.useClass(EmailService);
+providers.useClass(SendEmail);
+```
+
+You do not need to provide `[EmailService]` manually in this case.
+
+#### 2. Interface or type alias as a contract
+
+Interfaces and type aliases do not exist in JavaScript. The transformer creates an internal token automatically:
+
+```ts
+import type { UserRepository } from '../domain/user-repository.js';
+import { UserRepositoryMemory } from '../infra/user-repository-memory.js';
+
 providers.useClass<UserRepository>(UserRepositoryMemory);
-providers.useClass(UserRepositoryBase, UserRepositoryMemory);
+```
+
+Now any class whose constructor depends on `UserRepository` can be resolved automatically:
+
+```ts
+class CreateUser {
+  constructor(private readonly repository: UserRepository) {}
+}
+```
+
+For automatic tokens, the contract must be a **named, non-generic** interface or type alias.
+
+#### 3. Abstract class as a token
+
+An abstract class exists at runtime and can be used directly as a token:
+
+```ts
+abstract class UserRepositoryBase {
+  abstract save(name: string): Promise<void>;
+}
+
+class UserRepositoryDatabase extends UserRepositoryBase {
+  async save(name: string): Promise<void> {
+    // database
+  }
+}
+
+providers.useClass(UserRepositoryBase, UserRepositoryDatabase);
+```
+
+A class can depend on it normally:
+
+```ts
+class CreateUser {
+  constructor(private readonly repository: UserRepositoryBase) {}
+}
+```
+
+#### 4. Manual dependencies
+
+The transformer cannot infer every dependency. Primitive values, manual tokens, generic types, optional parameters, and some external types must be provided explicitly.
+
+The array order must match the constructor order:
+
+```ts
+import { createToken } from '../../kit-dev/di/container.js';
+
+const APP_NAME = createToken<string>('APP_NAME');
+
+class ConfigService {
+  constructor(readonly appName: string) {}
+}
+
+providers.useValue(APP_NAME, 'My API');
+providers.useClass(ConfigService, [APP_NAME]);
+```
+
+You can also provide dependencies manually when registering an interface:
+
+```ts
+providers.useClass<UserRepository>(UserRepositoryDatabase, [DATABASE]);
+```
+
+Or an abstract class:
+
+```ts
+providers.useClass(UserRepositoryBase, UserRepositoryDatabase, [DATABASE]);
+```
+
+### `createToken<T>()` — manual tokens
+
+Use `createToken<T>()` when there is no runtime class that can represent the dependency.
+
+It is especially useful for strings, numbers, configuration, external clients, and other manual dependencies:
+
+```ts
+import { createToken } from '../../kit-dev/di/container.js';
+
+export const DATABASE_URL = createToken<string>('DATABASE_URL');
+export const PORT = createToken<number>('PORT');
+```
+
+Register values:
+
+```ts
+providers.useValue(DATABASE_URL, process.env.DATABASE_URL!);
+providers.useValue(PORT, 3000);
+```
+
+And resolve with the same token:
+
+```ts
+const databaseUrl = container.get(DATABASE_URL);
+```
+
+The token is a `symbol`. Store and reuse the same constant; creating another token with the same description does not create the same token.
+
+### `useValue()` — existing value
+
+Use it when the instance or value already exists and the container does not need to create it:
+
+```ts
+const APP_NAME = createToken<string>('APP_NAME');
 
 providers.useValue(APP_NAME, 'Kit Dev');
-providers.useFactory(Database, (container) => new Database(container.get(DB_URL)));
+```
+
+It also works with objects and existing instances:
+
+```ts
+const config = {
+  port: 3000,
+  environment: 'development',
+};
+
+const CONFIG = createToken<typeof config>('CONFIG');
+providers.useValue(CONFIG, config);
+```
+
+A class can also be used as the token for an existing instance:
+
+```ts
+providers.useValue(Logger, new Logger());
+```
+
+`useValue()` always returns the same registered value.
+
+### `useFactory()` — custom creation
+
+Use it when dependency creation requires custom logic.
+
+The factory receives the `ApplicationContext`, so it can resolve other dependencies:
+
+```ts
+const DATABASE_URL = createToken<string>('DATABASE_URL');
+
+providers.useValue(DATABASE_URL, process.env.DATABASE_URL!);
+
+providers.useFactory(Database, (container) => {
+  const url = container.get(DATABASE_URL);
+  return new Database(url);
+});
+```
+
+Then:
+
+```ts
+const database = container.get(Database);
+```
+
+`useFactory()` is useful for database clients, SDKs, adapters, configured objects, and creation logic that does not fit automatic constructor inference.
+
+### `useExisting()` — alias
+
+Use it when two tokens should resolve to the **same instance**:
+
+```ts
+const PRIMARY_DATABASE = createToken<Database>('PRIMARY_DATABASE');
+
+providers.useClass(Database);
 providers.useExisting(PRIMARY_DATABASE, Database);
 ```
 
-The default scope is `singleton`. To create a new instance on each resolution:
+Now:
+
+```ts
+const database = container.get(Database);
+const primaryDatabase = container.get(PRIMARY_DATABASE);
+
+console.log(database === primaryDatabase); // true
+```
+
+`useExisting()` does not create another instance. It only redirects one token to another provider.
+
+### `imports()` — split providers by module
+
+You do not need to keep every registration in one file.
+
+Create smaller configurations:
+
+```ts
+// src/di/database-providers.ts
+import { AppConfig } from '../../kit-dev/di/container.js';
+import { Database } from '../infra/database.js';
+
+export const databaseProviders = new AppConfig()
+  .useClass(Database);
+```
+
+Then import them into the composition root:
+
+```ts
+// src/di/providers.ts
+import {
+  AppConfig,
+  createApplicationContext,
+} from '../../kit-dev/di/container.js';
+import { databaseProviders } from './database-providers.js';
+
+const providers = new AppConfig();
+
+providers.imports(databaseProviders);
+
+export const container = createApplicationContext(providers);
+```
+
+You can import multiple configurations at once:
+
+```ts
+providers.imports(
+  databaseProviders,
+  userProviders,
+  emailProviders,
+);
+```
+
+If two configurations register the same token, Kit Dev throws `DependencyInjectionError` instead of silently overwriting the provider.
+
+### `has()` — check an `AppConfig` registration
+
+Before creating the container:
+
+```ts
+providers.useClass(Database);
+
+console.log(providers.has(Database)); // true
+```
+
+This `has()` checks registrations in the `AppConfig`.
+
+## Scopes
+
+### `singleton` — default
+
+This is the default scope. The instance is created on the first resolution and reused by the container:
+
+```ts
+providers.useClass(Database);
+```
+
+Equivalent to:
+
+```ts
+providers.useClass(Database, [], { scope: 'singleton' });
+```
+
+### `transient`
+
+Creates a new instance on every resolution:
 
 ```ts
 providers.useClass(RequestContext, [], { scope: 'transient' });
 ```
 
-Use `createToken<T>()` when you need primitive values or other manual tokens.
+It can also be used with a factory:
 
-### Container methods
+```ts
+providers.useFactory(
+  RequestId,
+  () => new RequestId(crypto.randomUUID()),
+  { scope: 'transient' },
+);
+```
 
-| Method | Usage |
-|---|---|
-| `get()` | Resolves a dependency or throws an error |
-| `getOptional()` | Resolves a dependency or returns `undefined` |
-| `has()` | Checks whether the dependency exists |
-| `clearInstances()` | Clears cached instances |
-| `close()` | Closes resources and clears the container |
+And with contract registrations:
 
-### Important DI rules
+```ts
+providers.useClass<UserRepository>(
+  UserRepositoryMemory,
+  [],
+  { scope: 'transient' },
+);
+```
 
-- interfaces should use `import type` when imported;
+Transient instances are not stored by the container, so they are not managed by `close()`.
+
+## Chaining registrations
+
+Registration methods return the same `AppConfig`, so they can be chained:
+
+```ts
+const providers = new AppConfig()
+  .useValue(APP_NAME, 'Kit Dev')
+  .useClass(Logger)
+  .useClass(UserService);
+```
+
+## Creating the container
+
+Create the `ApplicationContext` only after registering and importing every provider:
+
+```ts
+export const container = createApplicationContext(providers);
+```
+
+The container receives a copy of the configuration at that moment. Register everything before calling `createApplicationContext()`.
+
+## Container methods
+
+### `get()`
+
+Resolves a dependency. If the token does not exist, it throws `DependencyInjectionError`:
+
+```ts
+const service = container.get(UserService);
+```
+
+### `getOptional()`
+
+Returns the dependency or `undefined` when it is not registered:
+
+```ts
+const logger = container.getOptional(LOGGER);
+```
+
+### `has()`
+
+Checks whether the token exists in the context:
+
+```ts
+if (container.has(UserService)) {
+  // registered
+}
+```
+
+### `clearInstances()`
+
+Clears cached instances without removing provider definitions:
+
+```ts
+container.clearInstances();
+```
+
+On the next resolution, class/factory singletons are created again.
+
+`clearInstances()` **does not call** `dispose()` or `close()` on previous instances. It is especially useful in tests.
+
+### `close()`
+
+Closes resources stored by the container and then clears the cache:
+
+```ts
+await container.close();
+```
+
+If a cached singleton has `dispose()` or `close()`, Kit Dev calls that method once during shutdown.
+
+Example:
+
+```ts
+class Database {
+  async close() {
+    // close connection
+  }
+}
+
+providers.useClass(Database);
+
+const database = container.get(Database);
+
+// when shutting down the application
+await container.close();
+```
+
+## When does automatic inference work?
+
+Kit Dev can infer constructor dependencies when they are represented by named project types such as supported classes, abstract classes, interfaces, and type aliases.
+
+Example:
+
+```ts
+class UserService {
+  constructor(
+    private readonly repository: UserRepository,
+    private readonly logger: Logger,
+  ) {}
+}
+
+providers.useClass<UserRepository>(UserRepositoryMemory);
+providers.useClass(Logger);
+providers.useClass(UserService);
+```
+
+In this case you do not need to manually provide `[UserRepository, Logger]`.
+
+When the transformer cannot infer a dependency, provide the tokens manually:
+
+```ts
+providers.useClass(ConfigService, [APP_NAME]);
+```
+
+This is mainly required for primitive values, generic types, optional parameters, rest parameters, and types that cannot be converted to an automatic project token.
+
+## DI errors
+
+Configuration problems use `DependencyInjectionError`, for example:
+
+- unregistered token;
+- duplicate token;
+- circular dependency;
+- invalid configuration;
+- failure while creating a dependency.
+
+Transformer analysis errors appear during `npm run dev` or `npm run build` and point to the registration that could not be transformed.
+
+## Quick rules
+
+- use `import type` for interfaces and type aliases used only as types;
 - concrete classes can use themselves as tokens;
-- constructor dependencies are inferred automatically when possible;
+- abstract classes can be runtime tokens;
+- use `createToken<T>()` for primitive values and manual tokens;
 - the default scope is `singleton`;
-- duplicate, missing, or circular dependencies throw `DependencyInjectionError`;
-- register every provider before calling `createApplicationContext()`.
+- use `transient` when you need a new instance on each resolution;
+- manual dependency order must match constructor parameter order;
+- register and import everything before `createApplicationContext()`;
+- prefer resolving a concrete root class instead of trying to resolve an interface directly.
 
 ## Project structure
 

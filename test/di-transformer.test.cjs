@@ -218,8 +218,8 @@ test('gera build com logs e sourcemap externo', async (context) => {
   );
 
   assert.equal(productionBuild.status, 0, productionBuild.stderr);
-  assert.match(productionBuild.stderr, /bundle\.cjs/);
-  assert.match(productionBuild.stderr, /bundle\.cjs\.map/);
+  assert.match(productionBuild.stdout, /bundle\.cjs/);
+  assert.match(productionBuild.stdout, /bundle\.cjs\.map/);
 
   const sourceMap = JSON.parse(
     await readFile(join(projectPath, 'dist', 'bundle.cjs.map'), 'utf-8'),

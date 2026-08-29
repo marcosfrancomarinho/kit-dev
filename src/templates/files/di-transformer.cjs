@@ -307,8 +307,8 @@ function detectFileChanges(fileNames, previousState) {
 
 function getFileStamp(fileName) {
   try {
-    const stats = statSync(fileName);
-    return `${stats.mtimeMs}:${stats.size}`;
+    const stats = statSync(fileName, { bigint: true });
+    return `${stats.mtimeNs}:${stats.ctimeNs}:${stats.size}`;
   } catch {
     return undefined;
   }

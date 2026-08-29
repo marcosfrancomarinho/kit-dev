@@ -194,7 +194,7 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
     import('typescript/unstable/ast'),
   ]);
   const tsconfigPath = resolve(projectRoot, customTsconfig || 'tsconfig.json');
-  const api = new API({ cwd: projectRoot });
+  let api = new API({ cwd: projectRoot });
   let snapshot;
   let project;
   let checker;
@@ -224,6 +224,20 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
     fileState = captureFileState(watchFiles);
 
     if (previousSnapshot) previousSnapshot.dispose();
+  }
+
+  function restartNativeCompiler() {
+    if (snapshot) snapshot.dispose();
+    api.close();
+
+    api = new API({ cwd: projectRoot });
+    snapshot = undefined;
+    project = undefined;
+    checker = undefined;
+    watchFiles = [];
+    fileState = new Map();
+
+    replaceSnapshot({ openProjects: [tsconfigPath] });
   }
 
   try {
@@ -262,17 +276,12 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
 
       if (!hasFileChanges(fileChanges)) return;
 
-      if (
-        process.platform === 'win32' &&
-        api.sourceFileCache &&
-        typeof api.sourceFileCache.clear === 'function'
-      ) {
-        api.sourceFileCache.clear();
+      if (process.platform === 'win32') {
+        restartNativeCompiler();
+        return;
       }
 
-      const snapshotChanges =
-        process.platform === 'win32' ? { invalidateAll: true } : fileChanges;
-      replaceSnapshot({ fileChanges: snapshotChanges });
+      replaceSnapshot({ fileChanges });
     },
     dispose() {
       if (snapshot) snapshot.dispose();

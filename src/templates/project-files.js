@@ -143,6 +143,7 @@ const esbuildConfig = [
   "  console.log('\\n📦 Build');",
   '  const result = await build(buildOptions);',
   "  console.log('✅ bundle.cjs generated');",
+  "  console.log('📍 Output: dist/bundle.cjs');",
   '  printBundleAnalysis(result.metafile);',
   "  console.log('\\n⚡ Completed in ' + (Date.now() - startedAt) + 'ms');",
   '}',

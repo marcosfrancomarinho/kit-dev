@@ -580,7 +580,7 @@ export const container = createApplicationContext(providers);
 
   await assert.rejects(
     buildFixture(projectPath),
-    /Informe-a explicitamente em providers\.useClass\(ConfigService, \[\.\.\.\]\)/,
+    /Provide it explicitly in providers\.useClass\(ConfigService, \[\.\.\.\]\)/,
   );
 });
 

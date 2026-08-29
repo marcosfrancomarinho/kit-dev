@@ -5,7 +5,7 @@
 
 <h1 align="center">🚀 Kit Dev</h1>
 
-<p align="center">Create Node.js + TypeScript projects ready for development and production builds.</p>
+<p align="center">Create Node.js + TypeScript projects with development, production builds, and optional DI already configured.</p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/create-kit-dev"><img src="https://img.shields.io/npm/v/create-kit-dev?style=flat-square&color=CB3837&logo=npm" alt="npm version"></a>
@@ -17,20 +17,26 @@
 
 ---
 
-## About
+## What is Kit Dev?
 
-**Kit Dev** is a CLI that creates the base of a Node.js TypeScript project, uses `esbuild` for development and production builds, and installs the required dependencies.
+**Kit Dev** is a CLI for starting Node.js TypeScript projects without configuring the environment from scratch.
+
+It creates the project, installs the required dependencies, and prepares development and production commands.
+
+You can use Kit Dev only as a project generator and build system. Dependency injection is completely optional.
 
 ## Quick start
 
+With npm:
+
 ```bash
-# npm
 npx create-kit-dev
+```
 
-# pnpm
+It also works with:
+
+```bash
 pnpm create kit-dev
-
-# Yarn
 yarn create kit-dev
 ```
 
@@ -41,186 +47,126 @@ cd my-api
 npm run dev
 ```
 
-The CLI automatically detects npm, Yarn, or pnpm.
+That's it. The application is rebuilt and restarted automatically when your code changes.
 
-## Included setup
+## What is already configured?
 
-- TypeScript with `tsconfig.json`;
-- development with esbuild watch mode and automatic Node.js restart;
-- minified builds with `esbuild`;
-- build logs and external source maps;
-- output in `dist/bundle.cjs` and `dist/bundle.cjs.map`;
-- `.gitignore`;
-- `typescript`, `esbuild`, and `@types/node`;
-- optional dependency injection.
+- TypeScript in `strict` mode;
+- esbuild for development and production;
+- watch mode with automatic Node.js restart;
+- type checking during production builds;
+- minified bundle;
+- external source map;
+- simple bundle analysis;
+- npm, pnpm, and Yarn support;
+- optional DI without decorators.
 
-## Project commands
+## Commands
 
-Commands are generated automatically in `package.json`. The examples below use
-npm, with an equivalent for each package manager:
+The scripts are added automatically to `package.json`.
 
-| Action | npm | pnpm | Yarn |
-|---|---|---|---|
-| Create project | `npx create-kit-dev` | `pnpm create kit-dev` | `yarn create kit-dev` |
-| Development | `npm run dev` | `pnpm dev` | `yarn dev` |
-| Check types | `npm run type` | `pnpm type` | `yarn type` |
-| Create build | `npm run build` | `pnpm build` | `yarn build` |
-| Run build | `npm start` | `pnpm start` | `yarn start` |
-| Install DI | `npm run di` | `pnpm di` | `yarn di` |
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Runs the application in development, watches changes, and restarts Node.js |
+| `npm run type` | Keeps TypeScript checking errors in real time |
+| `npm run build` | Checks types and creates the production bundle |
+| `npm start` | Runs the generated bundle from `dist` |
+| `npm run di` | Installs the optional DI setup |
 
-### `npm run dev` — development
+> With pnpm use `pnpm dev`, `pnpm build`, etc. With Yarn use `yarn dev`, `yarn build`, etc.
 
-Starts the application with esbuild watch mode. Each successful rebuild
-automatically restarts the Node.js process. When DI is installed, the same
-command also applies its transformer.
+### Development
+
+Most of the time you only need:
 
 ```bash
 npm run dev
 ```
 
-Use this command during development. It does not generate the minified
-production bundle in `dist`. Temporary bundles and source maps stay in
-`kit-dev/build/.cache`.
+esbuild watches the project and restarts the application after every successful rebuild.
 
-### `npm run type` — type checking
-
-Runs TypeScript in watch mode without generating JavaScript:
+If you want continuous TypeScript error checking in another terminal:
 
 ```bash
 npm run type
 ```
 
-The process stays active and displays new errors whenever a file changes. Use
-`Ctrl+C` to stop it.
+The `type` command is optional. `build` already performs a type check before generating the bundle.
 
-### `npm run build` — production build
+### Production build
 
-Compiles the entry point defined in `package.json`, bundles the project with
-esbuild, displays the output summary, minifies the code, and generates:
+```bash
+npm run build
+```
+
+The build runs, in order:
+
+1. TypeScript checking with `tsc --noEmit`;
+2. bundling with esbuild;
+3. minification;
+4. source map generation;
+5. a simple bundle summary.
+
+Generated files:
 
 ```text
 dist/bundle.cjs
 dist/bundle.cjs.map
 ```
 
-```bash
-npm run build
-```
+The summary shows bundle size, number of input files, and total build time.
 
-Packages listed in `dependencies` and `devDependencies` remain external to the
-bundle. A build or DI transformation error stops the command.
+Packages listed in `dependencies` and `devDependencies` remain external to the bundle.
 
-### `npm start` — run the build
-
-Runs `dist/bundle.cjs` with Node.js and enables source-map support:
+To run the result:
 
 ```bash
 npm start
 ```
 
-Run `npm run build` first. The `start` command does not rebuild the project or
-watch file changes.
+## Optional dependency injection
 
-### `npm run di` — install optional DI
+You **do not need DI** to use Kit Dev.
 
-Installs the DI container and transformer. It is a one-time setup command and
-is removed from `package.json` after installation.
+If you want it, run this once:
 
 ```bash
 npm run di
 ```
 
-The next section explains the generated structure and complete usage.
+The command installs the container and transformer. After that, the `di` script is removed from `package.json`, and DI works automatically with both `dev` and `build`.
 
-### Recommended workflow
+Kit Dev DI does not use decorators, `reflect-metadata`, or external DI libraries.
 
-```bash
-# Terminal 1: run and restart the application during development
-npm run dev
-
-# Terminal 2: watch TypeScript errors
-npm run type
-
-# Before running in production
-npm run build
-npm start
-```
-
-## Dependency injection
-
-DI is optional and uses no decorators, `reflect-metadata`, or external
-packages. Kit Dev analyzes TypeScript types and injects constructor
-dependencies during the build.
-
-### Installation
-
-```bash
-npm run di
-```
-
-The command installs DI once and removes the `di` script. Then use
-`npm run dev` or `npm run build`, because esbuild applies the transformer.
-
-Installed structure:
-
-```text
-kit-dev/
-├── build/
-│   ├── dev.cjs
-│   └── esbuild.config.cjs
-└── di/
-    ├── container.js
-    ├── container.d.ts
-    └── transformer.cjs
-src/
-└── di/
-    └── providers.ts
-```
-
-`kit-dev/build` contains the esbuild configuration and development runner.
-`kit-dev/di` contains the DI runtime and transformer. `src/di/providers.ts` is
-the composition root; smaller configurations can live in other `src/di` files
-and be combined with `imports()`.
-
-### Basic flow
-
-#### 1. Create the contract, implementation, and use case
+### Basic example
 
 ```ts
-// src/domain/repositories/user-repository.ts
-export interface UserRepository {
+interface UserRepository {
   save(name: string): Promise<void>;
 }
 
-// src/infra/repositories/user-repository-memory.ts
-import type { UserRepository } from '../../domain/repositories/user-repository.js';
-
-export class UserRepositoryMemory implements UserRepository {
+class UserRepositoryMemory implements UserRepository {
   async save(name: string): Promise<void> {
     console.log(`User ${name} saved`);
   }
 }
 
-// src/application/use-cases/create-user.ts
-import type { UserRepository } from '../../domain/repositories/user-repository.js';
-
-export class CreateUser {
+class CreateUser {
   constructor(private readonly repository: UserRepository) {}
 
-  execute(name: string): Promise<void> {
+  execute(name: string) {
     return this.repository.save(name);
   }
 }
 ```
 
-#### 2. Register the providers
+Register the classes in `src/di/providers.ts`:
 
 ```ts
-// src/di/providers.ts
-import { AppConfig, createApplicationContext } from '../../kit-dev/di/container.js';
-import { CreateUser } from '../application/use-cases/create-user.js';
-import type { UserRepository } from '../domain/repositories/user-repository.js';
-import { UserRepositoryMemory } from '../infra/repositories/user-repository-memory.js';
+import {
+  AppConfig,
+  createApplicationContext,
+} from '../../kit-dev/di/container.js';
 
 const providers = new AppConfig();
 
@@ -230,165 +176,89 @@ providers.useClass(CreateUser);
 export const container = createApplicationContext(providers);
 ```
 
-The transformer creates the interface token and discovers that `CreateUser`
-depends on `UserRepository`.
+The transformer detects that `CreateUser` depends on `UserRepository` and creates the dependency link automatically.
 
-#### 3. Resolve the root class
+Then resolve the class that starts your flow:
 
 ```ts
-// src/main.ts
-import { CreateUser } from './application/use-cases/create-user.js';
-import { container } from './di/providers.js';
-
 const createUser = container.get(CreateUser);
 await createUser.execute('Marcos');
 ```
 
-Resolve a concrete class. Interfaces exist only during TypeScript analysis and
-cannot be used in `container.get()`.
+### Registering dependencies
 
-### `AppConfig` methods
+| Method | Usage |
+|---|---|
+| `useClass()` | Concrete classes, interfaces, and abstract classes |
+| `useValue()` | Existing values such as configuration |
+| `useFactory()` | Custom dependency creation |
+| `useExisting()` | Alias for an existing provider |
+| `imports()` | Combines provider configurations |
+| `has()` | Checks whether a token is registered |
 
-Registration methods return the same `AppConfig` and can be chained.
-
-#### `useClass()` — register classes
-
-```ts
-providers.useClass(EmailService); // concrete class as token
-providers.useClass<UserRepository>(UserRepositoryMemory); // interface
-providers.useClass(UserRepositoryBase, UserRepositoryMemory); // abstract class
-providers.useClass(RequestContext, [], { scope: 'transient' }); // new instance on each get()
-```
-
-The default scope is `singleton`. Class dependencies are discovered from the
-constructor; provide a manual list only for tokens that do not exist at
-runtime.
-
-#### `useValue()` — register an existing value
+Quick examples:
 
 ```ts
-import { createToken } from '../../kit-dev/di/container.js';
-
-const APP_NAME = createToken<string>('APP_NAME');
-
-class ConfigService {
-  constructor(readonly appName: string) {}
-}
+providers.useClass(EmailService);
+providers.useClass<UserRepository>(UserRepositoryMemory);
+providers.useClass(UserRepositoryBase, UserRepositoryMemory);
 
 providers.useValue(APP_NAME, 'Kit Dev');
-providers.useClass(ConfigService, [APP_NAME]);
-```
-
-#### `useFactory()` — control creation
-
-```ts
-const DATABASE_URL = createToken<string>('DATABASE_URL');
-
-providers.useValue(DATABASE_URL, process.env.DATABASE_URL!);
-providers.useFactory(Database, (context) => new Database(context.get(DATABASE_URL)));
-```
-
-A factory receives the container. It also accepts `{ scope: 'transient' }` as
-its third argument.
-
-#### `useExisting()` — create an alias
-
-```ts
-const PRIMARY_DATABASE = createToken<Database>('PRIMARY_DATABASE');
-
-providers.useClass(Database);
+providers.useFactory(Database, (container) => new Database(container.get(DB_URL)));
 providers.useExisting(PRIMARY_DATABASE, Database);
 ```
 
-Both tokens resolve to the same instance.
-
-#### `imports()` — combine configurations
-
-Split providers by module and import them into the composition root:
+The default scope is `singleton`. To create a new instance on each resolution:
 
 ```ts
-// src/di/database-providers.ts
-import { AppConfig } from '../../kit-dev/di/container.js';
-import { Database } from '../infra/database.js';
-
-export const databaseProviders = new AppConfig().useClass(Database);
+providers.useClass(RequestContext, [], { scope: 'transient' });
 ```
 
-```ts
-// src/di/providers.ts
-import { AppConfig, createApplicationContext } from '../../kit-dev/di/container.js';
-import { CreateUser } from '../application/use-cases/create-user.js';
-import { databaseProviders } from './database-providers.js';
-
-const providers = new AppConfig();
-providers.imports(databaseProviders);
-providers.useClass(CreateUser);
-
-export const container = createApplicationContext(providers);
-```
-
-`imports(configA, configB)` accepts multiple configurations. If two register
-the same token, Kit Dev throws `DependencyInjectionError`.
-
-#### `has()` — check a registration
-
-```ts
-console.log(providers.has(Database)); // true
-```
+Use `createToken<T>()` when you need primitive values or other manual tokens.
 
 ### Container methods
 
-Create the container only after registering and importing every provider:
+| Method | Usage |
+|---|---|
+| `get()` | Resolves a dependency or throws an error |
+| `getOptional()` | Resolves a dependency or returns `undefined` |
+| `has()` | Checks whether the dependency exists |
+| `clearInstances()` | Clears cached instances |
+| `close()` | Closes resources and clears the container |
 
-```ts
-const container = createApplicationContext(providers);
-```
+### Important DI rules
 
-| Method | Example | Usage |
-|---|---|---|
-| `get()` | `const service = container.get(CreateUser);` | Resolves a provider or throws an error |
-| `getOptional()` | `const logger = container.getOptional(LOGGER);` | Returns the provider or `undefined` |
-| `has()` | `container.has(CreateUser);` | Checks whether the token exists in the context |
-| `clearInstances()` | `container.clearInstances();` | Clears the cache without disposing resources; useful in tests |
-| `close()` | `await container.close();` | Calls `dispose()` or `close()`, then clears the cache |
+- interfaces should use `import type` when imported;
+- concrete classes can use themselves as tokens;
+- constructor dependencies are inferred automatically when possible;
+- the default scope is `singleton`;
+- duplicate, missing, or circular dependencies throw `DependencyInjectionError`;
+- register every provider before calling `createApplicationContext()`.
 
-`close()` does not manage transient instances because the container does not
-store them.
+## Project structure
 
-### Quick rules
-
-- Use `import type` for interfaces and a regular import for classes.
-- Concrete classes use themselves as tokens.
-- Use `createToken<T>()` for primitive values and manual tokens.
-- The default scope is `singleton`; use `{ scope: 'transient' }` when needed.
-- Register everything before calling `createApplicationContext()`.
-- Missing or duplicate tokens and dependency cycles throw `DependencyInjectionError`.
-
-## Generated structure
+Right after creating a project:
 
 ```text
 my-api/
 ├── kit-dev/
-│   ├── build/
-│   │   ├── dev.cjs
-│   │   └── esbuild.config.cjs
-│   └── di/
-│       ├── container.d.ts
-│       ├── container.ts
-│       ├── install.cjs
-│       ├── providers.ts
-│       └── transformer.cjs
+│   └── build/
+│       ├── dev.cjs
+│       └── esbuild.config.cjs
 ├── src/
 │   └── main.ts
-├── .gitignore
 ├── package.json
 └── tsconfig.json
 ```
 
+Installing DI also adds the files under `kit-dev/di` and `src/di/providers.ts`.
+
+The `kit-dev` directory is part of the generated project configuration and can be committed with the rest of the project.
+
 ## Requirements
 
-- Node.js 22+
-- npm, Yarn, or pnpm
+- Node.js 22 or newer;
+- npm, pnpm, or Yarn.
 
 No global Kit Dev installation is required.
 

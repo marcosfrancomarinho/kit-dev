@@ -26,7 +26,7 @@ async function readPackageJson(path) {
   try {
     return JSON.parse(content);
   } catch {
-    throw new Error('package.json contém um JSON inválido.');
+    throw new Error('package.json contains invalid JSON.');
   }
 }
 
@@ -44,7 +44,7 @@ async function createDiFile(templatePath, destinationPath, displayPath) {
   if (await fileExists(destinationPath)) {
     console.log(
       colors.yellow +
-        `⚠️  ${displayPath} já existe e foi preservado.` +
+        `⚠️  ${displayPath} already exists and was preserved.` +
         colors.reset,
     );
     return;
@@ -53,14 +53,14 @@ async function createDiFile(templatePath, destinationPath, displayPath) {
   await mkdir(dirname(destinationPath), { recursive: true });
   await copyFile(templatePath, destinationPath, constants.COPYFILE_EXCL);
 
-  console.log(colors.green + `🧩 ${displayPath} criado.` + colors.reset);
+  console.log(colors.green + `🧩 ${displayPath} created.` + colors.reset);
 }
 
 async function createDiRuntime(templatePath, destinationPath, displayPath) {
   if (await fileExists(destinationPath)) {
     console.log(
       colors.yellow +
-        `⚠️  ${displayPath} já existe e foi preservado.` +
+        `⚠️  ${displayPath} already exists and was preserved.` +
         colors.reset,
     );
     return;
@@ -79,7 +79,7 @@ async function createDiRuntime(templatePath, destinationPath, displayPath) {
     flag: 'wx',
   });
 
-  console.log(colors.green + `🧩 ${displayPath} criado.` + colors.reset);
+  console.log(colors.green + `🧩 ${displayPath} created.` + colors.reset);
 }
 
 async function removeDiScript(packageJsonPath) {
@@ -109,7 +109,7 @@ async function removeInstaller(templatePaths) {
     if (error.code !== 'ENOENT' && error.code !== 'ENOTEMPTY') {
       console.log(
         colors.yellow +
-          '⚠️  A DI foi criada, mas não foi possível remover todo o instalador.' +
+          '⚠️  DI was installed, but the installer could not be completely removed.' +
           colors.reset,
       );
     }
@@ -133,7 +133,7 @@ async function run() {
   ];
 
   if (!(await fileExists(packageJsonPath))) {
-    throw new Error('Execute o comando di na raiz do projeto criado pelo Kit Dev.');
+    throw new Error('Run the di command from the root of a project created by Kit Dev.');
   }
 
   await createDiRuntime(
@@ -160,7 +160,7 @@ async function run() {
   }
 
   console.log(
-    '\n' + colors.green + '✅ Injeção de dependência adicionada!' + colors.reset,
+    '\n' + colors.green + '✅ Dependency injection added!' + colors.reset,
   );
 }
 

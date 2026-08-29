@@ -123,7 +123,7 @@ test('detecta dependência ausente e dependência circular', async () => {
   assert.throws(() => container.get(MISSING), DependencyInjectionError);
   assert.throws(
     () => container.get(A),
-    /Dependência circular detectada: Symbol\(A\) -> Symbol\(B\) -> Symbol\(A\)/,
+    /Circular dependency detected: Symbol\(A\) -> Symbol\(B\) -> Symbol\(A\)/,
   );
 });
 

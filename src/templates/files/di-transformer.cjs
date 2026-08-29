@@ -262,6 +262,14 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
 
       if (!hasFileChanges(fileChanges)) return;
 
+      if (
+        process.platform === 'win32' &&
+        api.sourceFileCache &&
+        typeof api.sourceFileCache.clear === 'function'
+      ) {
+        api.sourceFileCache.clear();
+      }
+
       const snapshotChanges =
         process.platform === 'win32' ? { invalidateAll: true } : fileChanges;
       replaceSnapshot({ fileChanges: snapshotChanges });

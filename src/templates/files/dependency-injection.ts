@@ -122,7 +122,7 @@ export class AppConfig {
 
     if (!hasExplicitToken && typeof tokenOrTarget !== "function") {
       throw new DependencyInjectionError(
-        "useClass() precisa receber uma classe ou um token seguido de uma classe.",
+        "useClass() must receive a class or a token followed by a class.",
       );
     }
 
@@ -212,7 +212,7 @@ export class ApplicationContext {
         .join(" -> ");
 
       throw new DependencyInjectionError(
-        `Dependência circular detectada: ${cycle}`,
+        `Circular dependency detected: ${cycle}`,
       );
     }
 
@@ -220,7 +220,7 @@ export class ApplicationContext {
 
     if (!definition) {
       throw new DependencyInjectionError(
-        `Nenhum bean encontrado para ${formatToken(token)}.`,
+        `No bean found for ${formatToken(token)}.`,
       );
     }
 
@@ -304,7 +304,7 @@ export class ApplicationContext {
       }
 
       throw new DependencyInjectionError(
-        `Erro ao criar o bean ${formatToken(token)}.`,
+        `Failed to create bean ${formatToken(token)}.`,
         { cause: error },
       );
     }
@@ -314,7 +314,7 @@ export class ApplicationContext {
 export function createApplicationContext(config: AppConfig): ApplicationContext {
   if (!(config instanceof AppConfig)) {
     throw new DependencyInjectionError(
-      "createApplicationContext() precisa receber uma instância de AppConfig.",
+      "createApplicationContext() must receive an AppConfig instance.",
     );
   }
 
@@ -330,7 +330,7 @@ function formatToken(token: DependencyToken): string {
     return token.description ? `Symbol(${token.description})` : token.toString();
   }
 
-  return token.name || "Classe anônima";
+  return token.name || "Anonymous class";
 }
 
 function getDefinitions(
@@ -340,7 +340,7 @@ function getDefinitions(
 
   if (!definitions) {
     throw new DependencyInjectionError(
-      "Configuração de providers inválida.",
+      "Invalid provider configuration.",
     );
   }
 
@@ -356,7 +356,7 @@ function addDefinition(
 
   if (definitions.has(token)) {
     throw new DependencyInjectionError(
-      `Já existe um bean registrado para ${formatToken(token)}.`,
+      `A bean is already registered for ${formatToken(token)}.`,
     );
   }
 

@@ -61,7 +61,7 @@ function kitDevDiPlugin(options = {}) {
 
         if (!compiler) {
           return {
-            errors: [{ text: 'O transformador de DI não foi inicializado.' }],
+            errors: [{ text: 'The DI transformer was not initialized.' }],
           };
         }
 
@@ -119,7 +119,7 @@ function createLegacyCompiler(ts, projectRoot, customTsconfig) {
   let watchFiles = [];
 
   if (!tsconfigPath) {
-    throw new Error('tsconfig.json não encontrado para transformar a DI.');
+    throw new Error('tsconfig.json was not found for DI transformation.');
   }
 
   function refreshProgram() {
@@ -208,7 +208,7 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
 
     if (!nextProject) {
       nextSnapshot.dispose();
-      throw new Error('tsconfig.json não encontrado para transformar a DI.');
+      throw new Error('tsconfig.json was not found for DI transformation.');
     }
 
     const previousSnapshot = snapshot;
@@ -509,7 +509,7 @@ function analyzeProviderCall(method, node, compiler, projectRoot) {
   if (typeArguments.length > 0) {
     if (typeArguments.length !== 1 || node.arguments.length === 0) {
       throw new Error(
-        'useClass<Contrato>() precisa receber um contrato e uma implementação.',
+        'useClass<Contract>() must receive a contract and an implementation.',
       );
     }
 
@@ -624,7 +624,7 @@ function resolveContract(typeNode, compiler, projectRoot) {
     typeNode.typeArguments.length > 0
   ) {
     throw new Error(
-      'Contratos genéricos ainda não são suportados pelo token automático.',
+      'Generic contracts are not yet supported by automatic tokens.',
     );
   }
 
@@ -632,7 +632,7 @@ function resolveContract(typeNode, compiler, projectRoot) {
 
   if (!symbol) {
     throw new Error(
-      `Não foi possível identificar o contrato ${typeNode.getText()}.`,
+      `Could not identify the contract ${typeNode.getText()}.`,
     );
   }
 
@@ -644,7 +644,7 @@ function resolveContract(typeNode, compiler, projectRoot) {
       !compiler.ast.isTypeAliasDeclaration(declaration))
   ) {
     throw new Error(
-      'useClass<Contrato>() aceita somente uma interface ou type alias nomeado.',
+      'useClass<Contract>() only accepts a named interface or type alias.',
     );
   }
 
@@ -696,7 +696,7 @@ function resolveClass(expression, compiler) {
 
   if (!symbol || !declaration) {
     throw new Error(
-      `${expression.getText()} precisa ser uma classe nomeada em useClass().`,
+      `${expression.getText()} must be a named class in useClass().`,
     );
   }
 
@@ -786,7 +786,7 @@ function createNamedToken(symbol, compiler, projectRoot, required = true) {
   if (!declaration || !declaration.name) {
     if (required) {
       throw new Error(
-        `O tipo ${getSymbolName(symbol, compiler)} precisa ter uma declaração nomeada.`,
+        `Type ${getSymbolName(symbol, compiler)} must have a named declaration.`,
       );
     }
 
@@ -801,7 +801,7 @@ function createNamedToken(symbol, compiler, projectRoot, required = true) {
   if (relativePath.startsWith('../')) {
     if (required) {
       throw new Error(
-        `O tipo ${declaration.name.text} precisa estar dentro do projeto.`,
+        `Type ${declaration.name.text} must be inside the project.`,
       );
     }
 
@@ -839,8 +839,8 @@ function applyReplacements(source, sourceOffset, replacements) {
 
 function throwUnsupportedDependency(className, parameterName) {
   throw new Error(
-    `Não foi possível inferir a dependência "${parameterName}" de ${className}. ` +
-      `Informe-a explicitamente em providers.useClass(${className}, [...]).`,
+    `Could not infer dependency "${parameterName}" for ${className}. ` +
+      `Provide it explicitly in providers.useClass(${className}, [...]).`,
   );
 }
 

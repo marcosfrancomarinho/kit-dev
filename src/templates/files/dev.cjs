@@ -109,6 +109,7 @@ async function run() {
     minifyIdentifiers: false,
     sourcemap: true,
     metafile: false,
+    logLevel: 'info',
     plugins: [...(buildOptions.plugins || []), restartPlugin],
   });
 

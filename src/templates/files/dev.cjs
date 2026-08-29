@@ -104,7 +104,11 @@ async function run() {
     ...buildOptions,
     outfile: outputFile,
     minify: false,
+    minifySyntax: false,
+    minifyWhitespace: false,
+    minifyIdentifiers: false,
     sourcemap: true,
+    metafile: false,
     plugins: [...(buildOptions.plugins || []), restartPlugin],
   });
 

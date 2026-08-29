@@ -1,4 +1,4 @@
-const { existsSync } = require('fs');
+const { existsSync, statSync } = require('fs');
 const { dirname, relative, resolve } = require('path');
 
 const CONTRACT_PREFIX = 'kit-dev:';
@@ -31,17 +31,23 @@ function kitDevDiPlugin(options = {}) {
 
       build.onStart(async () => {
         try {
-          if (compiler) compiler.dispose();
           enabled = existsSync(containerPath);
 
           if (!enabled) {
+            if (compiler) compiler.dispose();
             compiler = undefined;
             return undefined;
           }
 
-          compiler = await createCompiler(projectRoot, options.tsconfig);
+          if (compiler) {
+            await compiler.refresh();
+          } else {
+            compiler = await createCompiler(projectRoot, options.tsconfig);
+          }
+
           return undefined;
         } catch (error) {
+          if (compiler) compiler.dispose();
           compiler = undefined;
           return {
             errors: [{ text: formatError(error) }],
@@ -107,40 +113,58 @@ function createLegacyCompiler(ts, projectRoot, customTsconfig) {
   const tsconfigPath = customTsconfig
     ? resolve(projectRoot, customTsconfig)
     : ts.findConfigFile(projectRoot, ts.sys.fileExists, 'tsconfig.json');
+  let program;
+  let checker;
+  let watchFiles = [];
 
   if (!tsconfigPath) {
     throw new Error('tsconfig.json não encontrado para transformar a DI.');
   }
 
-  const configFile = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
+  function refreshProgram() {
+    const configFile = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
 
-  if (configFile.error) {
-    throw new Error(formatLegacyDiagnostic(ts, configFile.error));
-  }
+    if (configFile.error) {
+      throw new Error(formatLegacyDiagnostic(ts, configFile.error));
+    }
 
-  const parsedConfig = ts.parseJsonConfigFileContent(
-    configFile.config,
-    ts.sys,
-    dirname(tsconfigPath),
-  );
-
-  if (parsedConfig.errors.length > 0) {
-    throw new Error(
-      parsedConfig.errors
-        .map((diagnostic) => formatLegacyDiagnostic(ts, diagnostic))
-        .join('\n'),
+    const parsedConfig = ts.parseJsonConfigFileContent(
+      configFile.config,
+      ts.sys,
+      dirname(tsconfigPath),
     );
+
+    if (parsedConfig.errors.length > 0) {
+      throw new Error(
+        parsedConfig.errors
+          .map((diagnostic) => formatLegacyDiagnostic(ts, diagnostic))
+          .join('\n'),
+      );
+    }
+
+    program = ts.createProgram(
+      parsedConfig.fileNames,
+      parsedConfig.options,
+      undefined,
+      program,
+    );
+    checker = program.getTypeChecker();
+    watchFiles = [
+      tsconfigPath,
+      ...program
+        .getSourceFiles()
+        .map((sourceFile) => sourceFile.fileName)
+        .filter((fileName) => fileName.startsWith(projectRoot)),
+    ];
   }
 
-  const program = ts.createProgram({
-    rootNames: parsedConfig.fileNames,
-    options: parsedConfig.options,
-  });
-  const checker = program.getTypeChecker();
+  refreshProgram();
 
   return {
     ast: ts,
-    checker,
+    get checker() {
+      return checker;
+    },
     aliasFlag: ts.SymbolFlags.Alias,
     getSourceFile: (fileName) => program.getSourceFile(fileName),
     getDeclarations: (symbol) => symbol.declarations || [],
@@ -149,14 +173,17 @@ function createLegacyCompiler(ts, projectRoot, customTsconfig) {
       return checker.getTypeAtLocation(expression).getConstructSignatures();
     },
     getSymbolName: (symbol) => symbol.getName(),
-    watchFiles: [
-      tsconfigPath,
-      ...program
-        .getSourceFiles()
-        .map((sourceFile) => sourceFile.fileName)
-        .filter((fileName) => fileName.startsWith(projectRoot)),
-    ],
-    dispose() {},
+    get watchFiles() {
+      return watchFiles;
+    },
+    refresh() {
+      refreshProgram();
+    },
+    dispose() {
+      program = undefined;
+      checker = undefined;
+      watchFiles = [];
+    },
   };
 }
 
@@ -168,27 +195,49 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
   const tsconfigPath = resolve(projectRoot, customTsconfig || 'tsconfig.json');
   const api = new API({ cwd: projectRoot });
   let snapshot;
+  let project;
+  let checker;
+  let watchFiles = [];
+  let fileState = new Map();
+
+  function replaceSnapshot(params) {
+    const nextSnapshot = api.updateSnapshot(params);
+    const nextProject =
+      nextSnapshot.getProject(tsconfigPath) || nextSnapshot.getProjects()[0];
+
+    if (!nextProject) {
+      nextSnapshot.dispose();
+      throw new Error('tsconfig.json não encontrado para transformar a DI.');
+    }
+
+    const previousSnapshot = snapshot;
+    snapshot = nextSnapshot;
+    project = nextProject;
+    checker = project.checker;
+    watchFiles = [
+      tsconfigPath,
+      ...project.program
+        .getSourceFileNames()
+        .filter((fileName) => fileName.startsWith(projectRoot)),
+    ];
+    fileState = captureFileState(watchFiles);
+
+    if (previousSnapshot) previousSnapshot.dispose();
+  }
 
   try {
-    snapshot = api.updateSnapshot({ openProjects: [tsconfigPath] });
+    replaceSnapshot({ openProjects: [tsconfigPath] });
   } catch (error) {
+    if (snapshot) snapshot.dispose();
     api.close();
     throw error;
   }
-  const project =
-    snapshot.getProject(tsconfigPath) || snapshot.getProjects()[0];
-
-  if (!project) {
-    snapshot.dispose();
-    api.close();
-    throw new Error('tsconfig.json não encontrado para transformar a DI.');
-  }
-
-  const checker = project.checker;
 
   return {
     ast,
-    checker,
+    get checker() {
+      return checker;
+    },
     aliasFlag: SymbolFlags.Alias,
     getSourceFile: (fileName) => project.program.getSourceFile(fileName),
     getDeclarations: (symbol) =>
@@ -204,17 +253,73 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
         : [];
     },
     getSymbolName: (symbol) => symbol.name,
-    watchFiles: [
-      tsconfigPath,
-      ...project.program
-        .getSourceFileNames()
-        .filter((fileName) => fileName.startsWith(projectRoot)),
-    ],
+    get watchFiles() {
+      return watchFiles;
+    },
+    refresh() {
+      const fileChanges = detectFileChanges(watchFiles, fileState);
+
+      if (!hasFileChanges(fileChanges)) return;
+
+      replaceSnapshot({ fileChanges });
+    },
     dispose() {
-      snapshot.dispose();
+      if (snapshot) snapshot.dispose();
+      snapshot = undefined;
+      project = undefined;
+      checker = undefined;
+      watchFiles = [];
+      fileState = new Map();
       api.close();
     },
   };
+}
+
+function captureFileState(fileNames) {
+  return new Map(fileNames.map((fileName) => [fileName, getFileStamp(fileName)]));
+}
+
+function detectFileChanges(fileNames, previousState) {
+  const changed = [];
+  const created = [];
+  const deleted = [];
+  const currentFiles = new Set([...previousState.keys(), ...fileNames]);
+
+  for (const fileName of currentFiles) {
+    const previousStamp = previousState.get(fileName);
+    const currentStamp = getFileStamp(fileName);
+
+    if (previousStamp === undefined && currentStamp !== undefined) {
+      created.push(fileName);
+    } else if (previousStamp !== undefined && currentStamp === undefined) {
+      deleted.push(fileName);
+    } else if (
+      previousStamp !== undefined &&
+      currentStamp !== undefined &&
+      previousStamp !== currentStamp
+    ) {
+      changed.push(fileName);
+    }
+  }
+
+  return { changed, created, deleted };
+}
+
+function getFileStamp(fileName) {
+  try {
+    const stats = statSync(fileName);
+    return `${stats.mtimeMs}:${stats.size}`;
+  } catch {
+    return undefined;
+  }
+}
+
+function hasFileChanges(fileChanges) {
+  return (
+    fileChanges.changed.length > 0 ||
+    fileChanges.created.length > 0 ||
+    fileChanges.deleted.length > 0
+  );
 }
 
 function transformSourceFile(

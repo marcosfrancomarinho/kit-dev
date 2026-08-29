@@ -1,4 +1,5 @@
-const { existsSync, statSync } = require('fs');
+const { createHash } = require('crypto');
+const { existsSync, readFileSync, statSync } = require('fs');
 const { dirname, relative, resolve } = require('path');
 
 const CONTRACT_PREFIX = 'kit-dev:';
@@ -308,7 +309,15 @@ function detectFileChanges(fileNames, previousState) {
 function getFileStamp(fileName) {
   try {
     const stats = statSync(fileName, { bigint: true });
-    return `${stats.mtimeNs}:${stats.ctimeNs}:${stats.size}`;
+    const metadata = `${stats.mtimeNs}:${stats.ctimeNs}:${stats.size}`;
+
+    if (process.platform !== 'win32') return metadata;
+
+    const checksum = createHash('sha1')
+      .update(readFileSync(fileName))
+      .digest('base64');
+
+    return `${metadata}:${checksum}`;
   } catch {
     return undefined;
   }

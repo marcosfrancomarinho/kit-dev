@@ -262,7 +262,9 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
 
       if (!hasFileChanges(fileChanges)) return;
 
-      replaceSnapshot({ fileChanges });
+      const snapshotChanges =
+        process.platform === 'win32' ? { invalidateAll: true } : fileChanges;
+      replaceSnapshot({ fileChanges: snapshotChanges });
     },
     dispose() {
       if (snapshot) snapshot.dispose();

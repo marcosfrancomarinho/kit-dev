@@ -11,6 +11,7 @@ let buildContext;
 let restartPending = false;
 let restartTask;
 let shuttingDown = false;
+let initialBuild = true;
 
 function waitForExit(processToStop) {
   if (
@@ -81,6 +82,15 @@ function queueRestart() {
 const restartPlugin = {
   name: 'kit-dev-restart',
   setup(build) {
+    build.onStart(() => {
+      if (initialBuild) {
+        initialBuild = false;
+        return;
+      }
+
+      if (process.stdout.isTTY) console.clear();
+    });
+
     build.onEnd((result) => {
       if (result.errors.length > 0) return;
       return queueRestart();

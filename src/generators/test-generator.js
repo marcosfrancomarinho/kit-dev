@@ -136,7 +136,7 @@ function createTestContent(metadata, importPath) {
         .flatMap((dependency) =>
           dependency.methods.map(
             (dependencyMethod) =>
-              `  assert.ok(${dependency.name}.${dependencyMethod}.mock.callCount() >= 0);`,
+              `  assert.ok(${dependency.name}.${dependencyMethod}.mock.callCount(), 1);`,
           ),
         )
         .join('\n');

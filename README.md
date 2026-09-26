@@ -69,6 +69,7 @@ The scripts are added automatically to `package.json`.
 |---|---|
 | `npm run dev` | Runs the application in development, watches changes, and restarts Node.js |
 | `npm run type` | Keeps TypeScript checking errors in real time |
+| `npm test` | Runs TypeScript tests with `node:test` and stays in watch mode |
 | `npm run build` | Checks types and creates the production bundle |
 | `npm start` | Runs the generated bundle from `dist` |
 | `npm run di` | Installs the optional DI setup |
@@ -92,6 +93,32 @@ npm run type
 ```
 
 The `type` command is optional. `build` already performs a type check before generating the bundle.
+
+### Tests
+
+Generated projects include a native test runner. Run:
+
+```bash
+npm test
+```
+
+esbuild transpiles `.test.ts` and `.spec.ts` files, `node:test` executes them, and the process stays in watch mode. Jest, Vitest, ts-node, and tsx are not installed.
+
+An initial test is created at `test/example.test.ts`.
+
+To generate a test from an existing class, run this from the project root:
+
+```bash
+npx create-kit-dev test src/application/use-cases/create-user.ts
+```
+
+You can also pass a unique source file name:
+
+```bash
+npx create-kit-dev test create-user
+```
+
+The generator uses the TypeScript AST to discover the class, constructor dependencies, public methods, and calls such as `this.repository.save()`. It creates `t.mock.fn()` mocks and call assertions from that structure. When a value cannot be inferred safely, it leaves a `TODO` instead of inventing business behavior.
 
 ### Production build
 
@@ -702,11 +729,15 @@ Right after creating a project:
 ```text
 my-api/
 ├── kit-dev/
-│   └── build/
-│       ├── dev.cjs
-│       └── esbuild.config.cjs
+│   ├── build/
+│   │   ├── dev.cjs
+│   │   └── esbuild.config.cjs
+│   └── test/
+│       └── test.cjs
 ├── src/
 │   └── main.ts
+├── test/
+│   └── example.test.ts
 ├── package.json
 └── tsconfig.json
 ```

@@ -239,6 +239,7 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
           methodName: null,
           async: false,
           parameters: constructorParameters,
+          negativeCases: [],
           sourceAliases: new Map(
             constructorParameters.map((parameter) => [
               parameter.name,
@@ -251,12 +252,17 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
           methodName: null,
           async: false,
           parameters: [],
+          negativeCases: [],
           sourceAliases: new Map(),
         });
 
   const dependencyNames = new Set(
     constructorParameters
-      .filter((parameter) => parameter.kind === 'dependency')
+      .filter(
+        (parameter) =>
+          parameter.kind === 'dependency' ||
+          parameter.kind === 'dependencyCollection',
+      )
       .map((parameter) => parameter.name),
   );
   const knownNames = new Set([
@@ -274,6 +280,7 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
         method,
         className,
         dependencyNames,
+        constructorParameters,
         constructorNames: knownNames,
         propertySources,
         sourceAliases: creation.sourceAliases,
@@ -312,6 +319,20 @@ function analyzeParameters(
         parameter.questionToken || parameter.initializer,
       );
 
+      const collectionBehavior = analyzeBehaviorCollection(
+        ts,
+        checker,
+        parameter,
+      );
+      const kind = collectionBehavior
+        ? 'dependencyCollection'
+        : classifyParameterKind(
+            ts,
+            checker,
+            parameter,
+            fixture,
+          );
+
       return {
         index,
         name,
@@ -321,15 +342,101 @@ function analyzeParameters(
               checker.getTypeAtLocation(parameter),
             ),
         optional,
-        kind: classifyParameterKind(
-          ts,
-          checker,
-          parameter,
-          fixture,
-        ),
-        fixture: fixture ?? (optional ? 'undefined' : null),
+        kind,
+        fixture:
+          kind === 'dependencyCollection'
+            ? null
+            : fixture ?? (optional ? 'undefined' : null),
+        collectionBehavior,
       };
     });
+}
+
+function analyzeBehaviorCollection(
+  ts,
+  checker,
+  parameter,
+) {
+  try {
+    const type = parameter.type
+      ? checker.getTypeFromTypeNode(parameter.type)
+      : checker.getTypeAtLocation(parameter);
+    const typeArguments = getTypeArgumentsSafe(checker, type);
+    const typeText = checker.typeToString(type);
+
+    let container = null;
+    let elementType = null;
+
+    if (
+      checker.isArrayType?.(type) ||
+      typeText.endsWith('[]') ||
+      /^(?:Readonly)?Array<.+>$/.test(typeText)
+    ) {
+      container = 'array';
+      elementType =
+        checker.getElementTypeOfArrayType?.(type) ||
+        typeArguments[0] ||
+        null;
+    } else if (/^(?:Readonly)?Set<.+>$/.test(typeText)) {
+      container = 'set';
+      elementType = typeArguments[0] || null;
+    } else if (/^(?:Readonly)?Map<.+>$/.test(typeText)) {
+      container = 'map';
+      elementType = typeArguments[1] || null;
+    }
+
+    if (!elementType) return null;
+
+    const interfaceDeclaration = getInterfaceDeclaration(
+      ts,
+      checker,
+      elementType,
+    );
+
+    if (
+      interfaceDeclaration &&
+      interfaceHasBehavior(
+        ts,
+        checker,
+        interfaceDeclaration,
+      )
+    ) {
+      return {
+        kind: 'interface',
+        container,
+        elementType: checker.typeToString(elementType),
+      };
+    }
+
+    const classDeclaration = getClassDeclaration(
+      ts,
+      checker,
+      elementType,
+    );
+
+    if (
+      classDeclaration?.name &&
+      (
+        hasModifier(
+          ts,
+          classDeclaration,
+          ts.SyntaxKind.AbstractKeyword,
+        ) ||
+        isArchitecturalDependencyClass(
+          classDeclaration.name.text,
+          classDeclaration.getSourceFile().fileName,
+        )
+      )
+    ) {
+      return {
+        kind: 'class',
+        container,
+        elementType: checker.typeToString(elementType),
+      };
+    }
+  } catch {}
+
+  return null;
 }
 
 function classifyParameterKind(
@@ -468,6 +575,11 @@ function findStaticFactory(
     methodName: selected.name,
     async: selected.async,
     parameters,
+    negativeCases: detectSimpleFactoryThrowCases(
+      ts,
+      selected.method,
+      sourceFile,
+    ),
     sourceAliases: mapFactoryArgumentsToConstructor(
       ts,
       selected.method,
@@ -476,6 +588,115 @@ function findStaticFactory(
       sourceFile,
     ),
   };
+}
+
+function detectSimpleFactoryThrowCases(
+  ts,
+  method,
+  sourceFile,
+) {
+  if (!method.body) return [];
+
+  const parameterIndexes = new Map(
+    method.parameters
+      .filter((parameter) => ts.isIdentifier(parameter.name))
+      .map((parameter, index) => [
+        parameter.name.text,
+        index,
+      ]),
+  );
+  const cases = [];
+
+  for (const statement of method.body.statements) {
+    if (!ts.isIfStatement(statement)) continue;
+
+    const throws =
+      ts.isThrowStatement(statement.thenStatement) ||
+      (
+        ts.isBlock(statement.thenStatement) &&
+        statement.thenStatement.statements.some(
+          ts.isThrowStatement,
+        )
+      );
+
+    if (!throws) continue;
+
+    const invalid = renderInvalidGuardFixture(
+      ts,
+      statement.expression,
+      parameterIndexes,
+      sourceFile,
+    );
+
+    if (invalid) cases.push(invalid);
+  }
+
+  return cases;
+}
+
+function renderInvalidGuardFixture(
+  ts,
+  expression,
+  parameterIndexes,
+  sourceFile,
+) {
+  if (!ts.isBinaryExpression(expression)) return null;
+
+  const left = expression.left;
+  const right = expression.right;
+
+  if (!ts.isIdentifier(left)) return null;
+  if (!parameterIndexes.has(left.text)) return null;
+
+  const index = parameterIndexes.get(left.text);
+  const operator = expression.operatorToken.kind;
+
+  if (ts.isNumericLiteral(right)) {
+    const value = Number(right.text);
+    let invalidValue = null;
+
+    if (operator === ts.SyntaxKind.LessThanToken) {
+      invalidValue = value - 1;
+    } else if (
+      operator === ts.SyntaxKind.LessThanEqualsToken ||
+      operator === ts.SyntaxKind.EqualsEqualsToken ||
+      operator === ts.SyntaxKind.EqualsEqualsEqualsToken
+    ) {
+      invalidValue = value;
+    } else if (operator === ts.SyntaxKind.GreaterThanToken) {
+      invalidValue = value + 1;
+    } else if (
+      operator === ts.SyntaxKind.GreaterThanEqualsToken
+    ) {
+      invalidValue = value;
+    }
+
+    if (invalidValue !== null) {
+      return {
+        index,
+        parameterName: left.text,
+        fixture: String(invalidValue),
+        condition: expression.getText(sourceFile),
+      };
+    }
+  }
+
+  if (
+    ts.isStringLiteral(right) &&
+    (
+      operator === ts.SyntaxKind.EqualsEqualsToken ||
+      operator === ts.SyntaxKind.EqualsEqualsEqualsToken
+    )
+  ) {
+    return {
+      index,
+      parameterName: left.text,
+      fixture: JSON.stringify(right.text),
+      condition: expression.getText(sourceFile),
+    };
+  }
+
+  return null;
 }
 
 function methodReturnsClass(
@@ -637,6 +858,7 @@ function analyzeMethod({
   method,
   className,
   dependencyNames,
+  constructorParameters,
   constructorNames,
   propertySources,
   sourceAliases,
@@ -692,52 +914,132 @@ function analyzeMethod({
         ),
     ]),
   );
+  const collectionDependencies = new Set(
+    (constructorParameters || [])
+      .filter(
+        (parameter) =>
+          parameter.kind === 'dependencyCollection',
+      )
+      .map((parameter) => parameter.name),
+  );
+  const collectionAliases = new Map();
   const calls = new Map();
+
+  function recordCall(
+    node,
+    dependency,
+    callMethod,
+    mockTarget = dependency,
+    collection = false,
+  ) {
+    const key =
+      dependency + '.' + callMethod + ':' + mockTarget;
+    const current = calls.get(key) || {
+      dependency,
+      method: callMethod,
+      mockTarget,
+      collection,
+      awaited: false,
+      returnsPromise: false,
+      returnFixture: 'undefined',
+      expectedArguments: null,
+    };
+
+    const returnInfo = getCallReturnInfo(
+      ts,
+      checker,
+      node,
+      sourceFile,
+      callMethod + 'Result',
+    );
+
+    current.awaited = current.awaited || isAwaited(ts, node);
+    current.returnsPromise =
+      current.returnsPromise || returnInfo.returnsPromise;
+    current.returnFixture = returnInfo.fixture;
+    current.expectedArguments = renderExpectedArguments(
+      ts,
+      node.arguments,
+      parameterMap,
+      sourceFile,
+    );
+    calls.set(key, current);
+  }
 
   function visit(node) {
     if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      ts.isPropertyAccessExpression(node.expression.expression)
+      ts.isForOfStatement(node) &&
+      ts.isVariableDeclarationList(node.initializer) &&
+      node.initializer.declarations.length === 1
     ) {
-      const dependencyAccess = node.expression.expression;
+      const declaration = node.initializer.declarations[0];
+      const expression = node.expression;
+
+      if (ts.isIdentifier(declaration.name)) {
+        if (
+          ts.isPropertyAccessExpression(expression) &&
+          expression.expression.kind ===
+            ts.SyntaxKind.ThisKeyword &&
+          collectionDependencies.has(expression.name.text)
+        ) {
+          collectionAliases.set(
+            declaration.name.text,
+            expression.name.text,
+          );
+        } else if (
+          ts.isCallExpression(expression) &&
+          ts.isPropertyAccessExpression(expression.expression) &&
+          expression.expression.name.text === 'values' &&
+          ts.isPropertyAccessExpression(
+            expression.expression.expression,
+          ) &&
+          expression.expression.expression.expression.kind ===
+            ts.SyntaxKind.ThisKeyword &&
+          collectionDependencies.has(
+            expression.expression.expression.name.text,
+          )
+        ) {
+          collectionAliases.set(
+            declaration.name.text,
+            expression.expression.expression.name.text,
+          );
+        }
+      }
+    }
+
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression)
+    ) {
+      const receiver = node.expression.expression;
+      const callMethod = node.expression.name.text;
 
       if (
-        dependencyAccess.expression.kind === ts.SyntaxKind.ThisKeyword &&
-        ts.isIdentifier(dependencyAccess.name) &&
-        dependencyNames.has(dependencyAccess.name.text)
+        ts.isPropertyAccessExpression(receiver) &&
+        receiver.expression.kind ===
+          ts.SyntaxKind.ThisKeyword &&
+        ts.isIdentifier(receiver.name) &&
+        dependencyNames.has(receiver.name.text)
       ) {
-        const dependency = dependencyAccess.name.text;
-        const callMethod = node.expression.name.text;
-        const key = dependency + '.' + callMethod;
-        const current = calls.get(key) || {
-          dependency,
-          method: callMethod,
-          awaited: false,
-          returnsPromise: false,
-          returnFixture: 'undefined',
-          expectedArguments: null,
-        };
-
-        const returnInfo = getCallReturnInfo(
-          ts,
-          checker,
+        recordCall(
           node,
-          sourceFile,
-          callMethod + 'Result',
+          receiver.name.text,
+          callMethod,
         );
+      } else if (
+        ts.isIdentifier(receiver) &&
+        collectionAliases.has(receiver.text)
+      ) {
+        const dependency =
+          collectionAliases.get(receiver.text);
 
-        current.awaited = current.awaited || isAwaited(ts, node);
-        current.returnsPromise =
-          current.returnsPromise || returnInfo.returnsPromise;
-        current.returnFixture = returnInfo.fixture;
-        current.expectedArguments = renderExpectedArguments(
-          ts,
-          node.arguments,
-          parameterMap,
-          sourceFile,
+        recordCall(
+          node,
+          dependency,
+          callMethod,
+          receiver.text,
+          true,
         );
-        calls.set(key, current);
       }
     }
 
@@ -1141,6 +1443,42 @@ function renderTypeFixture(
     return null;
   }
 
+  const enumFixture = renderEnumFixture(
+    ts,
+    checker,
+    type,
+    options.fixtureContext,
+  );
+  if (enumFixture !== null) return enumFixture;
+
+  if (type.isIntersection?.()) {
+    const primitive = type.types.find((item) => {
+      const itemFlags = item.flags || 0;
+      return Boolean(
+        itemFlags & ts.TypeFlags.StringLike ||
+        itemFlags & ts.TypeFlags.NumberLike ||
+        itemFlags & ts.TypeFlags.BooleanLike ||
+        itemFlags & ts.TypeFlags.BigIntLike
+      );
+    });
+
+    if (primitive) {
+      const rendered = renderTypeFixture(
+        ts,
+        checker,
+        primitive,
+        name,
+        sourceFile,
+        depth + 1,
+        options,
+      );
+
+      if (rendered !== null) {
+        return rendered + ' as never';
+      }
+    }
+  }
+
   if (type.isUnion?.()) {
     const nullType = type.types.find(
       (item) => item.flags & ts.TypeFlags.Null,
@@ -1432,6 +1770,54 @@ function renderTypeFixture(
   return '{ ' + fields.join(', ') + ' }';
 }
 
+function renderEnumFixture(
+  ts,
+  checker,
+  type,
+  fixtureContext,
+) {
+  const symbol = type.getSymbol?.() || type.symbol;
+  const declaration = symbol?.declarations?.find(
+    (item) =>
+      ts.isEnumMember(item) ||
+      ts.isEnumDeclaration(item),
+  );
+
+  let enumDeclaration = null;
+  let member = null;
+
+  if (declaration && ts.isEnumMember(declaration)) {
+    member = declaration;
+    enumDeclaration = declaration.parent;
+  } else if (declaration && ts.isEnumDeclaration(declaration)) {
+    enumDeclaration = declaration;
+    member = declaration.members[0] || null;
+  } else {
+    const alias = type.aliasSymbol;
+    enumDeclaration = alias?.declarations?.find(
+      ts.isEnumDeclaration,
+    ) || null;
+    member = enumDeclaration?.members?.[0] || null;
+  }
+
+  if (!enumDeclaration || !enumDeclaration.name || !member) {
+    return null;
+  }
+
+  const enumName = enumDeclaration.name.text;
+  const memberName = member.name.getText(
+    enumDeclaration.getSourceFile(),
+  );
+
+  registerFixtureImport(
+    fixtureContext,
+    enumName,
+    enumDeclaration.getSourceFile().fileName,
+  );
+
+  return enumName + '.' + memberName;
+}
+
 function renderUserClassFixture(
   ts,
   checker,
@@ -1563,7 +1949,14 @@ function interfaceHasBehavior(
   ts,
   checker,
   interfaceDeclaration,
+  visited = new Set(),
 ) {
+  if (!interfaceDeclaration || visited.has(interfaceDeclaration)) {
+    return false;
+  }
+
+  visited.add(interfaceDeclaration);
+
   for (const member of interfaceDeclaration.members) {
     if (
       ts.isMethodSignature(member) ||
@@ -1591,6 +1984,33 @@ function interfaceHasBehavior(
       } catch {}
     }
   }
+
+  try {
+    const interfaceType = checker.getTypeAtLocation(
+      interfaceDeclaration,
+    );
+    const baseTypes = checker.getBaseTypes?.(interfaceType) || [];
+
+    for (const baseType of baseTypes) {
+      const baseDeclaration = getInterfaceDeclaration(
+        ts,
+        checker,
+        baseType,
+      );
+
+      if (
+        baseDeclaration &&
+        interfaceHasBehavior(
+          ts,
+          checker,
+          baseDeclaration,
+          visited,
+        )
+      ) {
+        return true;
+      }
+    }
+  } catch {}
 
   return false;
 }
@@ -1959,6 +2379,46 @@ function renderTest({
     '',
   ];
 
+  if (
+    creation.kind === 'factory' &&
+    creation.negativeCases?.length > 0
+  ) {
+    for (const negativeCase of creation.negativeCases) {
+      const callback = creation.async ? 'async ()' : '()';
+
+      lines.push(
+        `test('${className}.${creation.methodName} rejects invalid ${negativeCase.parameterName}', ${callback} => {`,
+        ...renderCreationSetup(
+          className,
+          creation,
+          [],
+        ),
+      );
+
+      if (creation.parameters.length > 0) lines.push('');
+
+      const invalidInvocation =
+        renderCreationExpressionWithOverride(
+          className,
+          creation,
+          negativeCase.index,
+          negativeCase.fixture,
+        );
+
+      if (creation.async) {
+        lines.push(
+          `  await assert.rejects(() => ${invalidInvocation})`,
+        );
+      } else {
+        lines.push(
+          `  assert.throws(() => ${invalidInvocation})`,
+        );
+      }
+
+      lines.push('})', '');
+    }
+  }
+
   if (methods.length === 0) {
     const callback =
       creation.async || fixtureRequiresAsync
@@ -2073,7 +2533,9 @@ function renderTest({
 
       for (const call of method.calls) {
         const access =
-          call.dependency + '.' + safePropertyAccess(call.method);
+          (call.mockTarget || call.dependency) +
+          '.' +
+          safePropertyAccess(call.method);
 
         lines.push(
           `  assert.equal(${access}.mock.callCount(), 1)`,
@@ -2132,6 +2594,54 @@ function renderCreationSetup(
       (call) => call.dependency === parameter.name,
     );
 
+    if (parameter.kind === 'dependencyCollection') {
+      if (dependencyCalls.length === 0) {
+        lines.push(
+          `  const ${parameter.name} = [] as unknown as ${creationParameterType(
+            className,
+            creation,
+            parameter.index,
+          )}`,
+        );
+        continue;
+      }
+
+      const itemName =
+        dependencyCalls[0].mockTarget ||
+        singularizeName(parameter.name);
+
+      lines.push(`  const ${itemName} = {`);
+
+      for (const call of dependencyCalls) {
+        const asyncKeyword =
+          call.awaited || call.returnsPromise ? 'async ' : '';
+
+        lines.push(
+          `    ${safePropertyName(call.method)}: t.mock.fn(${asyncKeyword}(..._args: unknown[]) => ${call.returnFixture}),`,
+        );
+      }
+
+      lines.push('  }');
+
+      const container =
+        parameter.collectionBehavior?.container || 'array';
+      const collectionFixture =
+        container === 'set'
+          ? `new Set([${itemName}])`
+          : container === 'map'
+            ? `new Map([["key", ${itemName}]])`
+            : `[${itemName}]`;
+
+      lines.push(
+        `  const ${parameter.name} = ${collectionFixture} as unknown as ${creationParameterType(
+          className,
+          creation,
+          parameter.index,
+        )}`,
+      );
+      continue;
+    }
+
     if (dependencyCalls.length === 0) {
       lines.push(`  const ${parameter.name} = {}`);
       continue;
@@ -2157,7 +2667,12 @@ function renderCreationSetup(
 function renderCreationExpression(className, creation) {
   const argumentsList = creation.parameters
     .map((parameter) => {
-      if (parameter.kind === 'value') return parameter.name;
+      if (
+        parameter.kind === 'value' ||
+        parameter.kind === 'dependencyCollection'
+      ) {
+        return parameter.name;
+      }
 
       return (
         parameter.name +
@@ -2184,6 +2699,47 @@ function renderCreationExpression(className, creation) {
   }
 
   return 'new ' + className + '(' + argumentsList + ')';
+}
+
+function renderCreationExpressionWithOverride(
+  className,
+  creation,
+  overrideIndex,
+  overrideFixture,
+) {
+  const argumentsList = creation.parameters
+    .map((parameter) => {
+      if (parameter.index === overrideIndex) {
+        return overrideFixture;
+      }
+
+      if (
+        parameter.kind === 'value' ||
+        parameter.kind === 'dependencyCollection'
+      ) {
+        return parameter.name;
+      }
+
+      return (
+        parameter.name +
+        ' as unknown as ' +
+        creationParameterType(
+          className,
+          creation,
+          parameter.index,
+        )
+      );
+    })
+    .join(', ');
+
+  return (
+    className +
+    '.' +
+    creation.methodName +
+    '(' +
+    argumentsList +
+    ')'
+  );
 }
 
 function creationParameterType(

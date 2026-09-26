@@ -2381,18 +2381,12 @@ function renderTest({
     `describe(${JSON.stringify(className)}, () => {`,
   ];
   const headerLength = lines.length;
-  const finish = () => {
-    const stack = [];
-    const body = lines.slice(headerLength).map((line) => {
-      if (line === '})') stack.pop();
-      const depth = 1 + stack.filter((kind) => kind === 'suite').length;
-      const formatted = line ? '  '.repeat(depth) + line : line;
-      if (line.startsWith('describe(')) stack.push('suite');
-      else if (line.startsWith('it(')) stack.push('test');
-      return formatted;
-    });
-    return [...lines.slice(0, headerLength), ...body, '})', ''].join('\n');
-  };
+  const finish = () => [
+    ...lines.slice(0, headerLength),
+    ...lines.slice(headerLength).map((line) => line ? '  ' + line : line),
+    '})',
+    '',
+  ].join('\n');
 
   if (
     creation.kind === 'factory' &&
@@ -2402,8 +2396,7 @@ function renderTest({
       const callback = creation.async ? 'async ()' : '()';
 
       lines.push(
-        `describe(${JSON.stringify(creation.methodName)}, () => {`,
-        `it(${JSON.stringify('rejects invalid ' + negativeCase.parameterName)}, ${callback} => {`,
+        `it(${JSON.stringify(creation.methodName + ' rejects invalid ' + negativeCase.parameterName)}, ${callback} => {`,
         ...renderCreationSetup(
           className,
           creation,
@@ -2431,7 +2424,7 @@ function renderTest({
         );
       }
 
-      lines.push('})', '})', '');
+      lines.push('})', '');
     }
   }
 
@@ -2442,8 +2435,7 @@ function renderTest({
         : '()';
 
     lines.push(
-      `describe(${JSON.stringify(creation.methodName || 'constructor')}, () => {`,
-      `it('creates an instance', ${callback} => {`,
+      `it(${JSON.stringify(creation.methodName || 'constructor')}, ${callback} => {`,
       ...renderCreationSetup(
         className,
         creation,
@@ -2464,7 +2456,6 @@ function renderTest({
       '',
     );
 
-    lines.push('})');
     return finish();
   }
 
@@ -2480,9 +2471,7 @@ function renderTest({
         ? '(t)'
         : '()';
 
-    lines.push(`describe(${JSON.stringify(method.name)}, () => {`);
-    const scenarioStart = lines.length;
-    lines.push(`it('verifies the behavior', ${callback} => {`);
+    lines.push(`it(${JSON.stringify(method.name)}, ${callback} => {`);
 
     lines.push(
       ...renderCreationSetup(
@@ -2573,16 +2562,6 @@ function renderTest({
       }
     }
 
-    lines.push('})');
-    if (!method.expectedReturn && method.calls.length === 0) {
-      const scaffold = lines.splice(scenarioStart);
-      lines.push(
-        "it.todo('verifies the business behavior')",
-        '',
-        '// Complete the assertions, then replace it.todo with this scenario:',
-        ...scaffold.map((line) => '// ' + line),
-      );
-    }
     lines.push('})', '');
   }
 

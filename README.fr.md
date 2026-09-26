@@ -65,7 +65,6 @@ yarn test create-user
 
 Le générateur analyse l’AST TypeScript pour identifier la classe, les dépendances du constructeur, les méthodes publiques et les appels tels que `this.repository.save()`. Il crée des mocks avec `t.mock.fn()` et des assertions sur les appels lorsqu’il peut les déduire.
 
-Les tests générés utilisent un seul `describe` pour la classe et un `it` portant le nom de chaque méthode. Si les assertions métier ne peuvent pas être déduites, la méthode reste exécutable avec un commentaire `// TODO`. Aucun `it.todo` ni corps de test commenté n’est généré. Relisez les tests et complétez les vérifications métier.
 
 ## Compilation de production
 

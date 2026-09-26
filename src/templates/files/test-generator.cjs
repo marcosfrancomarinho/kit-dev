@@ -2290,6 +2290,44 @@ function renderCreationSetup(
       (call) => call.dependency === parameter.name,
     );
 
+    if (parameter.kind === 'dependencyCollection') {
+      if (dependencyCalls.length === 0) {
+        lines.push(
+          `  const ${parameter.name} = [] as unknown as ${creationParameterType(
+            className,
+            creation,
+            parameter.index,
+          )}`,
+        );
+        continue;
+      }
+
+      const itemName =
+        dependencyCalls[0].mockTarget ||
+        singularizeName(parameter.name);
+
+      lines.push(`  const ${itemName} = {`);
+
+      for (const call of dependencyCalls) {
+        const asyncKeyword =
+          call.awaited || call.returnsPromise ? 'async ' : '';
+
+        lines.push(
+          `    ${safePropertyName(call.method)}: t.mock.fn(${asyncKeyword}(..._args: unknown[]) => ${call.returnFixture}),`,
+        );
+      }
+
+      lines.push('  }');
+      lines.push(
+        `  const ${parameter.name} = [${itemName}] as unknown as ${creationParameterType(
+          className,
+          creation,
+          parameter.index,
+        )}`,
+      );
+      continue;
+    }
+
     if (dependencyCalls.length === 0) {
       lines.push(`  const ${parameter.name} = {}`);
       continue;
@@ -2315,7 +2353,12 @@ function renderCreationSetup(
 function renderCreationExpression(className, creation) {
   const argumentsList = creation.parameters
     .map((parameter) => {
-      if (parameter.kind === 'value') return parameter.name;
+      if (
+        parameter.kind === 'value' ||
+        parameter.kind === 'dependencyCollection'
+      ) {
+        return parameter.name;
+      }
 
       return (
         parameter.name +

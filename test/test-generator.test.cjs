@@ -1807,3 +1807,210 @@ export class Identifier {
     assert.doesNotMatch(factoryTest, /new Identifier\(/);
   },
 );
+
+
+test(
+  'cobre enum branded types herança de ports coleções comportamentais e invariantes simples',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-advanced-domain-matrix-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'domain'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'types.ts'),
+      `
+export enum Status {
+  Active = 'active',
+  Inactive = 'inactive',
+}
+
+export type UserId = string & {
+  readonly __brand: 'UserId'
+}
+`,
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'entity.ts'),
+      `
+import { Status, type UserId } from './types.js'
+
+export class Entity {
+  constructor(
+    private readonly id: UserId,
+    private readonly status: Status,
+  ) {}
+
+  getStatus(): Status {
+    return this.status
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const entityResult = await generateTest(
+      'src/domain/entity.ts',
+      projectPath,
+    );
+    const entityTest = await readFile(
+      entityResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      entityTest,
+      /import \{ Status \} from '..\/..\/src\/domain\/types\.js'/,
+    );
+    assert.match(
+      entityTest,
+      /const id: ConstructorParameters<typeof Entity>\[0\] = "test-id" as never/,
+    );
+    assert.match(
+      entityTest,
+      /const status: ConstructorParameters<typeof Entity>\[1\] = Status\.Active/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'ports.ts'),
+      `
+interface BasePort {
+  send(message: string): Promise<void>
+}
+
+interface NotificationPort extends BasePort {}
+
+export class NotificationService {
+  constructor(
+    private readonly port: NotificationPort,
+  ) {}
+
+  async execute(message: string): Promise<void> {
+    await this.port.send(message)
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const inheritedResult = await generateTest(
+      'src/domain/ports.ts',
+      projectPath,
+    );
+    const inheritedTest = await readFile(
+      inheritedResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      inheritedTest,
+      /send: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'collections.ts'),
+      `
+interface Observer {
+  update(message: string): void
+}
+
+export class Broadcaster {
+  constructor(
+    private readonly setObservers: Set<Observer>,
+    private readonly mapObservers: Map<string, Observer>,
+  ) {}
+
+  notifySet(message: string): void {
+    for (const observer of this.setObservers) {
+      observer.update(message)
+    }
+  }
+
+  notifyMap(message: string): void {
+    for (const observer of this.mapObservers.values()) {
+      observer.update(message)
+    }
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const collectionResult = await generateTest(
+      'src/domain/collections.ts',
+      projectPath,
+    );
+    const collectionTest = await readFile(
+      collectionResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      collectionTest,
+      /new Set\(\[observer\]\) as unknown as ConstructorParameters<typeof Broadcaster>\[0\]/,
+    );
+    assert.match(
+      collectionTest,
+      /new Map\(\[\["key", observer\]\]\) as unknown as ConstructorParameters<typeof Broadcaster>\[1\]/,
+    );
+    assert.match(
+      collectionTest,
+      /observer\.update\.mock\.callCount\(\), 1/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'age.ts'),
+      `
+export class Age {
+  private constructor(
+    private readonly value: number,
+  ) {}
+
+  static create(value: number): Age {
+    if (value < 0) {
+      throw new Error('invalid age')
+    }
+
+    return new Age(value)
+  }
+
+  getValue(): number {
+    return this.value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const invariantResult = await generateTest(
+      'src/domain/age.ts',
+      projectPath,
+    );
+    const invariantTest = await readFile(
+      invariantResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      invariantTest,
+      /test\('Age\.create rejects invalid value', \(\) => \{/,
+    );
+    assert.match(
+      invariantTest,
+      /assert\.throws\(\(\) => Age\.create\(-1\)\)/,
+    );
+  },
+);

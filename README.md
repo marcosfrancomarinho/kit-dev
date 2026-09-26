@@ -488,20 +488,55 @@ console.log(database === primaryDatabase); // true
 
 ### `imports()` — split providers by module
 
-You do not need to keep every registration in one file.
+Use `imports()` to organize DI registrations by context or module instead of keeping everything in a single `providers.ts` file.
 
-Create smaller configurations:
+For example, the database module can own only persistence-related dependencies:
 
 ```ts
 // src/di/database-providers.ts
-import { AppConfig } from '../../kit-dev/di/container.js';
+import {
+  AppConfig,
+  createToken,
+} from '../../kit-dev/di/container.js';
 import { Database } from '../infra/database.js';
 
+export const DATABASE_URL =
+  createToken<string>('DATABASE_URL');
+
 export const databaseProviders = new AppConfig()
-  .useClass(Database);
+  .useValue(
+    DATABASE_URL,
+    process.env.DATABASE_URL ?? 'sqlite://local.db',
+  )
+  .useClass(Database, [DATABASE_URL]);
 ```
 
-Then import them into the composition root:
+The users module can register its own contract and implementation:
+
+```ts
+// src/di/user-providers.ts
+import { AppConfig } from '../../kit-dev/di/container.js';
+import type { UserRepository } from '../domain/repositories/user-repository.js';
+import { UserRepositoryDatabase } from '../infra/repositories/user-repository-database.js';
+import { CreateUser } from '../application/use-cases/create-user.js';
+
+export const userProviders = new AppConfig()
+  .useClass<UserRepository>(UserRepositoryDatabase)
+  .useClass(CreateUser);
+```
+
+Another module can do the same:
+
+```ts
+// src/di/email-providers.ts
+import { AppConfig } from '../../kit-dev/di/container.js';
+import { EmailService } from '../infra/email/email-service.js';
+
+export const emailProviders = new AppConfig()
+  .useClass(EmailService);
+```
+
+The composition root then only combines those configurations and creates the container:
 
 ```ts
 // src/di/providers.ts
@@ -510,25 +545,35 @@ import {
   createApplicationContext,
 } from '../../kit-dev/di/container.js';
 import { databaseProviders } from './database-providers.js';
+import { emailProviders } from './email-providers.js';
+import { userProviders } from './user-providers.js';
 
-const providers = new AppConfig();
+const providers = new AppConfig()
+  .imports(
+    databaseProviders,
+    userProviders,
+    emailProviders,
+  );
 
-providers.imports(databaseProviders);
-
-export const container = createApplicationContext(providers);
+export const container =
+  createApplicationContext(providers);
 ```
 
-You can import multiple configurations at once:
+The application then resolves only the root class it needs:
 
 ```ts
-providers.imports(
-  databaseProviders,
-  userProviders,
-  emailProviders,
-);
+// src/main.ts
+import { CreateUser } from './application/use-cases/create-user.js';
+import { container } from './di/providers.js';
+
+const createUser = container.get(CreateUser);
+
+await createUser.execute('Marcos');
 ```
 
-If two configurations register the same token, Kit Dev throws `DependencyInjectionError` instead of silently overwriting the provider.
+Each imported `AppConfig` remains independent while being configured. `imports()` copies its providers into the main configuration, so DI can be organized by domain, feature, or layer without creating multiple containers.
+
+If two modules register the same token, Kit Dev throws `DependencyInjectionError` instead of silently overwriting the provider.
 
 ### `has()` — check an `AppConfig` registration
 

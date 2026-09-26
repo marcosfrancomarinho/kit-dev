@@ -3,7 +3,7 @@ const { mkdtemp, mkdir, readFile, rm, writeFile } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const test = require('node:test');
-const { generateTest } = require('../src/generators/test-generator');
+const { generateTest } = require('../src/generators/automatic-test-generator');
 
 test('gera teste a partir das dependências e chamadas da classe', async (context) => {
   const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-test-generator-'));

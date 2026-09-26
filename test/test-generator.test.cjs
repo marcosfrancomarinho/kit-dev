@@ -9,6 +9,8 @@ const {
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const test = require('node:test');
+
+// Design-pattern regression matrix.
 const {
   generateTest,
 } = require('../src/templates/files/test-generator.cjs');
@@ -1539,6 +1541,478 @@ export class Entity {
     assert.doesNotMatch(
       generated,
       /reveal: t\.mock\.fn/,
+    );
+  },
+);
+
+
+test(
+  'reconhece estruturalmente padrões Observer Strategy Specification Decorator Adapter e Factory',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-design-patterns-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'patterns'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'patterns', 'observer.ts'),
+      `
+interface Observer {
+  update(message: string): void
+}
+
+export class Subject {
+  constructor(
+    private readonly observers: Observer[],
+  ) {}
+
+  notify(message: string): void {
+    for (const observer of this.observers) {
+      observer.update(message)
+    }
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const observerResult = await generateTest(
+      'src/patterns/observer.ts',
+      projectPath,
+    );
+    const observerTest = await readFile(
+      observerResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      observerTest,
+      /const observer = \{/,
+    );
+    assert.match(
+      observerTest,
+      /update: t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => undefined\)/,
+    );
+    assert.match(
+      observerTest,
+      /const observers = \[observer\] as unknown as ConstructorParameters<typeof Subject>\[0\]/,
+    );
+    assert.match(
+      observerTest,
+      /assert\.equal\(observer\.update\.mock\.callCount\(\), 1\)/,
+    );
+    assert.match(
+      observerTest,
+      /observer\.update\.mock\.calls\[0\]\.arguments, \["message"\]/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'patterns', 'strategy.ts'),
+      `
+interface PriceStrategy {
+  calculate(value: number): number
+}
+
+export class Checkout {
+  constructor(
+    private readonly strategy: PriceStrategy,
+  ) {}
+
+  total(value: number): number {
+    return this.strategy.calculate(value)
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const strategyResult = await generateTest(
+      'src/patterns/strategy.ts',
+      projectPath,
+    );
+    const strategyTest = await readFile(
+      strategyResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      strategyTest,
+      /calculate: t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => 1\)/,
+    );
+    assert.match(
+      strategyTest,
+      /strategy\.calculate\.mock\.callCount\(\), 1/,
+    );
+    assert.match(
+      strategyTest,
+      /strategy\.calculate\.mock\.calls\[0\]\.arguments, \[1\]/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'patterns', 'specification.ts'),
+      `
+interface Specification<T> {
+  isSatisfiedBy(candidate: T): boolean
+}
+
+export class ProductFilter {
+  constructor(
+    private readonly specification: Specification<string>,
+  ) {}
+
+  accepts(name: string): boolean {
+    return this.specification.isSatisfiedBy(name)
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const specificationResult = await generateTest(
+      'src/patterns/specification.ts',
+      projectPath,
+    );
+    const specificationTest = await readFile(
+      specificationResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      specificationTest,
+      /isSatisfiedBy: t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => true\)/,
+    );
+    assert.match(
+      specificationTest,
+      /specification\.isSatisfiedBy\.mock\.callCount\(\), 1/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'patterns', 'decorator.ts'),
+      `
+interface Service {
+  execute(name: string): Promise<void>
+}
+
+export class LoggingDecorator {
+  constructor(
+    private readonly inner: Service,
+  ) {}
+
+  async execute(name: string): Promise<void> {
+    await this.inner.execute(name)
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const decoratorResult = await generateTest(
+      'src/patterns/decorator.ts',
+      projectPath,
+    );
+    const decoratorTest = await readFile(
+      decoratorResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      decoratorTest,
+      /execute: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+    );
+    assert.match(
+      decoratorTest,
+      /inner\.execute\.mock\.callCount\(\), 1/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'patterns', 'adapter.ts'),
+      `
+interface PaymentPort {
+  charge(amount: number): Promise<boolean>
+}
+
+export class PaymentAdapter {
+  constructor(
+    private readonly port: PaymentPort,
+  ) {}
+
+  async pay(amount: number): Promise<boolean> {
+    return this.port.charge(amount)
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const adapterResult = await generateTest(
+      'src/patterns/adapter.ts',
+      projectPath,
+    );
+    const adapterTest = await readFile(
+      adapterResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      adapterTest,
+      /charge: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => true\)/,
+    );
+    assert.match(
+      adapterTest,
+      /port\.charge\.mock\.callCount\(\), 1/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'patterns', 'factory.ts'),
+      `
+export class Identifier {
+  private constructor(
+    private readonly value: string,
+  ) {}
+
+  static from(value: string): Identifier {
+    return new Identifier(value)
+  }
+
+  getValue(): string {
+    return this.value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const factoryResult = await generateTest(
+      'src/patterns/factory.ts',
+      projectPath,
+    );
+    const factoryTest = await readFile(
+      factoryResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      factoryTest,
+      /const sut = Identifier\.from\(value\)/,
+    );
+    assert.doesNotMatch(factoryTest, /new Identifier\(/);
+  },
+);
+
+
+test(
+  'cobre enum branded types herança de ports coleções comportamentais e invariantes simples',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-advanced-domain-matrix-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'domain'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'types.ts'),
+      `
+export enum Status {
+  Active = 'active',
+  Inactive = 'inactive',
+}
+
+export type UserId = string & {
+  readonly __brand: 'UserId'
+}
+`,
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'entity.ts'),
+      `
+import { Status, type UserId } from './types.js'
+
+export class Entity {
+  constructor(
+    private readonly id: UserId,
+    private readonly status: Status,
+  ) {}
+
+  getStatus(): Status {
+    return this.status
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const entityResult = await generateTest(
+      'src/domain/entity.ts',
+      projectPath,
+    );
+    const entityTest = await readFile(
+      entityResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      entityTest,
+      /import \{ Status \} from '..\/..\/src\/domain\/types\.js'/,
+    );
+    assert.match(
+      entityTest,
+      /const id: ConstructorParameters<typeof Entity>\[0\] = "test-id" as never/,
+    );
+    assert.match(
+      entityTest,
+      /const status: ConstructorParameters<typeof Entity>\[1\] = Status\.Active/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'ports.ts'),
+      `
+interface BasePort {
+  send(message: string): Promise<void>
+}
+
+interface NotificationPort extends BasePort {}
+
+export class NotificationService {
+  constructor(
+    private readonly port: NotificationPort,
+  ) {}
+
+  async execute(message: string): Promise<void> {
+    await this.port.send(message)
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const inheritedResult = await generateTest(
+      'src/domain/ports.ts',
+      projectPath,
+    );
+    const inheritedTest = await readFile(
+      inheritedResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      inheritedTest,
+      /send: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'collections.ts'),
+      `
+interface Observer {
+  update(message: string): void
+}
+
+export class Broadcaster {
+  constructor(
+    private readonly setObservers: Set<Observer>,
+    private readonly mapObservers: Map<string, Observer>,
+  ) {}
+
+  notifySet(message: string): void {
+    for (const observer of this.setObservers) {
+      observer.update(message)
+    }
+  }
+
+  notifyMap(message: string): void {
+    for (const observer of this.mapObservers.values()) {
+      observer.update(message)
+    }
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const collectionResult = await generateTest(
+      'src/domain/collections.ts',
+      projectPath,
+    );
+    const collectionTest = await readFile(
+      collectionResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      collectionTest,
+      /new Set\(\[observer\]\) as unknown as ConstructorParameters<typeof Broadcaster>\[0\]/,
+    );
+    assert.match(
+      collectionTest,
+      /new Map\(\[\["key", observer\]\]\) as unknown as ConstructorParameters<typeof Broadcaster>\[1\]/,
+    );
+    assert.match(
+      collectionTest,
+      /observer\.update\.mock\.callCount\(\), 1/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'age.ts'),
+      `
+export class Age {
+  private constructor(
+    private readonly value: number,
+  ) {}
+
+  static create(value: number): Age {
+    if (value < 0) {
+      throw new Error('invalid age')
+    }
+
+    return new Age(value)
+  }
+
+  getValue(): number {
+    return this.value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const invariantResult = await generateTest(
+      'src/domain/age.ts',
+      projectPath,
+    );
+    const invariantTest = await readFile(
+      invariantResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      invariantTest,
+      /test\('Age\.create rejects invalid value', \(\) => \{/,
+    );
+    assert.match(
+      invariantTest,
+      /assert\.throws\(\(\) => Age\.create\(-1\)\)/,
     );
   },
 );

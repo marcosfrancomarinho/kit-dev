@@ -869,14 +869,48 @@ function renderInitializerFixture(
     return "new Date('2026-01-01T00:00:00.000Z')";
   }
 
+  if (ts.isRegularExpressionLiteral?.(initializer)) {
+    return initializer.getText(sourceFile);
+  }
+
   if (ts.isArrayLiteralExpression(initializer)) {
-    return initializer.elements.length === 0
-      ? '[]'
-      : initializer.getText(sourceFile);
+    const items = initializer.elements.map((element) =>
+      renderInitializerFixture(ts, element, sourceFile),
+    );
+
+    if (items.some((item) => item === null)) return null;
+    return '[' + items.join(', ') + ']';
   }
 
   if (ts.isObjectLiteralExpression(initializer)) {
-    return initializer.getText(sourceFile);
+    const fields = [];
+
+    for (const property of initializer.properties) {
+      if (
+        !ts.isPropertyAssignment(property) ||
+        !(
+          ts.isIdentifier(property.name) ||
+          ts.isStringLiteral(property.name) ||
+          ts.isNumericLiteral(property.name)
+        )
+      ) {
+        return null;
+      }
+
+      const value = renderInitializerFixture(
+        ts,
+        property.initializer,
+        sourceFile,
+      );
+
+      if (value === null) return null;
+
+      fields.push(
+        safePropertyName(property.name.text) + ': ' + value,
+      );
+    }
+
+    return '{ ' + fields.join(', ') + ' }';
   }
 
   return null;
@@ -1696,8 +1730,12 @@ function uniqueParameterName(name, methodName, constructorNames) {
 function sampleString(name) {
   const normalized = String(name).toLowerCase();
 
-  if (normalized.includes('email')) return 'user@example.com';
+  if (normalized.includes('email')) return 'marcos@example.com';
   if (normalized.includes('name')) return 'Marcos';
+  if (normalized.includes('phone')) return '+5599999999999';
+  if (normalized.includes('slug')) return 'example-slug';
+  if (normalized.includes('token')) return 'test-token';
+  if (normalized.includes('password')) return 'Test@123';
   if (normalized.includes('id')) return 'test-id';
   if (normalized.includes('url')) return 'https://example.com';
 

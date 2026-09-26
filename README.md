@@ -814,3 +814,6 @@ MIT
 
 <p align="center">Made by <a href="https://github.com/marcosfrancomarinho">Marcos Franco Marinho</a></p>
 <p align="center"><strong>Less configuration. More code.</strong></p>
+
+
+Generated tests use `describe` for the class and methods, and `it` for scenarios with assertions. Methods without inferred assertions use `it.todo` with a commented scaffold to complete; these pending scenarios do not execute.

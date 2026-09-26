@@ -51,12 +51,14 @@ const mainFile = "console.log('Hello World!');";
 
 const exampleTest = [
   "import assert from 'node:assert/strict'",
-  "import { test } from 'node:test'",
+  "import { describe, it } from 'node:test'",
   '',
-  "test('should sum two numbers', () => {",
-  '  const result = 1 + 1',
+  "describe('addition', () => {",
+  "  it('should sum two numbers', () => {",
+  '    const result = 1 + 1',
   '',
-  '  assert.equal(result, 2)',
+  '    assert.equal(result, 2)',
+  '  })',
   '})',
   '',
 ].join('\n');
@@ -178,3 +180,4 @@ module.exports = {
   gitignore,
   mainFile,
 };
+

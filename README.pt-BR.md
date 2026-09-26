@@ -816,3 +816,6 @@ MIT
 
 <p align="center">Feito por <a href="https://github.com/marcosfrancomarinho">Marcos Franco Marinho</a></p>
 <p align="center"><strong>Menos configuração. Mais código.</strong></p>
+
+
+Os testes gerados usam `describe` para a classe e os métodos, e `it` para cenários com verificações. Métodos sem assertions inferidas usam `it.todo` com um esboço comentado para completar; esses cenários pendentes não são executados.

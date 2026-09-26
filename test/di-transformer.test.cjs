@@ -82,7 +82,7 @@ test('gera as pastas visíveis de build e DI', async (context) => {
     join(projectPath, 'test', 'example.test.ts'),
     'utf-8',
   );
-  assert.match(exampleTest, /test\('should sum two numbers'/);
+  assert.match(exampleTest, /it\('should sum two numbers'/);
   assert.doesNotMatch(exampleTest, /\\\\n/);
   await transform(exampleTest, {
     loader: 'ts',
@@ -771,3 +771,4 @@ function waitForOutput(stream, expected, timeout = 5000) {
     stream.on('error', onError);
   });
 }
+

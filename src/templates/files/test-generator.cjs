@@ -2373,12 +2373,26 @@ function renderTest({
 }) {
   const lines = [
     "import assert from 'node:assert/strict'",
-    "import { test } from 'node:test'",
+    "import { describe, it } from 'node:test'",
     '',
     `import { ${className} } from '${importPath}'`,
     ...fixtureImports,
     '',
+    `describe(${JSON.stringify(className)}, () => {`,
   ];
+  const headerLength = lines.length;
+  const finish = () => {
+    const stack = [];
+    const body = lines.slice(headerLength).map((line) => {
+      if (line === '})') stack.pop();
+      const depth = 1 + stack.filter((kind) => kind === 'suite').length;
+      const formatted = line ? '  '.repeat(depth) + line : line;
+      if (line.startsWith('describe(')) stack.push('suite');
+      else if (line.startsWith('it(')) stack.push('test');
+      return formatted;
+    });
+    return [...lines.slice(0, headerLength), ...body, '})', ''].join('\n');
+  };
 
   if (
     creation.kind === 'factory' &&
@@ -2388,7 +2402,8 @@ function renderTest({
       const callback = creation.async ? 'async ()' : '()';
 
       lines.push(
-        `test('${className}.${creation.methodName} rejects invalid ${negativeCase.parameterName}', ${callback} => {`,
+        `describe(${JSON.stringify(creation.methodName)}, () => {`,
+        `it(${JSON.stringify('rejects invalid ' + negativeCase.parameterName)}, ${callback} => {`,
         ...renderCreationSetup(
           className,
           creation,
@@ -2416,7 +2431,7 @@ function renderTest({
         );
       }
 
-      lines.push('})', '');
+      lines.push('})', '})', '');
     }
   }
 
@@ -2427,7 +2442,8 @@ function renderTest({
         : '()';
 
     lines.push(
-      `test('${className}', ${callback} => {`,
+      `describe(${JSON.stringify(creation.methodName || 'constructor')}, () => {`,
+      `it('creates an instance', ${callback} => {`,
       ...renderCreationSetup(
         className,
         creation,
@@ -2448,7 +2464,8 @@ function renderTest({
       '',
     );
 
-    return lines.join('\n');
+    lines.push('})');
+    return finish();
   }
 
   for (const method of methods) {
@@ -2463,9 +2480,9 @@ function renderTest({
         ? '(t)'
         : '()';
 
-    lines.push(
-      `test('${className}.${method.name}', ${callback} => {`,
-    );
+    lines.push(`describe(${JSON.stringify(method.name)}, () => {`);
+    const scenarioStart = lines.length;
+    lines.push(`it('verifies the behavior', ${callback} => {`);
 
     lines.push(
       ...renderCreationSetup(
@@ -2556,10 +2573,20 @@ function renderTest({
       }
     }
 
+    lines.push('})');
+    if (!method.expectedReturn && method.calls.length === 0) {
+      const scaffold = lines.splice(scenarioStart);
+      lines.push(
+        "it.todo('verifies the business behavior')",
+        '',
+        '// Complete the assertions, then replace it.todo with this scenario:',
+        ...scaffold.map((line) => '// ' + line),
+      );
+    }
     lines.push('})', '');
   }
 
-  return lines.join('\n');
+  return finish();
 }
 
 function renderCreationSetup(
@@ -3101,3 +3128,4 @@ module.exports = {
   renderTest,
   resolveSourceFile,
 };
+

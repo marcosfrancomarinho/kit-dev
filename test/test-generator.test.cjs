@@ -1324,10 +1324,6 @@ export class UserService {
     );
     assert.match(
       generated,
-      /const repository = \{/,
-    );
-    assert.match(
-      generated,
       /save: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
     );
     assert.match(

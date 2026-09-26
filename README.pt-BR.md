@@ -818,4 +818,4 @@ MIT
 <p align="center"><strong>Menos configuração. Mais código.</strong></p>
 
 
-Os testes gerados usam `describe` para a classe e os métodos, e `it` para cenários com verificações. Métodos sem assertions inferidas usam `it.todo` com um esboço comentado para completar; esses cenários pendentes não são executados.
+Os testes gerados usam um único `describe` para a classe e um `it` com o nome de cada método. Quando não for possível inferir assertions, o método continua executável com um comentário `// TODO` para adicionar verificações de negócio. Não são gerados `it.todo` nem corpos de teste comentados.

@@ -816,4 +816,4 @@ MIT
 <p align="center"><strong>Less configuration. More code.</strong></p>
 
 
-Generated tests use `describe` for the class and methods, and `it` for scenarios with assertions. Methods without inferred assertions use `it.todo` with a commented scaffold to complete; these pending scenarios do not execute.
+Generated tests use a single `describe` for the class and an `it` named after each method. When assertions cannot be inferred, the method remains executable with a `// TODO` comment to add business assertions. No `it.todo` or commented-out test bodies are generated.

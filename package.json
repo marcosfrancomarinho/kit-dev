@@ -1,6 +1,6 @@
 {
   "name": "create-kit-dev",
-  "version": "1.1.28",
+  "version": "1.1.27",
   "description": "Fast Node.js + TypeScript project generator with esbuild, native testing, automatic test generation, optional dependency injection, and a zero-config developer workflow.",
   "bin": {
     "create-kit-dev": "index.js"

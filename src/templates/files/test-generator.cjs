@@ -239,6 +239,7 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
           methodName: null,
           async: false,
           parameters: constructorParameters,
+          negativeCases: [],
           sourceAliases: new Map(
             constructorParameters.map((parameter) => [
               parameter.name,
@@ -251,6 +252,7 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
           methodName: null,
           async: false,
           parameters: [],
+          negativeCases: [],
           sourceAliases: new Map(),
         });
 
@@ -573,6 +575,11 @@ function findStaticFactory(
     methodName: selected.name,
     async: selected.async,
     parameters,
+    negativeCases: detectSimpleFactoryThrowCases(
+      ts,
+      selected.method,
+      sourceFile,
+    ),
     sourceAliases: mapFactoryArgumentsToConstructor(
       ts,
       selected.method,
@@ -581,6 +588,115 @@ function findStaticFactory(
       sourceFile,
     ),
   };
+}
+
+function detectSimpleFactoryThrowCases(
+  ts,
+  method,
+  sourceFile,
+) {
+  if (!method.body) return [];
+
+  const parameterIndexes = new Map(
+    method.parameters
+      .filter((parameter) => ts.isIdentifier(parameter.name))
+      .map((parameter, index) => [
+        parameter.name.text,
+        index,
+      ]),
+  );
+  const cases = [];
+
+  for (const statement of method.body.statements) {
+    if (!ts.isIfStatement(statement)) continue;
+
+    const throws =
+      ts.isThrowStatement(statement.thenStatement) ||
+      (
+        ts.isBlock(statement.thenStatement) &&
+        statement.thenStatement.statements.some(
+          ts.isThrowStatement,
+        )
+      );
+
+    if (!throws) continue;
+
+    const invalid = renderInvalidGuardFixture(
+      ts,
+      statement.expression,
+      parameterIndexes,
+      sourceFile,
+    );
+
+    if (invalid) cases.push(invalid);
+  }
+
+  return cases;
+}
+
+function renderInvalidGuardFixture(
+  ts,
+  expression,
+  parameterIndexes,
+  sourceFile,
+) {
+  if (!ts.isBinaryExpression(expression)) return null;
+
+  const left = expression.left;
+  const right = expression.right;
+
+  if (!ts.isIdentifier(left)) return null;
+  if (!parameterIndexes.has(left.text)) return null;
+
+  const index = parameterIndexes.get(left.text);
+  const operator = expression.operatorToken.kind;
+
+  if (ts.isNumericLiteral(right)) {
+    const value = Number(right.text);
+    let invalidValue = null;
+
+    if (operator === ts.SyntaxKind.LessThanToken) {
+      invalidValue = value - 1;
+    } else if (
+      operator === ts.SyntaxKind.LessThanEqualsToken ||
+      operator === ts.SyntaxKind.EqualsEqualsToken ||
+      operator === ts.SyntaxKind.EqualsEqualsEqualsToken
+    ) {
+      invalidValue = value;
+    } else if (operator === ts.SyntaxKind.GreaterThanToken) {
+      invalidValue = value + 1;
+    } else if (
+      operator === ts.SyntaxKind.GreaterThanEqualsToken
+    ) {
+      invalidValue = value;
+    }
+
+    if (invalidValue !== null) {
+      return {
+        index,
+        parameterName: left.text,
+        fixture: String(invalidValue),
+        condition: expression.getText(sourceFile),
+      };
+    }
+  }
+
+  if (
+    ts.isStringLiteral(right) &&
+    (
+      operator === ts.SyntaxKind.EqualsEqualsToken ||
+      operator === ts.SyntaxKind.EqualsEqualsEqualsToken
+    )
+  ) {
+    return {
+      index,
+      parameterName: left.text,
+      fixture: JSON.stringify(right.text),
+      condition: expression.getText(sourceFile),
+    };
+  }
+
+  return null;
 }
 
 function methodReturnsClass(
@@ -2263,6 +2379,46 @@ function renderTest({
     '',
   ];
 
+  if (
+    creation.kind === 'factory' &&
+    creation.negativeCases?.length > 0
+  ) {
+    for (const negativeCase of creation.negativeCases) {
+      const callback = creation.async ? 'async ()' : '()';
+
+      lines.push(
+        `test('${className}.${creation.methodName} rejects invalid ${negativeCase.parameterName}', ${callback} => {`,
+        ...renderCreationSetup(
+          className,
+          creation,
+          [],
+        ),
+      );
+
+      if (creation.parameters.length > 0) lines.push('');
+
+      const invalidInvocation =
+        renderCreationExpressionWithOverride(
+          className,
+          creation,
+          negativeCase.index,
+          negativeCase.fixture,
+        );
+
+      if (creation.async) {
+        lines.push(
+          `  await assert.rejects(() => ${invalidInvocation})`,
+        );
+      } else {
+        lines.push(
+          `  assert.throws(() => ${invalidInvocation})`,
+        );
+      }
+
+      lines.push('})', '');
+    }
+  }
+
   if (methods.length === 0) {
     const callback =
       creation.async || fixtureRequiresAsync
@@ -2543,6 +2699,47 @@ function renderCreationExpression(className, creation) {
   }
 
   return 'new ' + className + '(' + argumentsList + ')';
+}
+
+function renderCreationExpressionWithOverride(
+  className,
+  creation,
+  overrideIndex,
+  overrideFixture,
+) {
+  const argumentsList = creation.parameters
+    .map((parameter) => {
+      if (parameter.index === overrideIndex) {
+        return overrideFixture;
+      }
+
+      if (
+        parameter.kind === 'value' ||
+        parameter.kind === 'dependencyCollection'
+      ) {
+        return parameter.name;
+      }
+
+      return (
+        parameter.name +
+        ' as unknown as ' +
+        creationParameterType(
+          className,
+          creation,
+          parameter.index,
+        )
+      );
+    })
+    .join(', ');
+
+  return (
+    className +
+    '.' +
+    creation.methodName +
+    '(' +
+    argumentsList +
+    ')'
+  );
 }
 
 function creationParameterType(

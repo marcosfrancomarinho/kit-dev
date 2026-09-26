@@ -54,6 +54,8 @@ Pronto. A aplicação será recompilada e reiniciada automaticamente quando o c�
 - TypeScript em modo `strict`;
 - esbuild para desenvolvimento e produção;
 - watch com reinício automático do Node.js;
+- testes nativos com `node:test` em watch, sem framework adicional;
+- geração de testes por análise AST de classes TypeScript;
 - checagem de tipos no build;
 - bundle minificado;
 - sourcemap externo;
@@ -69,6 +71,7 @@ Os scripts são adicionados automaticamente ao `package.json`.
 |---|---|
 | `npm run dev` | Executa a aplicação em desenvolvimento, observa alterações e reinicia o Node.js |
 | `npm run type` | Mantém o TypeScript verificando erros em tempo real |
+| `npm test` | Executa os testes TypeScript com `node:test` e permanece em watch |
 | `npm run build` | Verifica os tipos e gera o bundle de produção |
 | `npm start` | Executa o bundle já gerado em `dist` |
 | `npm run di` | Instala a DI opcional no projeto |
@@ -92,6 +95,32 @@ npm run type
 ```
 
 O comando `type` é opcional. O `build` já executa uma checagem de tipos antes de gerar o bundle.
+
+### Testes
+
+O projeto já é criado com um runner de testes nativo. Basta executar:
+
+```bash
+npm test
+```
+
+O esbuild transpila os arquivos `.test.ts` e `.spec.ts`, o `node:test` executa os testes e o processo permanece observando alterações. Nenhum Jest, Vitest, ts-node ou tsx é instalado.
+
+Um teste inicial é criado em `test/example.test.ts`.
+
+Para gerar um teste a partir de uma classe existente, execute na raiz do projeto:
+
+```bash
+npx create-kit-dev test src/application/use-cases/create-user.ts
+```
+
+Também é possível informar apenas um nome de arquivo quando ele for único dentro de `src`:
+
+```bash
+npx create-kit-dev test create-user
+```
+
+O gerador usa a AST do TypeScript para localizar a classe, dependências do construtor, métodos públicos e chamadas como `this.repository.save()`. A partir disso ele cria mocks com `t.mock.fn()` e verificações de chamadas. Quando não consegue inferir um valor com segurança, deixa um `TODO` em vez de inventar uma regra de negócio.
 
 ### Build de produção
 
@@ -702,11 +731,15 @@ Logo após criar um projeto:
 ```text
 minha-api/
 ├── kit-dev/
-│   └── build/
-│       ├── dev.cjs
-│       └── esbuild.config.cjs
+│   ├── build/
+│   │   ├── dev.cjs
+│   │   └── esbuild.config.cjs
+│   └── test/
+│       └── test.cjs
 ├── src/
 │   └── main.ts
+├── test/
+│   └── example.test.ts
 ├── package.json
 └── tsconfig.json
 ```

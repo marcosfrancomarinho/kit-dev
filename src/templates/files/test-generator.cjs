@@ -21,7 +21,13 @@ async function generateTest(target, projectRoot = process.cwd()) {
     sourcePath,
   );
 
-  const metadata = analyzeClass(ts, sourceFile, checker);
+  const fixtureContext = createFixtureContext(sourcePath);
+  const metadata = analyzeClass(
+    ts,
+    sourceFile,
+    checker,
+    fixtureContext,
+  );
 
   if (!metadata) {
     throw new Error(
@@ -44,6 +50,13 @@ async function generateTest(target, projectRoot = process.cwd()) {
   const content = renderTest({
     ...metadata,
     importPath: getImportPath(destinationPath, sourcePath),
+    fixtureImports: renderFixtureImports(
+      fixtureContext,
+      destinationPath,
+      sourcePath,
+      metadata.className,
+    ),
+    fixtureRequiresAsync: fixtureContext.requiresAsync,
   });
 
   await writeFile(destinationPath, content, 'utf-8');
@@ -116,7 +129,7 @@ function createProgramContext(ts, projectRoot, sourcePath) {
   };
 }
 
-function analyzeClass(ts, sourceFile, checker) {
+function analyzeClass(ts, sourceFile, checker, fixtureContext) {
   const classes = sourceFile.statements.filter(ts.isClassDeclaration);
   const classNode =
     classes.find(
@@ -136,6 +149,7 @@ function analyzeClass(ts, sourceFile, checker) {
     checker,
     constructorNode?.parameters || [],
     sourceFile,
+    fixtureContext,
   );
   const propertySources = collectConstructorPropertySources(
     ts,
@@ -149,6 +163,7 @@ function analyzeClass(ts, sourceFile, checker) {
     constructorNode,
     constructorParameters,
     sourceFile,
+    fixtureContext,
   );
   const constructorAccessible =
     !constructorNode ||
@@ -208,6 +223,7 @@ function analyzeClass(ts, sourceFile, checker) {
         constructorNames: knownNames,
         propertySources,
         sourceAliases: creation.sourceAliases,
+        fixtureContext,
       }),
     );
 
@@ -224,6 +240,7 @@ function analyzeParameters(
   checker,
   parameters,
   sourceFile,
+  fixtureContext,
 ) {
   return parameters
     .filter((parameter) => ts.isIdentifier(parameter.name))
@@ -235,6 +252,7 @@ function analyzeParameters(
         parameter,
         name,
         sourceFile,
+        { fixtureContext },
       );
       const optional = Boolean(
         parameter.questionToken || parameter.initializer,
@@ -262,6 +280,7 @@ function findStaticFactory(
   constructorNode,
   constructorParameters,
   sourceFile,
+  fixtureContext,
 ) {
   const className = classNode.name.text;
   const preferredNames = new Map([
@@ -325,6 +344,7 @@ function findStaticFactory(
     checker,
     selected.method.parameters,
     sourceFile,
+    fixtureContext,
   );
 
   return {
@@ -504,6 +524,7 @@ function analyzeMethod({
   constructorNames,
   propertySources,
   sourceAliases,
+  fixtureContext,
 }) {
   const methodName = method.name.text;
   const parameters = method.parameters
@@ -516,6 +537,7 @@ function analyzeMethod({
         parameter,
         name,
         sourceFile,
+        { fixtureContext },
       );
       const optional = Boolean(
         parameter.questionToken || parameter.initializer,
@@ -792,6 +814,7 @@ function renderParameterFixture(
   parameter,
   name,
   sourceFile,
+  options = {},
 ) {
   const initializer = renderInitializerFixture(
     ts,
@@ -813,7 +836,10 @@ function renderParameterFixture(
       name,
       sourceFile,
       0,
-      { preferNull: false },
+      {
+        ...options,
+        preferNull: false,
+      },
     );
   } catch {
     if (parameter.type) {

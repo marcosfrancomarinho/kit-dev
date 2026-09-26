@@ -9,6 +9,8 @@ const {
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const test = require('node:test');
+
+// Design-pattern regression matrix.
 const {
   generateTest,
 } = require('../src/templates/files/test-generator.cjs');

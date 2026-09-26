@@ -275,7 +275,7 @@ export class User {
     assert.match(generated, /const age = 1/);
     assert.match(
       generated,
-      /const createdAt = new Date\('2026-01-01T00:00:00\.000Z'\)/,
+      /const createdAt: Parameters<typeof User\.create>\[3\] = new Date\('2026-01-01T00:00:00\.000Z'\)/,
     );
     assert.match(generated, /const isActive = true/);
     assert.match(generated, /const deletedAt = null/);
@@ -363,37 +363,46 @@ export class FixtureCatalog {
     assert.match(generated, /const total = 1n/);
     assert.match(
       generated,
-      /const createdAt = new Date\('2026-01-01T00:00:00\.000Z'\)/,
+      /const createdAt: ConstructorParameters<typeof FixtureCatalog>\[4\] = new Date\('2026-01-01T00:00:00\.000Z'\)/,
     );
     assert.match(generated, /const nullable = null/);
     assert.match(generated, /const missing = undefined/);
     assert.match(generated, /const marker = Symbol\('test'\)/);
-    assert.match(generated, /const tags = \[\]/);
+    assert.match(
+      generated,
+      /const tags: ConstructorParameters<typeof FixtureCatalog>\[8\] = \["tag"\]/,
+    );
     assert.match(generated, /const pair = \["pair1", 1\]/);
     assert.match(
       generated,
-      /const metadata = \{ key: "value" \}/,
+      /const metadata: ConstructorParameters<typeof FixtureCatalog>\[10\] = \{ key: "value" \}/,
     );
     assert.match(generated, /const pattern = \/test\//);
     assert.match(
       generated,
       /const endpoint = new URL\('https:\/\/example\.com'\)/,
     );
-    assert.match(generated, /const lookup = new Map\(\)/);
-    assert.match(generated, /const values = new Set\(\)/);
     assert.match(
       generated,
-      /const callback = \(\.\.\._args: unknown\[\]\) => 1/,
+      /const lookup: ConstructorParameters<typeof FixtureCatalog>\[13\] = new Map\(\[\["key", 1\]\]\)/,
     );
     assert.match(
       generated,
-      /const pending = Promise\.resolve\("pending"\)/,
+      /const values: ConstructorParameters<typeof FixtureCatalog>\[14\] = new Set\(\["value"\]\)/,
+    );
+    assert.match(
+      generated,
+      /const callback: ConstructorParameters<typeof FixtureCatalog>\[15\] = \(\.\.\._args: unknown\[\]\) => 1/,
+    );
+    assert.match(
+      generated,
+      /const pending: ConstructorParameters<typeof FixtureCatalog>\[16\] = Promise\.resolve\("pending"\)/,
     );
     assert.match(generated, /const status = "active"/);
     assert.match(generated, /const maybeName = "Marcos"/);
     assert.match(
       generated,
-      /const optionalDate = new Date\('2026-01-01T00:00:00\.000Z'\)/,
+      /const optionalDate: ConstructorParameters<typeof FixtureCatalog>\[19\] = new Date\('2026-01-01T00:00:00\.000Z'\)/,
     );
     assert.match(generated, /const optionalFlag = true/);
   },

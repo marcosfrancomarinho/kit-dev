@@ -29,6 +29,14 @@ async function generateTest(target, projectRoot = process.cwd()) {
     );
   }
 
+  if (metadata.creation.kind === 'unavailable') {
+    throw new Error(
+      metadata.className +
+        ' has a non-public constructor and no supported public static factory. ' +
+        'Add a static create/from/of/build/make method or write this test manually.',
+    );
+  }
+
   const destinationPath = getTestPath(projectRoot, sourcePath);
   await assertDoesNotExist(destinationPath);
   await mkdir(dirname(destinationPath), { recursive: true });
@@ -142,18 +150,40 @@ function analyzeClass(ts, sourceFile, checker) {
     constructorParameters,
     sourceFile,
   );
-  const creation = factory || {
-    kind: 'constructor',
-    methodName: null,
-    async: false,
-    parameters: constructorParameters,
-    sourceAliases: new Map(
-      constructorParameters.map((parameter) => [
-        parameter.name,
-        parameter.name,
-      ]),
-    ),
-  };
+  const constructorAccessible =
+    !constructorNode ||
+    (!hasModifier(
+      ts,
+      constructorNode,
+      ts.SyntaxKind.PrivateKeyword,
+    ) &&
+      !hasModifier(
+        ts,
+        constructorNode,
+        ts.SyntaxKind.ProtectedKeyword,
+      ));
+  const creation =
+    factory ||
+    (constructorAccessible
+      ? {
+          kind: 'constructor',
+          methodName: null,
+          async: false,
+          parameters: constructorParameters,
+          sourceAliases: new Map(
+            constructorParameters.map((parameter) => [
+              parameter.name,
+              parameter.name,
+            ]),
+          ),
+        }
+      : {
+          kind: 'unavailable',
+          methodName: null,
+          async: false,
+          parameters: [],
+          sourceAliases: new Map(),
+        });
 
   const dependencyNames = new Set(
     constructorParameters
@@ -285,19 +315,7 @@ function findStaticFactory(
     .filter(Boolean)
     .sort((a, b) => b.score - a.score);
 
-  const constructorIsPrivate = Boolean(
-    constructorNode &&
-      (hasModifier(ts, constructorNode, ts.SyntaxKind.PrivateKeyword) ||
-        hasModifier(
-          ts,
-          constructorNode,
-          ts.SyntaxKind.ProtectedKeyword,
-        )),
-  );
-
-  if (candidates.length === 0) {
-    return constructorIsPrivate ? null : null;
-  }
+  if (candidates.length === 0) return null;
 
   const selected = candidates[0];
   const parameters = analyzeParameters(

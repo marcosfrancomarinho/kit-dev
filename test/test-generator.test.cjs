@@ -454,7 +454,7 @@ export class Token {
     );
     assert.match(
       generated,
-      /assert\.equal\(result, "value"\)/,
+      /assert\.equal\(result, value\)/,
     );
   },
 );

@@ -1770,17 +1770,23 @@ function renderTest({
   creation,
   methods,
   importPath,
+  fixtureImports = [],
+  fixtureRequiresAsync = false,
 }) {
   const lines = [
     "import assert from 'node:assert/strict'",
     "import { test } from 'node:test'",
     '',
     `import { ${className} } from '${importPath}'`,
+    ...fixtureImports,
     '',
   ];
 
   if (methods.length === 0) {
-    const callback = creation.async ? 'async ()' : '()';
+    const callback =
+      creation.async || fixtureRequiresAsync
+        ? 'async ()'
+        : '()';
 
     lines.push(
       `test('${className}', ${callback} => {`,
@@ -1809,7 +1815,8 @@ function renderTest({
 
   for (const method of methods) {
     const usesMocks = method.calls.length > 0;
-    const needsAsync = method.async || creation.async;
+    const needsAsync =
+      method.async || creation.async || fixtureRequiresAsync;
     const callback = needsAsync
       ? usesMocks
         ? 'async (t)'

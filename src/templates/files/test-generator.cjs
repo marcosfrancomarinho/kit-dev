@@ -256,7 +256,11 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
 
   const dependencyNames = new Set(
     constructorParameters
-      .filter((parameter) => parameter.kind === 'dependency')
+      .filter(
+        (parameter) =>
+          parameter.kind === 'dependency' ||
+          parameter.kind === 'dependencyCollection',
+      )
       .map((parameter) => parameter.name),
   );
   const knownNames = new Set([
@@ -312,6 +316,20 @@ function analyzeParameters(
         parameter.questionToken || parameter.initializer,
       );
 
+      const collectionBehavior = analyzeBehaviorCollection(
+        ts,
+        checker,
+        parameter,
+      );
+      const kind = collectionBehavior
+        ? 'dependencyCollection'
+        : classifyParameterKind(
+            ts,
+            checker,
+            parameter,
+            fixture,
+          );
+
       return {
         index,
         name,
@@ -321,15 +339,89 @@ function analyzeParameters(
               checker.getTypeAtLocation(parameter),
             ),
         optional,
-        kind: classifyParameterKind(
-          ts,
-          checker,
-          parameter,
-          fixture,
-        ),
-        fixture: fixture ?? (optional ? 'undefined' : null),
+        kind,
+        fixture:
+          kind === 'dependencyCollection'
+            ? null
+            : fixture ?? (optional ? 'undefined' : null),
+        collectionBehavior,
       };
     });
+}
+
+function analyzeBehaviorCollection(
+  ts,
+  checker,
+  parameter,
+) {
+  try {
+    const type = parameter.type
+      ? checker.getTypeFromTypeNode(parameter.type)
+      : checker.getTypeAtLocation(parameter);
+    const typeArguments = getTypeArgumentsSafe(checker, type);
+    const typeText = checker.typeToString(type);
+    const isArray =
+      checker.isArrayType?.(type) ||
+      typeText.endsWith('[]') ||
+      /^(?:Readonly)?Array<.+>$/.test(typeText);
+
+    if (!isArray) return null;
+
+    const elementType =
+      checker.getElementTypeOfArrayType?.(type) ||
+      typeArguments[0] ||
+      null;
+
+    if (!elementType) return null;
+
+    const interfaceDeclaration = getInterfaceDeclaration(
+      ts,
+      checker,
+      elementType,
+    );
+
+    if (
+      interfaceDeclaration &&
+      interfaceHasBehavior(
+        ts,
+        checker,
+        interfaceDeclaration,
+      )
+    ) {
+      return {
+        kind: 'interface',
+        elementType: checker.typeToString(elementType),
+      };
+    }
+
+    const classDeclaration = getClassDeclaration(
+      ts,
+      checker,
+      elementType,
+    );
+
+    if (
+      classDeclaration?.name &&
+      (
+        hasModifier(
+          ts,
+          classDeclaration,
+          ts.SyntaxKind.AbstractKeyword,
+        ) ||
+        isArchitecturalDependencyClass(
+          classDeclaration.name.text,
+          classDeclaration.getSourceFile().fileName,
+        )
+      )
+    ) {
+      return {
+        kind: 'class',
+        elementType: checker.typeToString(elementType),
+      };
+    }
+  } catch {}
+
+  return null;
 }
 
 function classifyParameterKind(

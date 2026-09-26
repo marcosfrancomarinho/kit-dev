@@ -65,7 +65,6 @@ yarn test create-user
 
 生成器分析 TypeScript AST，识别类、构造函数依赖、公共方法以及 `this.repository.save()` 等调用。在能够推断的情况下，它使用 `t.mock.fn()` 创建 mock 和调用断言。
 
-生成的测试为每个类使用一个 `describe`，并为每个方法生成以方法名命名的 `it`。无法推断业务断言时，方法仍可执行，并保留 `// TODO` 注释供补充验证。不会生成 `it.todo` 或被注释掉的测试体。请检查生成结果并完善业务规则的断言。
 
 ## 生产构建
 

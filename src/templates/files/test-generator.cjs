@@ -1528,11 +1528,11 @@ function renderCreationSetup(
         lines.push(`  const ${parameter.name} = ${fixture}`);
       } else {
         lines.push(
-          `  const ${parameter.name} = ${fixture} satisfies ${creationParameterType(
+          `  const ${parameter.name}: ${creationParameterType(
             className,
             creation,
             parameter.index,
-          )}`,
+          )} = ${fixture}`,
         );
       }
 
@@ -1654,7 +1654,7 @@ function renderMethodParameterSetup(className, method) {
       );
 
     lines.push(
-      `  const ${parameter.variableName} = ${fixture} satisfies Parameters<${className}['${method.name}']>[${parameter.index}]`,
+      `  const ${parameter.variableName}: Parameters<${className}['${method.name}']>[${parameter.index}] = ${fixture}`,
     );
   }
 
@@ -1716,8 +1716,7 @@ function isSimpleFixture(fixture) {
     fixture === 'false' ||
     fixture === '1' ||
     fixture === '1n' ||
-    /^["']/.test(fixture) ||
-    fixture === '[]'
+    /^["']/.test(fixture)
   );
 }
 

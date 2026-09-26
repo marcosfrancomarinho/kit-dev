@@ -4,6 +4,7 @@ const { once } = require('node:events');
 const {
   copyFile,
   mkdtemp,
+  readFile,
   mkdir,
   rm,
   writeFile,
@@ -19,6 +20,15 @@ const runnerTemplate = join(
   'templates',
   'files',
   'runner.cjs',
+);
+
+const generatorTemplate = join(
+  __dirname,
+  '..',
+  'src',
+  'templates',
+  'files',
+  'test-generator.cjs',
 );
 
 test('executa testes TypeScript e permanece em watch', async (context) => {
@@ -95,6 +105,80 @@ test('sum', () => {
   const [exitCode, signal] = await exit;
 
   assert.ok(exitCode === 0 || signal === 'SIGTERM');
+});
+
+test('gera teste automaticamente quando recebe um alvo', async (context) => {
+  const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-test-command-'));
+  const testToolPath = join(projectPath, 'kit-dev', 'test');
+  context.after(() => rm(projectPath, { recursive: true, force: true }));
+
+  await Promise.all([
+    mkdir(join(projectPath, 'src', 'application'), { recursive: true }),
+    mkdir(testToolPath, { recursive: true }),
+  ]);
+
+  await Promise.all([
+    writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    ),
+    writeFile(
+      join(projectPath, 'src', 'application', 'create-user.ts'),
+      `
+interface UserRepository {
+  save(name: string): Promise<void>
+}
+
+export class CreateUser {
+  constructor(private readonly repository: UserRepository) {}
+
+  async execute(name: string) {
+    await this.repository.save(name)
+  }
+}
+`.trimStart(),
+      'utf-8',
+    ),
+    copyFile(runnerTemplate, join(testToolPath, 'test.cjs')),
+    copyFile(generatorTemplate, join(testToolPath, 'generator.cjs')),
+  ]);
+
+  const generation = spawn(
+    process.execPath,
+    ['kit-dev/test/test.cjs', 'create-user'],
+    {
+      cwd: projectPath,
+      env: {
+        ...process.env,
+        NODE_PATH: join(__dirname, '..', 'node_modules'),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+
+  let output = '';
+  generation.stdout.setEncoding('utf-8');
+  generation.stderr.setEncoding('utf-8');
+  generation.stdout.on('data', (chunk) => {
+    output += chunk;
+  });
+  generation.stderr.on('data', (chunk) => {
+    output += chunk;
+  });
+
+  const [exitCode] = await once(generation, 'exit');
+
+  assert.equal(exitCode, 0, output);
+  assert.match(output, /Test created: test[\\/]application[\\/]create-user\.test\.ts/);
+
+  const generated = await readFile(
+    join(projectPath, 'test', 'application', 'create-user.test.ts'),
+    'utf-8',
+  );
+
+  assert.match(generated, /new CreateUser\(repository\)/);
+  assert.match(generated, /save: t\.mock\.fn\(async/);
 });
 
 function waitForOutput(child, expected, timeout = 7000) {

@@ -68,7 +68,7 @@ Os scripts são adicionados automaticamente ao `package.json`.
 | Comando | Para que serve |
 |---|---|
 | `npm run dev` | Executa a aplicação em desenvolvimento, observa alterações e reinicia o Node.js |
-| `npm run type` | Mantém o TypeScript verificando erros em tempo real |
+| `npm test` | Executa testes com `node:test` em watch mode |\n| `npm run type` | Mantém o TypeScript verificando erros em tempo real |
 | `npm run build` | Verifica os tipos e gera o bundle de produção |
 | `npm start` | Executa o bundle já gerado em `dist` |
 | `npm run di` | Instala a DI opcional no projeto |
@@ -93,7 +93,7 @@ npm run type
 
 O comando `type` é opcional. O `build` já executa uma checagem de tipos antes de gerar o bundle.
 
-### Build de produção
+### Testes\n\nO projeto já vem com `node:test` e `node:assert/strict`, sem framework adicional. O esbuild transpila os arquivos `*.test.ts` e `*.spec.ts` dentro de `test/` e executa novamente quando o teste ou o código-fonte muda.\n\n```bash\nnpm test\n```\n\nPara gerar a base de um teste a partir de uma classe TypeScript existente:\n\n```bash\nnpx create-kit-dev test src/application/create-user.ts\n```\n\nO gerador analisa a AST da classe, identifica dependências do construtor e os métodos utilizados, cria mocks com `t.mock.fn()` e deixa `TODO` onde a regra de negócio não pode ser inferida com segurança.\n\n### Build de produção
 
 ```bash
 npm run build

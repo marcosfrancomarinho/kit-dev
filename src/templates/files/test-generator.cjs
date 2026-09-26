@@ -1371,6 +1371,236 @@ function renderTypeFixture(
   return '{ ' + fields.join(', ') + ' }';
 }
 
+function renderUserClassFixture(
+  ts,
+  checker,
+  type,
+  name,
+  sourceFile,
+  depth,
+  options,
+) {
+  const declaration = getClassDeclaration(ts, checker, type);
+  if (!declaration || !declaration.name) return null;
+
+  if (
+    hasModifier(ts, declaration, ts.SyntaxKind.AbstractKeyword)
+  ) {
+    return null;
+  }
+
+  const className = declaration.name.text;
+  const classSource = declaration.getSourceFile();
+  const classSourcePath = classSource.fileName;
+  const context = options.fixtureContext;
+  const stack = options.classStack || new Set();
+  const identity = resolve(classSourcePath) + ':' + declaration.pos;
+
+  if (stack.has(identity) || depth >= 4) return null;
+
+  const plan = getClassFixturePlan(
+    ts,
+    checker,
+    declaration,
+    context,
+  );
+
+  if (!plan) return null;
+
+  const nextOptions = {
+    ...options,
+    classStack: new Set([...stack, identity]),
+  };
+  const args = [];
+
+  for (const parameter of plan.parameters) {
+    const fixture = renderParameterFixture(
+      ts,
+      checker,
+      parameter,
+      parameter.name && ts.isIdentifier(parameter.name)
+        ? parameter.name.text
+        : name,
+      classSource,
+      nextOptions,
+    );
+
+    if (fixture === null) return null;
+    args.push(fixture);
+  }
+
+  registerFixtureImport(
+    context,
+    className,
+    classSourcePath,
+  );
+
+  if (plan.async) {
+    if (context) context.requiresAsync = true;
+
+    return (
+      'await ' +
+      className +
+      '.' +
+      plan.methodName +
+      '(' +
+      args.join(', ') +
+      ')'
+    );
+  }
+
+  if (plan.kind === 'factory') {
+    return (
+      className +
+      '.' +
+      plan.methodName +
+      '(' +
+      args.join(', ') +
+      ')'
+    );
+  }
+
+  return 'new ' + className + '(' + args.join(', ') + ')';
+}
+
+function getClassDeclaration(ts, checker, type) {
+  let symbol = type.getSymbol?.() || type.symbol;
+
+  if (
+    symbol &&
+    symbol.flags & ts.SymbolFlags.Alias &&
+    checker.getAliasedSymbol
+  ) {
+    try {
+      symbol = checker.getAliasedSymbol(symbol);
+    } catch {}
+  }
+
+  return symbol?.declarations?.find(ts.isClassDeclaration) || null;
+}
+
+function getClassFixturePlan(
+  ts,
+  checker,
+  classNode,
+  context,
+) {
+  const sourcePath = classNode.getSourceFile().fileName;
+  const cacheKey = resolve(sourcePath) + ':' + classNode.pos;
+
+  if (context?.classPlanCache.has(cacheKey)) {
+    return context.classPlanCache.get(cacheKey);
+  }
+
+  const className = classNode.name?.text;
+  if (!className) return null;
+
+  const factories = classNode.members
+    .filter(
+      (member) =>
+        ts.isMethodDeclaration(member) &&
+        ts.isIdentifier(member.name) &&
+        hasModifier(ts, member, ts.SyntaxKind.StaticKeyword) &&
+        !hasModifier(ts, member, ts.SyntaxKind.PrivateKeyword) &&
+        !hasModifier(ts, member, ts.SyntaxKind.ProtectedKeyword) &&
+        ['create', 'from', 'of', 'build', 'make'].includes(
+          member.name.text.toLowerCase(),
+        ) &&
+        methodReturnsClass(
+          ts,
+          checker,
+          member,
+          className,
+          classNode.getSourceFile(),
+        ),
+    )
+    .map((method) => {
+      const signature = checker.getSignatureFromDeclaration(method);
+      const returnType = signature
+        ? checker.getReturnTypeOfSignature(signature)
+        : null;
+      const promisedType = returnType
+        ? checker.getPromisedTypeOfPromise?.(returnType)
+        : null;
+      const priority = {
+        create: 100,
+        from: 90,
+        of: 80,
+        build: 70,
+        make: 60,
+      };
+
+      return {
+        kind: 'factory',
+        methodName: method.name.text,
+        parameters: [...method.parameters],
+        async: Boolean(
+          promisedType ||
+            method.modifiers?.some(
+              (modifier) =>
+                modifier.kind === ts.SyntaxKind.AsyncKeyword,
+            ),
+        ),
+        score:
+          priority[method.name.text.toLowerCase()] || 10,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  let plan = factories[0] || null;
+
+  if (!plan) {
+    const constructorNode = classNode.members.find(
+      ts.isConstructorDeclaration,
+    );
+    const hasNonPublicConstructor = Boolean(
+      constructorNode &&
+        (hasModifier(
+          ts,
+          constructorNode,
+          ts.SyntaxKind.PrivateKeyword,
+        ) ||
+          hasModifier(
+            ts,
+            constructorNode,
+            ts.SyntaxKind.ProtectedKeyword,
+          )),
+    );
+    const hasPublicInstanceMethods = classNode.members.some(
+      (member) =>
+        ts.isMethodDeclaration(member) &&
+        !hasModifier(
+          ts,
+          member,
+          ts.SyntaxKind.StaticKeyword,
+        ) &&
+        !hasModifier(
+          ts,
+          member,
+          ts.SyntaxKind.PrivateKeyword,
+        ) &&
+        !hasModifier(
+          ts,
+          member,
+          ts.SyntaxKind.ProtectedKeyword,
+        ),
+    );
+
+    if (!hasNonPublicConstructor && !hasPublicInstanceMethods) {
+      plan = {
+        kind: 'constructor',
+        methodName: null,
+        parameters: [...(constructorNode?.parameters || [])],
+        async: false,
+        score: 0,
+      };
+    }
+  }
+
+  if (context) context.classPlanCache.set(cacheKey, plan);
+  return plan;
+}
+
 function getTypeArgumentsSafe(checker, type) {
   try {
     return checker.getTypeArguments?.(type) || [];

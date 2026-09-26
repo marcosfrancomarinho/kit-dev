@@ -497,3 +497,113 @@ export class Secret {
     );
   },
 );
+
+
+test(
+  'tipa Date arrays e objetos pela factory estática sem ConstructorParameters',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-typed-object-fixtures-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'user.ts'),
+      `
+type Parent = {
+  name: string
+  bornAt: Date
+  active: boolean
+  meta: {
+    city: string
+  }
+}
+
+type Profile = {
+  address: {
+    city: string
+  }
+  tags: string[]
+}
+
+type UserProps = {
+  name: string
+  age: number
+  email: string
+  createdAt: Date
+  isActive: boolean
+  parents: Parent[]
+  profile: Profile
+}
+
+export class User {
+  private constructor(
+    private readonly props: UserProps,
+  ) {}
+
+  static create(
+    name: string,
+    age: number,
+    email: string,
+    createdAt: Date,
+    isActive: boolean,
+    parents: Parent[],
+    profile: Profile,
+  ) {
+    return new User({
+      name,
+      age,
+      email,
+      createdAt,
+      isActive,
+      parents,
+      profile,
+    })
+  }
+
+  getAge(): number {
+    return this.props.age
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/user.ts', projectPath);
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /const createdAt: Parameters<typeof User\.create>\[3\] = new Date\('2026-01-01T00:00:00\.000Z'\)/,
+    );
+    assert.match(
+      generated,
+      /const parents: Parameters<typeof User\.create>\[5\] = \[\{ name: "Marcos", bornAt: new Date\('2026-01-01T00:00:00\.000Z'\), active: true, meta: \{ city: "city" \} \}\]/,
+    );
+    assert.match(
+      generated,
+      /const profile: Parameters<typeof User\.create>\[6\] = \{ address: \{ city: "city" \}, tags: \["tag"\] \}/,
+    );
+    assert.match(
+      generated,
+      /const sut = User\.create\(name, age, email, createdAt, isActive, parents, profile\)/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /ConstructorParameters<typeof User>/,
+    );
+    assert.doesNotMatch(generated, /const parents = \[\]/);
+    assert.doesNotMatch(generated, /new User\(/);
+  },
+);

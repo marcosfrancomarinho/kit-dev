@@ -29,6 +29,14 @@ async function generateTest(target, projectRoot = process.cwd()) {
     );
   }
 
+  if (metadata.creation.kind === 'unavailable') {
+    throw new Error(
+      metadata.className +
+        ' has a non-public constructor and no supported public static factory. ' +
+        'Add a static create/from/of/build/make method or write this test manually.',
+    );
+  }
+
   const destinationPath = getTestPath(projectRoot, sourcePath);
   await assertDoesNotExist(destinationPath);
   await mkdir(dirname(destinationPath), { recursive: true });
@@ -123,45 +131,69 @@ function analyzeClass(ts, sourceFile, checker) {
 
   const className = classNode.name.text;
   const constructorNode = classNode.members.find(ts.isConstructorDeclaration);
-  const constructorParameters = (constructorNode?.parameters || [])
-    .filter((parameter) => ts.isIdentifier(parameter.name))
-    .map((parameter, index) => {
-      const name = parameter.name.text;
-      const fixture = renderTypeNodeFixture(
-        ts,
-        checker,
-        parameter.type,
-        name,
-        sourceFile,
-      );
-
-      return {
-        index,
-        name,
-        type: parameter.type
-          ? parameter.type.getText(sourceFile)
-          : 'unknown',
-        optional: Boolean(parameter.questionToken || parameter.initializer),
-        kind: fixture === null ? 'dependency' : 'value',
-        fixture:
-          parameter.questionToken || parameter.initializer
-            ? 'undefined'
-            : fixture,
-      };
-    });
-
+  const constructorParameters = analyzeParameters(
+    ts,
+    checker,
+    constructorNode?.parameters || [],
+    sourceFile,
+  );
   const propertySources = collectConstructorPropertySources(
     ts,
     constructorNode,
+    sourceFile,
   );
+  const factory = findStaticFactory(
+    ts,
+    checker,
+    classNode,
+    constructorNode,
+    constructorParameters,
+    sourceFile,
+  );
+  const constructorAccessible =
+    !constructorNode ||
+    (!hasModifier(
+      ts,
+      constructorNode,
+      ts.SyntaxKind.PrivateKeyword,
+    ) &&
+      !hasModifier(
+        ts,
+        constructorNode,
+        ts.SyntaxKind.ProtectedKeyword,
+      ));
+  const creation =
+    factory ||
+    (constructorAccessible
+      ? {
+          kind: 'constructor',
+          methodName: null,
+          async: false,
+          parameters: constructorParameters,
+          sourceAliases: new Map(
+            constructorParameters.map((parameter) => [
+              parameter.name,
+              parameter.name,
+            ]),
+          ),
+        }
+      : {
+          kind: 'unavailable',
+          methodName: null,
+          async: false,
+          parameters: [],
+          sourceAliases: new Map(),
+        });
+
   const dependencyNames = new Set(
     constructorParameters
       .filter((parameter) => parameter.kind === 'dependency')
       .map((parameter) => parameter.name),
   );
-  const constructorNames = new Set(
-    constructorParameters.map((parameter) => parameter.name),
-  );
+  const knownNames = new Set([
+    ...constructorParameters.map((parameter) => parameter.name),
+    ...creation.parameters.map((parameter) => parameter.name),
+  ]);
 
   const methods = classNode.members
     .filter((member) => isPublicMethod(ts, member))
@@ -173,16 +205,293 @@ function analyzeClass(ts, sourceFile, checker) {
         method,
         className,
         dependencyNames,
-        constructorNames,
+        constructorNames: knownNames,
         propertySources,
+        sourceAliases: creation.sourceAliases,
       }),
     );
 
   return {
     className,
     constructorParameters,
+    creation,
     methods,
   };
+}
+
+function analyzeParameters(
+  ts,
+  checker,
+  parameters,
+  sourceFile,
+) {
+  return parameters
+    .filter((parameter) => ts.isIdentifier(parameter.name))
+    .map((parameter, index) => {
+      const name = parameter.name.text;
+      const fixture = renderParameterFixture(
+        ts,
+        checker,
+        parameter,
+        name,
+        sourceFile,
+      );
+      const optional = Boolean(
+        parameter.questionToken || parameter.initializer,
+      );
+
+      return {
+        index,
+        name,
+        type: parameter.type
+          ? parameter.type.getText(sourceFile)
+          : checker.typeToString(
+              checker.getTypeAtLocation(parameter),
+            ),
+        optional,
+        kind: fixture === null ? 'dependency' : 'value',
+        fixture: fixture ?? (optional ? 'undefined' : null),
+      };
+    });
+}
+
+function findStaticFactory(
+  ts,
+  checker,
+  classNode,
+  constructorNode,
+  constructorParameters,
+  sourceFile,
+) {
+  const className = classNode.name.text;
+  const preferredNames = new Map([
+    ['create', 100],
+    ['from', 90],
+    ['of', 80],
+    ['build', 70],
+    ['make', 60],
+  ]);
+  const candidates = classNode.members
+    .filter(
+      (member) =>
+        ts.isMethodDeclaration(member) &&
+        ts.isIdentifier(member.name) &&
+        hasModifier(ts, member, ts.SyntaxKind.StaticKeyword) &&
+        !hasModifier(ts, member, ts.SyntaxKind.PrivateKeyword) &&
+        !hasModifier(ts, member, ts.SyntaxKind.ProtectedKeyword),
+    )
+    .map((method) => {
+      const returnsClass = methodReturnsClass(
+        ts,
+        checker,
+        method,
+        className,
+        sourceFile,
+      );
+
+      if (!returnsClass) return null;
+
+      const name = method.name.text;
+      const signature = checker.getSignatureFromDeclaration(method);
+      const returnType = signature
+        ? checker.getReturnTypeOfSignature(signature)
+        : null;
+      const promisedType = returnType
+        ? checker.getPromisedTypeOfPromise?.(returnType)
+        : null;
+
+      return {
+        method,
+        name,
+        score: (preferredNames.get(name.toLowerCase()) || 10) +
+          (containsNewClass(ts, method, className) ? 10 : 0),
+        async: Boolean(
+          promisedType ||
+            method.modifiers?.some(
+              (modifier) =>
+                modifier.kind === ts.SyntaxKind.AsyncKeyword,
+            ),
+        ),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+
+  if (candidates.length === 0) return null;
+
+  const selected = candidates[0];
+  const parameters = analyzeParameters(
+    ts,
+    checker,
+    selected.method.parameters,
+    sourceFile,
+  );
+
+  return {
+    kind: 'factory',
+    methodName: selected.name,
+    async: selected.async,
+    parameters,
+    sourceAliases: mapFactoryArgumentsToConstructor(
+      ts,
+      selected.method,
+      className,
+      constructorParameters,
+      sourceFile,
+    ),
+  };
+}
+
+function methodReturnsClass(
+  ts,
+  checker,
+  method,
+  className,
+  sourceFile,
+) {
+  if (containsNewClass(ts, method, className)) return true;
+
+  if (method.type) {
+    const text = method.type.getText(sourceFile).replace(/\s+/g, '');
+    if (
+      text === className ||
+      text === `Promise<${className}>`
+    ) {
+      return true;
+    }
+  }
+
+  try {
+    const signature = checker.getSignatureFromDeclaration(method);
+    if (!signature) return false;
+
+    const returnType = checker.getReturnTypeOfSignature(signature);
+    const promisedType = checker.getPromisedTypeOfPromise?.(returnType);
+    const text = checker.typeToString(promisedType || returnType);
+    return text === className;
+  } catch {
+    return false;
+  }
+}
+
+function containsNewClass(ts, method, className) {
+  let found = false;
+
+  function visit(node) {
+    if (
+      ts.isNewExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === className
+    ) {
+      found = true;
+      return;
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  if (method.body) visit(method.body);
+  return found;
+}
+
+function mapFactoryArgumentsToConstructor(
+  ts,
+  method,
+  className,
+  constructorParameters,
+  sourceFile,
+) {
+  const aliases = new Map();
+  let newExpression = null;
+
+  function visit(node) {
+    if (
+      !newExpression &&
+      ts.isNewExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === className
+    ) {
+      newExpression = node;
+      return;
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  if (method.body) visit(method.body);
+
+  if (!newExpression) return aliases;
+
+  const argumentsList = newExpression.arguments || [];
+
+  constructorParameters.forEach((parameter, index) => {
+    const argument = argumentsList[index];
+    if (!argument) return;
+
+    if (ts.isObjectLiteralExpression(argument)) {
+      for (const property of argument.properties) {
+        if (
+          ts.isShorthandPropertyAssignment(property) &&
+          ts.isIdentifier(property.name)
+        ) {
+          aliases.set(
+            parameter.name + '.' + property.name.text,
+            property.name.text,
+          );
+          continue;
+        }
+
+        if (
+          ts.isPropertyAssignment(property) &&
+          (ts.isIdentifier(property.name) ||
+            ts.isStringLiteral(property.name))
+        ) {
+          const rendered = renderFactorySourceExpression(
+            ts,
+            property.initializer,
+            sourceFile,
+          );
+
+          if (rendered) {
+            aliases.set(
+              parameter.name + '.' + property.name.text,
+              rendered,
+            );
+          }
+        }
+      }
+
+      return;
+    }
+
+    const rendered = renderFactorySourceExpression(
+      ts,
+      argument,
+      sourceFile,
+    );
+
+    if (rendered) aliases.set(parameter.name, rendered);
+  });
+
+  return aliases;
+}
+
+function renderFactorySourceExpression(ts, node, sourceFile) {
+  if (
+    ts.isIdentifier(node) ||
+    ts.isPropertyAccessExpression(node) ||
+    ts.isElementAccessExpression(node)
+  ) {
+    return node.getText(sourceFile);
+  }
+
+  return null;
+}
+
+function hasModifier(ts, node, kind) {
+  return Boolean(
+    node.modifiers?.some((modifier) => modifier.kind === kind),
+  );
 }
 
 function analyzeMethod({
@@ -194,32 +503,40 @@ function analyzeMethod({
   dependencyNames,
   constructorNames,
   propertySources,
+  sourceAliases,
 }) {
   const methodName = method.name.text;
   const parameters = method.parameters
     .filter((parameter) => ts.isIdentifier(parameter.name))
     .map((parameter, index) => {
       const name = parameter.name.text;
-      const fixture = renderTypeNodeFixture(
+      const inferredFixture = renderParameterFixture(
         ts,
         checker,
-        parameter.type,
+        parameter,
         name,
         sourceFile,
       );
-      const simple = fixture !== null && isSimpleFixture(fixture);
+      const optional = Boolean(
+        parameter.questionToken || parameter.initializer,
+      );
+      const fixture =
+        inferredFixture ?? (optional ? 'undefined' : null);
+      const simple =
+        fixture !== null && isSimpleFixture(fixture);
       const variableName = simple
         ? null
-        : uniqueParameterName(name, methodName, constructorNames);
+        : uniqueParameterName(
+            name,
+            methodName,
+            constructorNames,
+          );
 
       return {
         index,
         name,
-        optional: Boolean(parameter.questionToken || parameter.initializer),
-        fixture:
-          parameter.questionToken || parameter.initializer
-            ? 'undefined'
-            : fixture,
+        optional,
+        fixture,
         variableName,
       };
     });
@@ -300,16 +617,43 @@ function analyzeMethod({
     ),
     parameters,
     calls: [...calls.values()],
-    expectedReturn: detectExpectedReturn(
-      ts,
-      method,
-      propertySources,
-      sourceFile,
+    expectedReturn: translateSourceExpression(
+      detectExpectedReturn(
+        ts,
+        method,
+        propertySources,
+        sourceFile,
+      ),
+      sourceAliases,
     ),
   };
 }
 
-function collectConstructorPropertySources(ts, constructorNode) {
+function translateSourceExpression(source, aliases) {
+  if (!source || !aliases) return source;
+
+  const parts = source.split('.');
+
+  for (let length = parts.length; length > 0; length -= 1) {
+    const prefix = parts.slice(0, length).join('.');
+    const alias = aliases.get(prefix);
+
+    if (!alias) continue;
+
+    const rest = parts.slice(length);
+    return rest.length > 0
+      ? alias + '.' + rest.join('.')
+      : alias;
+  }
+
+  return aliases.size > 0 ? null : source;
+}
+
+function collectConstructorPropertySources(
+  ts,
+  constructorNode,
+  sourceFile,
+) {
   const sources = new Map();
 
   if (!constructorNode) return sources;
@@ -341,11 +685,18 @@ function collectConstructorPropertySources(ts, constructorNode) {
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
       ts.isPropertyAccessExpression(node.left) &&
-      node.left.expression.kind === ts.SyntaxKind.ThisKeyword &&
-      ts.isIdentifier(node.right) &&
-      parameterNames.has(node.right.text)
+      node.left.expression.kind === ts.SyntaxKind.ThisKeyword
     ) {
-      sources.set(node.left.name.text, node.right.text);
+      const source = renderParameterSourceExpression(
+        ts,
+        node.right,
+        parameterNames,
+        sourceFile,
+      );
+
+      if (source) {
+        sources.set(node.left.name.text, source);
+      }
     }
 
     ts.forEachChild(node, visit);
@@ -356,20 +707,56 @@ function collectConstructorPropertySources(ts, constructorNode) {
   return sources;
 }
 
-function detectExpectedReturn(ts, method, propertySources, sourceFile) {
+function renderParameterSourceExpression(
+  ts,
+  node,
+  parameterNames,
+  sourceFile,
+) {
+  let current = node;
+
+  while (
+    ts.isPropertyAccessExpression(current) ||
+    ts.isElementAccessExpression(current)
+  ) {
+    current = current.expression;
+  }
+
+  if (
+    ts.isIdentifier(current) &&
+    parameterNames.has(current.text)
+  ) {
+    return node.getText(sourceFile);
+  }
+
+  return null;
+}
+
+function detectExpectedReturn(
+  ts,
+  method,
+  propertySources,
+  sourceFile,
+) {
   if (!method.body || method.body.statements.length !== 1) return null;
 
   const statement = method.body.statements[0];
-  if (!ts.isReturnStatement(statement) || !statement.expression) return null;
+  if (!ts.isReturnStatement(statement) || !statement.expression) {
+    return null;
+  }
 
   const expression = statement.expression;
+  const thisPath = getThisPropertyPath(ts, expression);
 
-  if (
-    ts.isPropertyAccessExpression(expression) &&
-    expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
-    propertySources.has(expression.name.text)
-  ) {
-    return propertySources.get(expression.name.text);
+  if (thisPath && thisPath.length > 0) {
+    const [root, ...rest] = thisPath;
+    const source = propertySources.get(root);
+
+    if (source) {
+      return rest.length > 0
+        ? source + '.' + rest.join('.')
+        : source;
+    }
   }
 
   if (
@@ -380,6 +767,150 @@ function detectExpectedReturn(ts, method, propertySources, sourceFile) {
     expression.kind === ts.SyntaxKind.NullKeyword
   ) {
     return expression.getText(sourceFile);
+  }
+
+  return null;
+}
+
+function getThisPropertyPath(ts, expression) {
+  const parts = [];
+  let current = expression;
+
+  while (ts.isPropertyAccessExpression(current)) {
+    parts.unshift(current.name.text);
+    current = current.expression;
+  }
+
+  return current.kind === ts.SyntaxKind.ThisKeyword
+    ? parts
+    : null;
+}
+
+function renderParameterFixture(
+  ts,
+  checker,
+  parameter,
+  name,
+  sourceFile,
+) {
+  const initializer = renderInitializerFixture(
+    ts,
+    parameter.initializer,
+    sourceFile,
+  );
+
+  if (initializer !== null) return initializer;
+
+  try {
+    const type = parameter.type
+      ? checker.getTypeFromTypeNode(parameter.type)
+      : checker.getTypeAtLocation(parameter);
+
+    return renderTypeFixture(
+      ts,
+      checker,
+      type,
+      name,
+      sourceFile,
+      0,
+      { preferNull: false },
+    );
+  } catch {
+    if (parameter.type) {
+      return renderTypeTextFixture(
+        parameter.type.getText(sourceFile),
+        name,
+      );
+    }
+
+    return null;
+  }
+}
+
+function renderInitializerFixture(
+  ts,
+  initializer,
+  sourceFile,
+) {
+  if (!initializer) return null;
+
+  if (ts.isStringLiteral(initializer)) {
+    return JSON.stringify(initializer.text);
+  }
+
+  if (
+    ts.isNumericLiteral(initializer) ||
+    initializer.kind === ts.SyntaxKind.TrueKeyword ||
+    initializer.kind === ts.SyntaxKind.FalseKeyword ||
+    initializer.kind === ts.SyntaxKind.NullKeyword
+  ) {
+    return initializer.getText(sourceFile);
+  }
+
+  if (
+    ts.SyntaxKind.BigIntLiteral &&
+    initializer.kind === ts.SyntaxKind.BigIntLiteral
+  ) {
+    return initializer.getText(sourceFile);
+  }
+
+  if (
+    ts.isIdentifier(initializer) &&
+    initializer.text === 'undefined'
+  ) {
+    return 'undefined';
+  }
+
+  if (
+    ts.isNewExpression(initializer) &&
+    ts.isIdentifier(initializer.expression) &&
+    initializer.expression.text === 'Date'
+  ) {
+    return "new Date('2026-01-01T00:00:00.000Z')";
+  }
+
+  if (ts.isRegularExpressionLiteral?.(initializer)) {
+    return initializer.getText(sourceFile);
+  }
+
+  if (ts.isArrayLiteralExpression(initializer)) {
+    const items = initializer.elements.map((element) =>
+      renderInitializerFixture(ts, element, sourceFile),
+    );
+
+    if (items.some((item) => item === null)) return null;
+    return '[' + items.join(', ') + ']';
+  }
+
+  if (ts.isObjectLiteralExpression(initializer)) {
+    const fields = [];
+
+    for (const property of initializer.properties) {
+      if (
+        !ts.isPropertyAssignment(property) ||
+        !(
+          ts.isIdentifier(property.name) ||
+          ts.isStringLiteral(property.name) ||
+          ts.isNumericLiteral(property.name)
+        )
+      ) {
+        return null;
+      }
+
+      const value = renderInitializerFixture(
+        ts,
+        property.initializer,
+        sourceFile,
+      );
+
+      if (value === null) return null;
+
+      fields.push(
+        safePropertyName(property.name.text) + ': ' + value,
+      );
+    }
+
+    return '{ ' + fields.join(', ') + ' }';
   }
 
   return null;
@@ -403,9 +934,13 @@ function renderTypeNodeFixture(
       name,
       sourceFile,
       0,
+      { preferNull: false },
     );
   } catch {
-    return renderTypeTextFixture(typeNode.getText(sourceFile), name);
+    return renderTypeTextFixture(
+      typeNode.getText(sourceFile),
+      name,
+    );
   }
 }
 
@@ -416,8 +951,9 @@ function renderTypeFixture(
   name,
   sourceFile,
   depth,
+  options = {},
 ) {
-  if (!type || depth > 3) return null;
+  if (!type || depth > 4) return null;
 
   if (type.isStringLiteral?.()) {
     return JSON.stringify(type.value);
@@ -429,6 +965,13 @@ function renderTypeFixture(
 
   const flags = type.flags || 0;
 
+  if (
+    ts.TypeFlags.BooleanLiteral &&
+    flags & ts.TypeFlags.BooleanLiteral
+  ) {
+    return type.intrinsicName === 'false' ? 'false' : 'true';
+  }
+
   if (flags & ts.TypeFlags.StringLike) {
     return JSON.stringify(sampleString(name));
   }
@@ -436,18 +979,39 @@ function renderTypeFixture(
   if (flags & ts.TypeFlags.NumberLike) return '1';
   if (flags & ts.TypeFlags.BooleanLike) return 'true';
   if (flags & ts.TypeFlags.BigIntLike) return '1n';
+
+  const symbolFlags =
+    (ts.TypeFlags.ESSymbolLike || 0) |
+    (ts.TypeFlags.UniqueESSymbol || 0);
+  if (symbolFlags && flags & symbolFlags) {
+    return "Symbol('test')";
+  }
+
   if (flags & ts.TypeFlags.Null) return 'null';
   if (flags & ts.TypeFlags.Undefined) return 'undefined';
   if (flags & ts.TypeFlags.Void) return 'undefined';
+
+  if (
+    (ts.TypeFlags.Any && flags & ts.TypeFlags.Any) ||
+    (ts.TypeFlags.Unknown && flags & ts.TypeFlags.Unknown) ||
+    (ts.TypeFlags.Never && flags & ts.TypeFlags.Never)
+  ) {
+    return null;
+  }
 
   if (type.isUnion?.()) {
     const nullType = type.types.find(
       (item) => item.flags & ts.TypeFlags.Null,
     );
-    if (nullType) return 'null';
+    const undefinedType = type.types.find(
+      (item) => item.flags & ts.TypeFlags.Undefined,
+    );
+
+    if (options.preferNull && nullType) return 'null';
 
     const candidates = type.types.filter(
       (item) =>
+        !(item.flags & ts.TypeFlags.Null) &&
         !(item.flags & ts.TypeFlags.Undefined) &&
         !(item.flags & ts.TypeFlags.Never),
     );
@@ -460,10 +1024,14 @@ function renderTypeFixture(
         name,
         sourceFile,
         depth + 1,
+        options,
       );
 
       if (rendered !== null) return rendered;
     }
+
+    if (nullType) return 'null';
+    if (undefinedType) return 'undefined';
 
     return null;
   }
@@ -474,17 +1042,122 @@ function renderTypeFixture(
     return "new Date('2026-01-01T00:00:00.000Z')";
   }
 
+  if (typeText === 'RegExp') return '/test/';
+  if (typeText === 'URL') {
+    return "new URL('https://example.com')";
+  }
+  if (typeText === 'Buffer') {
+    return "Buffer.from('test')";
+  }
+  if (typeText === 'Error') {
+    return "new Error('test')";
+  }
+
+  if (/^(?:Readonly)?Map<.+>$/.test(typeText)) {
+    return 'new Map()';
+  }
+  if (/^(?:Readonly)?Set<.+>$/.test(typeText)) {
+    return 'new Set()';
+  }
+  if (/^WeakMap<.+>$/.test(typeText)) {
+    return 'new WeakMap()';
+  }
+  if (/^WeakSet<.+>$/.test(typeText)) {
+    return 'new WeakSet()';
+  }
+  if (
+    /^(?:Uint|Int|Float|BigInt|BigUint)\d*Array$/.test(typeText)
+  ) {
+    return `new ${typeText}()`;
+  }
+
+  if (checker.isTupleType?.(type)) {
+    const items = checker.getTypeArguments?.(type) || [];
+    const renderedItems = items.map((item, index) =>
+      renderTypeFixture(
+        ts,
+        checker,
+        item,
+        name + (index + 1),
+        sourceFile,
+        depth + 1,
+        options,
+      ) ?? 'undefined',
+    );
+
+    return '[' + renderedItems.join(', ') + ']';
+  }
+
   if (
     checker.isArrayType?.(type) ||
     typeText.endsWith('[]') ||
-    /^Array<.+>$/.test(typeText)
+    /^(?:Readonly)?Array<.+>$/.test(typeText)
   ) {
     return '[]';
+  }
+
+  const promisedType = checker.getPromisedTypeOfPromise?.(type);
+  if (promisedType) {
+    const value =
+      renderTypeFixture(
+        ts,
+        checker,
+        promisedType,
+        name,
+        sourceFile,
+        depth + 1,
+        options,
+      ) ?? 'undefined';
+
+    return 'Promise.resolve(' + value + ')';
+  }
+
+  const callSignatures = type.getCallSignatures?.() || [];
+  if (callSignatures.length > 0) {
+    const returnType = checker.getReturnTypeOfSignature(
+      callSignatures[0],
+    );
+    const promisedReturn =
+      checker.getPromisedTypeOfPromise?.(returnType);
+    const value =
+      renderTypeFixture(
+        ts,
+        checker,
+        promisedReturn || returnType,
+        name + 'Result',
+        sourceFile,
+        depth + 1,
+        options,
+      ) ?? 'undefined';
+
+    return promisedReturn
+      ? 'async (..._args: unknown[]) => ' + value
+      : '(..._args: unknown[]) => ' + value;
   }
 
   const properties = checker.getPropertiesOfType(type);
 
   if (properties.length === 0) {
+    const stringIndex = checker.getIndexTypeOfType?.(
+      type,
+      ts.IndexKind.String,
+    );
+
+    if (stringIndex) {
+      const value =
+        renderTypeFixture(
+          ts,
+          checker,
+          stringIndex,
+          'value',
+          sourceFile,
+          depth + 1,
+          options,
+        ) ?? 'undefined';
+
+      return '{ key: ' + value + ' }';
+    }
+
     return renderTypeTextFixture(typeText, name);
   }
 
@@ -494,14 +1167,15 @@ function renderTypeFixture(
     if (property.flags & ts.SymbolFlags.Method) return null;
 
     const declaration =
-      property.valueDeclaration || property.declarations?.[0] || sourceFile;
+      property.valueDeclaration ||
+      property.declarations?.[0] ||
+      sourceFile;
     const propertyType = checker.getTypeOfSymbolAtLocation(
       property,
       declaration,
     );
 
     if (propertyType.getCallSignatures().length > 0) return null;
-    if (property.flags & ts.SymbolFlags.Optional) continue;
 
     const propertyName = property.getName();
 
@@ -519,13 +1193,23 @@ function renderTypeFixture(
       propertyName,
       sourceFile,
       depth + 1,
+      options,
     );
+
+    if (
+      rendered === null &&
+      property.flags & ts.SymbolFlags.Optional
+    ) {
+      continue;
+    }
 
     fields.push(
       safePropertyName(propertyName) +
         ': ' +
         (rendered ??
-          '{} as never /* TODO: provide ' + propertyName + ' */'),
+          '{} as never /* TODO: provide ' +
+            propertyName +
+            ' */'),
     );
   }
 
@@ -537,17 +1221,39 @@ function renderTypeFixture(
 function renderTypeTextFixture(type, name) {
   const normalized = String(type).replace(/\s+/g, '');
 
-  if (normalized === 'string') return JSON.stringify(sampleString(name));
+  if (normalized === 'string') {
+    return JSON.stringify(sampleString(name));
+  }
   if (normalized === 'number') return '1';
   if (normalized === 'boolean') return 'true';
   if (normalized === 'bigint') return '1n';
+  if (normalized === 'symbol') return "Symbol('test')";
+  if (normalized === 'null') return 'null';
+  if (normalized === 'undefined' || normalized === 'void') {
+    return 'undefined';
+  }
   if (normalized === 'Date') {
     return "new Date('2026-01-01T00:00:00.000Z')";
   }
-  if (normalized.endsWith('[]') || /^Array<.+>$/.test(normalized)) {
+  if (normalized === 'RegExp') return '/test/';
+  if (normalized === 'URL') {
+    return "new URL('https://example.com')";
+  }
+  if (normalized === 'Buffer') {
+    return "Buffer.from('test')";
+  }
+  if (
+    normalized.endsWith('[]') ||
+    /^(?:Readonly)?Array<.+>$/.test(normalized)
+  ) {
     return '[]';
   }
-  if (normalized.includes('|undefined')) return 'undefined';
+  if (/^(?:Readonly)?Map<.+>$/.test(normalized)) {
+    return 'new Map()';
+  }
+  if (/^(?:Readonly)?Set<.+>$/.test(normalized)) {
+    return 'new Set()';
+  }
 
   return null;
 }
@@ -579,6 +1285,7 @@ function getCallReturnInfo(
         name,
         sourceFile,
         0,
+        { preferNull: true },
       ) ?? 'undefined';
 
     return {
@@ -655,7 +1362,7 @@ function renderSafeExpression(
 
 function renderTest({
   className,
-  constructorParameters,
+  creation,
   methods,
   importPath,
 }) {
@@ -668,18 +1375,24 @@ function renderTest({
   ];
 
   if (methods.length === 0) {
+    const callback = creation.async ? 'async ()' : '()';
+
     lines.push(
-      `test('${className}', () => {`,
-      ...renderConstructorSetup(
+      `test('${className}', ${callback} => {`,
+      ...renderCreationSetup(
         className,
-        constructorParameters,
+        creation,
         [],
       ),
-      '',
-      `  const sut = new ${className}(${renderConstructorArguments(
+    );
+
+    if (creation.parameters.length > 0) lines.push('');
+
+    lines.push(
+      `  const sut = ${renderCreationExpression(
         className,
-        constructorParameters,
-      )})`,
+        creation,
+      )}`,
       '',
       '  assert.ok(sut)',
       '})',
@@ -691,7 +1404,8 @@ function renderTest({
 
   for (const method of methods) {
     const usesMocks = method.calls.length > 0;
-    const callback = method.async
+    const needsAsync = method.async || creation.async;
+    const callback = needsAsync
       ? usesMocks
         ? 'async (t)'
         : 'async ()'
@@ -704,9 +1418,9 @@ function renderTest({
     );
 
     lines.push(
-      ...renderConstructorSetup(
+      ...renderCreationSetup(
         className,
-        constructorParameters,
+        creation,
         method.calls,
       ),
     );
@@ -717,7 +1431,7 @@ function renderTest({
     );
 
     if (
-      constructorParameters.length > 0 &&
+      creation.parameters.length > 0 &&
       methodParameterLines.length > 0
     ) {
       lines.push('');
@@ -726,17 +1440,17 @@ function renderTest({
     lines.push(...methodParameterLines);
 
     if (
-      constructorParameters.length > 0 ||
+      creation.parameters.length > 0 ||
       methodParameterLines.length > 0
     ) {
       lines.push('');
     }
 
     lines.push(
-      `  const sut = new ${className}(${renderConstructorArguments(
+      `  const sut = ${renderCreationExpression(
         className,
-        constructorParameters,
-      )})`,
+        creation,
+      )}`,
       '',
     );
 
@@ -792,19 +1506,20 @@ function renderTest({
   return lines.join('\n');
 }
 
-function renderConstructorSetup(
+function renderCreationSetup(
   className,
-  constructorParameters,
+  creation,
   calls,
 ) {
   const lines = [];
 
-  for (const parameter of constructorParameters) {
+  for (const parameter of creation.parameters) {
     if (parameter.kind === 'value') {
       const fixture =
         parameter.fixture ??
-        fallbackConstructorParameter(
+        fallbackCreationParameter(
           className,
+          creation,
           parameter.index,
           parameter.name,
         );
@@ -813,7 +1528,11 @@ function renderConstructorSetup(
         lines.push(`  const ${parameter.name} = ${fixture}`);
       } else {
         lines.push(
-          `  const ${parameter.name} = ${fixture} satisfies ConstructorParameters<typeof ${className}>[${parameter.index}]`,
+          `  const ${parameter.name} = ${fixture} satisfies ${creationParameterType(
+            className,
+            creation,
+            parameter.index,
+          )}`,
         );
       }
 
@@ -846,24 +1565,77 @@ function renderConstructorSetup(
   return lines;
 }
 
-function renderConstructorArguments(
-  className,
-  constructorParameters,
-) {
-  return constructorParameters
+function renderCreationExpression(className, creation) {
+  const argumentsList = creation.parameters
     .map((parameter) => {
       if (parameter.kind === 'value') return parameter.name;
 
       return (
         parameter.name +
-        ' as unknown as ConstructorParameters<typeof ' +
-        className +
-        '>[' +
-        parameter.index +
-        ']'
+        ' as unknown as ' +
+        creationParameterType(
+          className,
+          creation,
+          parameter.index,
+        )
       );
     })
     .join(', ');
+
+  if (creation.kind === 'factory') {
+    return (
+      (creation.async ? 'await ' : '') +
+      className +
+      '.' +
+      creation.methodName +
+      '(' +
+      argumentsList +
+      ')'
+    );
+  }
+
+  return 'new ' + className + '(' + argumentsList + ')';
+}
+
+function creationParameterType(
+  className,
+  creation,
+  index,
+) {
+  if (creation.kind === 'factory') {
+    return (
+      'Parameters<typeof ' +
+      className +
+      '.' +
+      creation.methodName +
+      '>[' +
+      index +
+      ']'
+    );
+  }
+
+  return (
+    'ConstructorParameters<typeof ' +
+    className +
+    '>[' +
+    index +
+    ']'
+  );
+}
+
+function fallbackCreationParameter(
+  className,
+  creation,
+  index,
+  name,
+) {
+  return (
+    '{} as ' +
+    creationParameterType(className, creation, index) +
+    ' /* TODO: provide ' +
+    name +
+    ' */'
+  );
 }
 
 function renderMethodParameterSetup(className, method) {
@@ -960,6 +1732,10 @@ function sampleString(name) {
 
   if (normalized.includes('email')) return 'user@example.com';
   if (normalized.includes('name')) return 'Marcos';
+  if (normalized.includes('phone')) return '+5599999999999';
+  if (normalized.includes('slug')) return 'example-slug';
+  if (normalized.includes('token')) return 'test-token';
+  if (normalized.includes('password')) return 'Test@123';
   if (normalized.includes('id')) return 'test-id';
   if (normalized.includes('url')) return 'https://example.com';
 

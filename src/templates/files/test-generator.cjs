@@ -1103,6 +1103,7 @@ function getCallReturnInfo(
         name,
         sourceFile,
         0,
+        { preferNull: true },
       ) ?? 'undefined';
 
     return {
@@ -1179,7 +1180,7 @@ function renderSafeExpression(
 
 function renderTest({
   className,
-  constructorParameters,
+  creation,
   methods,
   importPath,
 }) {
@@ -1192,18 +1193,24 @@ function renderTest({
   ];
 
   if (methods.length === 0) {
+    const callback = creation.async ? 'async ()' : '()';
+
     lines.push(
-      `test('${className}', () => {`,
-      ...renderConstructorSetup(
+      `test('${className}', ${callback} => {`,
+      ...renderCreationSetup(
         className,
-        constructorParameters,
+        creation,
         [],
       ),
-      '',
-      `  const sut = new ${className}(${renderConstructorArguments(
+    );
+
+    if (creation.parameters.length > 0) lines.push('');
+
+    lines.push(
+      `  const sut = ${renderCreationExpression(
         className,
-        constructorParameters,
-      )})`,
+        creation,
+      )}`,
       '',
       '  assert.ok(sut)',
       '})',
@@ -1215,7 +1222,8 @@ function renderTest({
 
   for (const method of methods) {
     const usesMocks = method.calls.length > 0;
-    const callback = method.async
+    const needsAsync = method.async || creation.async;
+    const callback = needsAsync
       ? usesMocks
         ? 'async (t)'
         : 'async ()'
@@ -1228,9 +1236,9 @@ function renderTest({
     );
 
     lines.push(
-      ...renderConstructorSetup(
+      ...renderCreationSetup(
         className,
-        constructorParameters,
+        creation,
         method.calls,
       ),
     );
@@ -1241,7 +1249,7 @@ function renderTest({
     );
 
     if (
-      constructorParameters.length > 0 &&
+      creation.parameters.length > 0 &&
       methodParameterLines.length > 0
     ) {
       lines.push('');
@@ -1250,17 +1258,17 @@ function renderTest({
     lines.push(...methodParameterLines);
 
     if (
-      constructorParameters.length > 0 ||
+      creation.parameters.length > 0 ||
       methodParameterLines.length > 0
     ) {
       lines.push('');
     }
 
     lines.push(
-      `  const sut = new ${className}(${renderConstructorArguments(
+      `  const sut = ${renderCreationExpression(
         className,
-        constructorParameters,
-      )})`,
+        creation,
+      )}`,
       '',
     );
 
@@ -1316,19 +1324,20 @@ function renderTest({
   return lines.join('\n');
 }
 
-function renderConstructorSetup(
+function renderCreationSetup(
   className,
-  constructorParameters,
+  creation,
   calls,
 ) {
   const lines = [];
 
-  for (const parameter of constructorParameters) {
+  for (const parameter of creation.parameters) {
     if (parameter.kind === 'value') {
       const fixture =
         parameter.fixture ??
-        fallbackConstructorParameter(
+        fallbackCreationParameter(
           className,
+          creation,
           parameter.index,
           parameter.name,
         );
@@ -1337,7 +1346,11 @@ function renderConstructorSetup(
         lines.push(`  const ${parameter.name} = ${fixture}`);
       } else {
         lines.push(
-          `  const ${parameter.name} = ${fixture} satisfies ConstructorParameters<typeof ${className}>[${parameter.index}]`,
+          `  const ${parameter.name} = ${fixture} satisfies ${creationParameterType(
+            className,
+            creation,
+            parameter.index,
+          )}`,
         );
       }
 
@@ -1370,24 +1383,77 @@ function renderConstructorSetup(
   return lines;
 }
 
-function renderConstructorArguments(
-  className,
-  constructorParameters,
-) {
-  return constructorParameters
+function renderCreationExpression(className, creation) {
+  const argumentsList = creation.parameters
     .map((parameter) => {
       if (parameter.kind === 'value') return parameter.name;
 
       return (
         parameter.name +
-        ' as unknown as ConstructorParameters<typeof ' +
-        className +
-        '>[' +
-        parameter.index +
-        ']'
+        ' as unknown as ' +
+        creationParameterType(
+          className,
+          creation,
+          parameter.index,
+        )
       );
     })
     .join(', ');
+
+  if (creation.kind === 'factory') {
+    return (
+      (creation.async ? 'await ' : '') +
+      className +
+      '.' +
+      creation.methodName +
+      '(' +
+      argumentsList +
+      ')'
+    );
+  }
+
+  return 'new ' + className + '(' + argumentsList + ')';
+}
+
+function creationParameterType(
+  className,
+  creation,
+  index,
+) {
+  if (creation.kind === 'factory') {
+    return (
+      'Parameters<typeof ' +
+      className +
+      '.' +
+      creation.methodName +
+      '>[' +
+      index +
+      ']'
+    );
+  }
+
+  return (
+    'ConstructorParameters<typeof ' +
+    className +
+    '>[' +
+    index +
+    ']'
+  );
+}
+
+function fallbackCreationParameter(
+  className,
+  creation,
+  index,
+  name,
+) {
+  return (
+    '{} as ' +
+    creationParameterType(className, creation, index) +
+    ' /* TODO: provide ' +
+    name +
+    ' */'
+  );
 }
 
 function renderMethodParameterSetup(className, method) {

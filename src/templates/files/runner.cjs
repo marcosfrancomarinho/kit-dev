@@ -198,6 +198,18 @@ function fail(error) {
 }
 
 async function main() {
+  const [target] = process.argv.slice(2);
+
+  if (target) {
+    const { generateTest } = require('./generator.cjs');
+    const result = await generateTest(target, projectRoot);
+
+    console.log(
+      '🧪 Test created: ' + relative(projectRoot, result.destinationPath),
+    );
+    return;
+  }
+
   await mkdir(testRoot, { recursive: true });
   await refreshContext(true);
 

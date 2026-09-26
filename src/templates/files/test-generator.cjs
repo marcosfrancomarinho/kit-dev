@@ -1414,13 +1414,18 @@ function renderUserClassFixture(
   const args = [];
 
   for (const parameter of plan.parameters) {
+    const parameterName =
+      parameter.name && ts.isIdentifier(parameter.name)
+        ? parameter.name.text
+        : name;
+    const fixtureName = isGenericFixtureName(parameterName)
+      ? name
+      : parameterName;
     const fixture = renderParameterFixture(
       ts,
       checker,
       parameter,
-      parameter.name && ts.isIdentifier(parameter.name)
-        ? parameter.name.text
-        : name,
+      fixtureName,
       classSource,
       nextOptions,
     );
@@ -1461,6 +1466,17 @@ function renderUserClassFixture(
   }
 
   return 'new ' + className + '(' + args.join(', ') + ')';
+}
+
+function isGenericFixtureName(name) {
+  return [
+    'value',
+    'input',
+    'data',
+    'props',
+    'payload',
+    'raw',
+  ].includes(String(name).toLowerCase());
 }
 
 function getClassDeclaration(ts, checker, type) {

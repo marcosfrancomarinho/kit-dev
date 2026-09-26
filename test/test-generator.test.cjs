@@ -153,12 +153,14 @@ export class CreateUser {
     );
     assert.match(
       generated,
-      /findByName: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => null\)/,
+      /const repositoryFindByNameMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => null\)/,
     );
     assert.match(
       generated,
-      /create: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /const repositoryCreateMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
     );
+    assert.match(generated, /findByName: repositoryFindByNameMock/);
+    assert.match(generated, /create: repositoryCreateMock/);
     assert.match(
       generated,
       /const repository: ConstructorParameters<typeof CreateUser>\[0\] = \{/,
@@ -170,19 +172,19 @@ export class CreateUser {
     assert.match(generated, /await sut\.execute\(dto\)/);
     assert.match(
       generated,
-      /repositoryFindByNameMock\\.mock\\.callCount\(\), 1/,
+      /repositoryFindByNameMock\.mock\.callCount\(\), 1/,
     );
     assert.match(
       generated,
-      /repositoryCreateMock\\.mock\\.callCount\(\), 1/,
+      /repositoryCreateMock\.mock\.callCount\(\), 1/,
     );
     assert.match(
       generated,
-      /repositoryFindByNameMock\\.mock\\.calls\[0\]\.arguments, \[dto\.name\]/,
+      /repositoryFindByNameMock\.mock\.calls\[0\]\.arguments, \[dto\.name\]/,
     );
     assert.match(
       generated,
-      /repositoryCreateMock\\.mock\\.calls\[0\]\.arguments, \[dto\]/,
+      /repositoryCreateMock\.mock\.calls\[0\]\.arguments, \[dto\]/,
     );
   },
 );
@@ -844,7 +846,7 @@ export class CreateUserHandler {
     );
     assert.match(
       generated,
-      /repositorySaveMock\\.mock\\.callCount\(\), 1/,
+      /repositorySaveMock\.mock\.callCount\(\), 1/,
     );
   },
 );
@@ -1328,12 +1330,13 @@ export class UserService {
     );
     assert.match(
       generated,
-      /save: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /const repositorySaveMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
     );
     assert.match(
       generated,
       /const repository: ConstructorParameters<typeof UserService>\[1\] = \{/,
     );
+    assert.match(generated, /save: repositorySaveMock/);
     assert.doesNotMatch(
       generated,
       /props as unknown as ConstructorParameters<typeof UserService>\[0\]/,
@@ -1389,12 +1392,13 @@ export class Runner {
 
     assert.match(
       generated,
-      /run: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /const portRunMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
     );
     assert.match(
       generated,
       /const port: ConstructorParameters<typeof Runner>\[0\] = \{/,
     );
+    assert.match(generated, /run: portRunMock/);
   },
 );
 
@@ -1459,12 +1463,13 @@ export class CreateUser {
     );
     assert.match(
       generated,
-      /save: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /const repositorySaveMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
     );
     assert.match(
       generated,
       /const repository: ConstructorParameters<typeof CreateUser>\[0\] = \{/,
     );
+    assert.match(generated, /save: repositorySaveMock/);
     assert.doesNotMatch(
       generated,
       /input as unknown as/,
@@ -1648,15 +1653,16 @@ export class Checkout {
 
     assert.match(
       strategyTest,
-      /calculate: t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => 1\)/,
+      /const strategyCalculateMock = t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => 1\)/,
+    );
+    assert.match(strategyTest, /calculate: strategyCalculateMock/);
+    assert.match(
+      strategyTest,
+      /strategyCalculateMock\.mock\.callCount\(\), 1/,
     );
     assert.match(
       strategyTest,
-      /strategyCalculateMock\\.mock\\.callCount\(\), 1/,
-    );
-    assert.match(
-      strategyTest,
-      /strategyCalculateMock\\.mock\\.calls\[0\]\.arguments, \[1\]/,
+      /strategyCalculateMock\.mock\.calls\[0\]\.arguments, \[1\]/,
     );
 
     await writeFile(
@@ -1690,11 +1696,15 @@ export class ProductFilter {
 
     assert.match(
       specificationTest,
-      /isSatisfiedBy: t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => true\)/,
+      /const specificationIsSatisfiedByMock = t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => true\)/,
     );
     assert.match(
       specificationTest,
-      /specificationIsSatisfiedByMock\\.mock\\.callCount\(\), 1/,
+      /isSatisfiedBy: specificationIsSatisfiedByMock/,
+    );
+    assert.match(
+      specificationTest,
+      /specificationIsSatisfiedByMock\.mock\.callCount\(\), 1/,
     );
 
     await writeFile(
@@ -1728,11 +1738,12 @@ export class LoggingDecorator {
 
     assert.match(
       decoratorTest,
-      /execute: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /const innerExecuteMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
     );
+    assert.match(decoratorTest, /execute: innerExecuteMock/);
     assert.match(
       decoratorTest,
-      /innerExecuteMock\\.mock\\.callCount\(\), 1/,
+      /innerExecuteMock\.mock\.callCount\(\), 1/,
     );
 
     await writeFile(
@@ -1766,11 +1777,12 @@ export class PaymentAdapter {
 
     assert.match(
       adapterTest,
-      /charge: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => true\)/,
+      /const portChargeMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => true\)/,
     );
+    assert.match(adapterTest, /charge: portChargeMock/);
     assert.match(
       adapterTest,
-      /portChargeMock\\.mock\\.callCount\(\), 1/,
+      /portChargeMock\.mock\.callCount\(\), 1/,
     );
 
     await writeFile(
@@ -1919,8 +1931,9 @@ export class NotificationService {
 
     assert.match(
       inheritedTest,
-      /send: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /const portSendMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
     );
+    assert.match(inheritedTest, /send: portSendMock/);
 
     await writeFile(
       join(projectPath, 'src', 'domain', 'collections.ts'),

@@ -1879,7 +1879,7 @@ export class Entity {
     );
     assert.match(
       entityTest,
-      /const id: ConstructorParameters<typeof Entity>\[0\] = "test-id" as never/,
+      /const id = "test-id" as never/,
     );
     assert.match(
       entityTest,

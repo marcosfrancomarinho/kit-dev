@@ -793,6 +793,14 @@ function renderParameterFixture(
   name,
   sourceFile,
 ) {
+  const initializer = renderInitializerFixture(
+    ts,
+    parameter.initializer,
+    sourceFile,
+  );
+
+  if (initializer !== null) return initializer;
+
   try {
     const type = parameter.type
       ? checker.getTypeFromTypeNode(parameter.type)
@@ -817,6 +825,61 @@ function renderParameterFixture(
 
     return null;
   }
+}
+
+function renderInitializerFixture(
+  ts,
+  initializer,
+  sourceFile,
+) {
+  if (!initializer) return null;
+
+  if (ts.isStringLiteral(initializer)) {
+    return JSON.stringify(initializer.text);
+  }
+
+  if (
+    ts.isNumericLiteral(initializer) ||
+    initializer.kind === ts.SyntaxKind.TrueKeyword ||
+    initializer.kind === ts.SyntaxKind.FalseKeyword ||
+    initializer.kind === ts.SyntaxKind.NullKeyword
+  ) {
+    return initializer.getText(sourceFile);
+  }
+
+  if (
+    ts.SyntaxKind.BigIntLiteral &&
+    initializer.kind === ts.SyntaxKind.BigIntLiteral
+  ) {
+    return initializer.getText(sourceFile);
+  }
+
+  if (
+    ts.isIdentifier(initializer) &&
+    initializer.text === 'undefined'
+  ) {
+    return 'undefined';
+  }
+
+  if (
+    ts.isNewExpression(initializer) &&
+    ts.isIdentifier(initializer.expression) &&
+    initializer.expression.text === 'Date'
+  ) {
+    return "new Date('2026-01-01T00:00:00.000Z')";
+  }
+
+  if (ts.isArrayLiteralExpression(initializer)) {
+    return initializer.elements.length === 0
+      ? '[]'
+      : initializer.getText(sourceFile);
+  }
+
+  if (ts.isObjectLiteralExpression(initializer)) {
+    return initializer.getText(sourceFile);
+  }
+
+  return null;
 }
 
 function renderTypeNodeFixture(

@@ -1053,26 +1053,70 @@ function renderTypeFixture(
     return "new Error('test')";
   }
 
+  const typeArguments = getTypeArgumentsSafe(checker, type);
+
   if (/^(?:Readonly)?Map<.+>$/.test(typeText)) {
-    return 'new Map()';
+    const key = typeArguments[0]
+      ? renderTypeFixture(
+          ts,
+          checker,
+          typeArguments[0],
+          'key',
+          sourceFile,
+          depth + 1,
+          options,
+        )
+      : null;
+    const value = typeArguments[1]
+      ? renderTypeFixture(
+          ts,
+          checker,
+          typeArguments[1],
+          'value',
+          sourceFile,
+          depth + 1,
+          options,
+        )
+      : null;
+
+    return key !== null && value !== null
+      ? 'new Map([[' + key + ', ' + value + ']])'
+      : 'new Map()';
   }
+
   if (/^(?:Readonly)?Set<.+>$/.test(typeText)) {
-    return 'new Set()';
+    const value = typeArguments[0]
+      ? renderTypeFixture(
+          ts,
+          checker,
+          typeArguments[0],
+          name + 'Item',
+          sourceFile,
+          depth + 1,
+          options,
+        )
+      : null;
+
+    return value !== null
+      ? 'new Set([' + value + '])'
+      : 'new Set()';
   }
+
   if (/^WeakMap<.+>$/.test(typeText)) {
     return 'new WeakMap()';
   }
   if (/^WeakSet<.+>$/.test(typeText)) {
     return 'new WeakSet()';
   }
+
   if (
     /^(?:Uint|Int|Float|BigInt|BigUint)\d*Array$/.test(typeText)
   ) {
-    return `new ${typeText}()`;
+    return `new ${typeText}([1])`;
   }
 
   if (checker.isTupleType?.(type)) {
-    const items = checker.getTypeArguments?.(type) || [];
+    const items = typeArguments;
     const renderedItems = items.map((item, index) =>
       renderTypeFixture(
         ts,
@@ -1093,7 +1137,23 @@ function renderTypeFixture(
     typeText.endsWith('[]') ||
     /^(?:Readonly)?Array<.+>$/.test(typeText)
   ) {
-    return '[]';
+    const elementType =
+      checker.getElementTypeOfArrayType?.(type) ||
+      typeArguments[0] ||
+      null;
+    const item = elementType
+      ? renderTypeFixture(
+          ts,
+          checker,
+          elementType,
+          singularizeName(name),
+          sourceFile,
+          depth + 1,
+          options,
+        )
+      : null;
+
+    return item !== null ? '[' + item + ']' : '[]';
   }
 
   const promisedType = checker.getPromisedTypeOfPromise?.(type);
@@ -1216,6 +1276,28 @@ function renderTypeFixture(
   if (fields.length === 0) return '{}';
 
   return '{ ' + fields.join(', ') + ' }';
+}
+
+function getTypeArgumentsSafe(checker, type) {
+  try {
+    return checker.getTypeArguments?.(type) || [];
+  } catch {
+    return type.aliasTypeArguments || type.typeArguments || [];
+  }
+}
+
+function singularizeName(name) {
+  const value = String(name || 'item');
+
+  if (value.endsWith('ies') && value.length > 3) {
+    return value.slice(0, -3) + 'y';
+  }
+
+  if (value.endsWith('s') && value.length > 1) {
+    return value.slice(0, -1);
+  }
+
+  return value + 'Item';
 }
 
 function renderTypeTextFixture(type, name) {

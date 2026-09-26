@@ -69,7 +69,7 @@ The scripts are added automatically to `package.json`.
 |---|---|
 | `npm run dev` | Runs the application in development, watches changes, and restarts Node.js |
 | `npm run type` | Keeps TypeScript checking errors in real time |
-| `npm test` | Runs TypeScript tests with `node:test` and stays in watch mode |
+| `npm test` | Runs tests in watch mode; with a target, generates a test automatically |
 | `npm run build` | Checks types and creates the production bundle |
 | `npm start` | Runs the generated bundle from `dist` |
 | `npm run di` | Installs the optional DI setup |

@@ -123,45 +123,46 @@ function analyzeClass(ts, sourceFile, checker) {
 
   const className = classNode.name.text;
   const constructorNode = classNode.members.find(ts.isConstructorDeclaration);
-  const constructorParameters = (constructorNode?.parameters || [])
-    .filter((parameter) => ts.isIdentifier(parameter.name))
-    .map((parameter, index) => {
-      const name = parameter.name.text;
-      const fixture = renderTypeNodeFixture(
-        ts,
-        checker,
-        parameter.type,
-        name,
-        sourceFile,
-      );
-
-      return {
-        index,
-        name,
-        type: parameter.type
-          ? parameter.type.getText(sourceFile)
-          : 'unknown',
-        optional: Boolean(parameter.questionToken || parameter.initializer),
-        kind: fixture === null ? 'dependency' : 'value',
-        fixture:
-          parameter.questionToken || parameter.initializer
-            ? 'undefined'
-            : fixture,
-      };
-    });
-
+  const constructorParameters = analyzeParameters(
+    ts,
+    checker,
+    constructorNode?.parameters || [],
+    sourceFile,
+  );
   const propertySources = collectConstructorPropertySources(
     ts,
     constructorNode,
   );
+  const factory = findStaticFactory(
+    ts,
+    checker,
+    classNode,
+    constructorNode,
+    constructorParameters,
+    sourceFile,
+  );
+  const creation = factory || {
+    kind: 'constructor',
+    methodName: null,
+    async: false,
+    parameters: constructorParameters,
+    sourceAliases: new Map(
+      constructorParameters.map((parameter) => [
+        parameter.name,
+        parameter.name,
+      ]),
+    ),
+  };
+
   const dependencyNames = new Set(
     constructorParameters
       .filter((parameter) => parameter.kind === 'dependency')
       .map((parameter) => parameter.name),
   );
-  const constructorNames = new Set(
-    constructorParameters.map((parameter) => parameter.name),
-  );
+  const knownNames = new Set([
+    ...constructorParameters.map((parameter) => parameter.name),
+    ...creation.parameters.map((parameter) => parameter.name),
+  ]);
 
   const methods = classNode.members
     .filter((member) => isPublicMethod(ts, member))
@@ -173,16 +174,267 @@ function analyzeClass(ts, sourceFile, checker) {
         method,
         className,
         dependencyNames,
-        constructorNames,
+        constructorNames: knownNames,
         propertySources,
+        sourceAliases: creation.sourceAliases,
       }),
     );
 
   return {
     className,
     constructorParameters,
+    creation,
     methods,
   };
+}
+
+function analyzeParameters(
+  ts,
+  checker,
+  parameters,
+  sourceFile,
+) {
+  return parameters
+    .filter((parameter) => ts.isIdentifier(parameter.name))
+    .map((parameter, index) => {
+      const name = parameter.name.text;
+      const fixture = renderTypeNodeFixture(
+        ts,
+        checker,
+        parameter.type,
+        name,
+        sourceFile,
+      );
+      const optional = Boolean(
+        parameter.questionToken || parameter.initializer,
+      );
+
+      return {
+        index,
+        name,
+        type: parameter.type
+          ? parameter.type.getText(sourceFile)
+          : 'unknown',
+        optional,
+        kind: fixture === null ? 'dependency' : 'value',
+        fixture: fixture ?? (optional ? 'undefined' : null),
+      };
+    });
+}
+
+function findStaticFactory(
+  ts,
+  checker,
+  classNode,
+  constructorNode,
+  constructorParameters,
+  sourceFile,
+) {
+  const className = classNode.name.text;
+  const preferredNames = new Map([
+    ['create', 100],
+    ['from', 90],
+    ['of', 80],
+    ['build', 70],
+    ['make', 60],
+  ]);
+  const candidates = classNode.members
+    .filter(
+      (member) =>
+        ts.isMethodDeclaration(member) &&
+        ts.isIdentifier(member.name) &&
+        hasModifier(ts, member, ts.SyntaxKind.StaticKeyword) &&
+        !hasModifier(ts, member, ts.SyntaxKind.PrivateKeyword) &&
+        !hasModifier(ts, member, ts.SyntaxKind.ProtectedKeyword),
+    )
+    .map((method) => {
+      const returnsClass = methodReturnsClass(
+        ts,
+        checker,
+        method,
+        className,
+        sourceFile,
+      );
+
+      if (!returnsClass) return null;
+
+      const name = method.name.text;
+      const signature = checker.getSignatureFromDeclaration(method);
+      const returnType = signature
+        ? checker.getReturnTypeOfSignature(signature)
+        : null;
+      const promisedType = returnType
+        ? checker.getPromisedTypeOfPromise?.(returnType)
+        : null;
+
+      return {
+        method,
+        name,
+        score: (preferredNames.get(name.toLowerCase()) || 10) +
+          (containsNewClass(ts, method, className) ? 10 : 0),
+        async: Boolean(
+          promisedType ||
+            method.modifiers?.some(
+              (modifier) =>
+                modifier.kind === ts.SyntaxKind.AsyncKeyword,
+            ),
+        ),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+
+  const constructorIsPrivate = Boolean(
+    constructorNode &&
+      (hasModifier(ts, constructorNode, ts.SyntaxKind.PrivateKeyword) ||
+        hasModifier(
+          ts,
+          constructorNode,
+          ts.SyntaxKind.ProtectedKeyword,
+        )),
+  );
+
+  if (candidates.length === 0) {
+    return constructorIsPrivate ? null : null;
+  }
+
+  const selected = candidates[0];
+  const parameters = analyzeParameters(
+    ts,
+    checker,
+    selected.method.parameters,
+    sourceFile,
+  );
+
+  return {
+    kind: 'factory',
+    methodName: selected.name,
+    async: selected.async,
+    parameters,
+    sourceAliases: mapFactoryArgumentsToConstructor(
+      ts,
+      selected.method,
+      className,
+      constructorParameters,
+      sourceFile,
+    ),
+  };
+}
+
+function methodReturnsClass(
+  ts,
+  checker,
+  method,
+  className,
+  sourceFile,
+) {
+  if (containsNewClass(ts, method, className)) return true;
+
+  if (method.type) {
+    const text = method.type.getText(sourceFile).replace(/\s+/g, '');
+    if (
+      text === className ||
+      text === `Promise<${className}>`
+    ) {
+      return true;
+    }
+  }
+
+  try {
+    const signature = checker.getSignatureFromDeclaration(method);
+    if (!signature) return false;
+
+    const returnType = checker.getReturnTypeOfSignature(signature);
+    const promisedType = checker.getPromisedTypeOfPromise?.(returnType);
+    const text = checker.typeToString(promisedType || returnType);
+    return text === className;
+  } catch {
+    return false;
+  }
+}
+
+function containsNewClass(ts, method, className) {
+  let found = false;
+
+  function visit(node) {
+    if (
+      ts.isNewExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === className
+    ) {
+      found = true;
+      return;
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  if (method.body) visit(method.body);
+  return found;
+}
+
+function mapFactoryArgumentsToConstructor(
+  ts,
+  method,
+  className,
+  constructorParameters,
+  sourceFile,
+) {
+  const aliases = new Map();
+  let newExpression = null;
+
+  function visit(node) {
+    if (
+      !newExpression &&
+      ts.isNewExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === className
+    ) {
+      newExpression = node;
+      return;
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  if (method.body) visit(method.body);
+
+  if (!newExpression) return aliases;
+
+  const argumentsList = newExpression.arguments || [];
+
+  constructorParameters.forEach((parameter, index) => {
+    const argument = argumentsList[index];
+    if (!argument) return;
+
+    const rendered = renderFactorySourceExpression(
+      ts,
+      argument,
+      sourceFile,
+    );
+
+    if (rendered) aliases.set(parameter.name, rendered);
+  });
+
+  return aliases;
+}
+
+function renderFactorySourceExpression(ts, node, sourceFile) {
+  if (
+    ts.isIdentifier(node) ||
+    ts.isPropertyAccessExpression(node) ||
+    ts.isElementAccessExpression(node)
+  ) {
+    return node.getText(sourceFile);
+  }
+
+  return null;
+}
+
+function hasModifier(ts, node, kind) {
+  return Boolean(
+    node.modifiers?.some((modifier) => modifier.kind === kind),
+  );
 }
 
 function analyzeMethod({

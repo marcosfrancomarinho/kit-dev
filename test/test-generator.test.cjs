@@ -450,7 +450,7 @@ export class Token {
     );
     assert.match(
       generated,
-      /const sut = await Token\.create\("value"\)/,
+      /const sut = await Token\.create\(value\)/,
     );
     assert.match(
       generated,

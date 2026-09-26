@@ -72,7 +72,7 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   );
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'test'))).sort(),
-    ['test.cjs'],
+    ['generator.cjs', 'test.cjs'],
   );
   assert.deepEqual(await readdir(join(projectPath, 'test')), [
     'example.test.ts',

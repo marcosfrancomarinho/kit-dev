@@ -2533,10 +2533,14 @@ function renderTest({
       lines.push('');
 
       for (const call of method.calls) {
-        const access =
-          (call.mockTarget || call.dependency) +
-          '.' +
-          safePropertyAccess(call.method);
+        const access = call.collection
+          ? (call.mockTarget || call.dependency) +
+            '.' +
+            safePropertyAccess(call.method)
+          : mockVariableName(
+              call.dependency,
+              call.method,
+            );
 
         lines.push(
           `  assert.equal(${access}.mock.callCount(), 1)`,
@@ -2654,6 +2658,18 @@ function renderCreationSetup(
       continue;
     }
 
+    for (const call of dependencyCalls) {
+      const asyncKeyword =
+        call.awaited || call.returnsPromise ? 'async ' : '';
+
+      lines.push(
+        `  const ${mockVariableName(
+          parameter.name,
+          call.method,
+        )} = t.mock.fn(${asyncKeyword}(..._args: unknown[]) => ${call.returnFixture})`,
+      );
+    }
+
     lines.push(
       `  const ${parameter.name}: ${creationParameterType(
         className,
@@ -2663,11 +2679,11 @@ function renderCreationSetup(
     );
 
     for (const call of dependencyCalls) {
-      const asyncKeyword =
-        call.awaited || call.returnsPromise ? 'async ' : '';
-
       lines.push(
-        `    ${safePropertyName(call.method)}: t.mock.fn(${asyncKeyword}(..._args: unknown[]) => ${call.returnFixture}),`,
+        `    ${safePropertyName(call.method)}: ${mockVariableName(
+          parameter.name,
+          call.method,
+        )},`,
       );
     }
 
@@ -2892,6 +2908,16 @@ function isAwaited(ts, node) {
   }
 
   return Boolean(current && ts.isAwaitExpression(current));
+}
+
+function mockVariableName(dependency, method) {
+  const methodPart = String(method)
+    .replace(/[^A-Za-z0-9_$]+(.)?/g, (_match, next) =>
+      next ? next.toUpperCase() : '',
+    )
+    .replace(/^./, (char) => char.toUpperCase());
+
+  return dependency + methodPart + 'Mock';
 }
 
 function safePropertyName(name) {

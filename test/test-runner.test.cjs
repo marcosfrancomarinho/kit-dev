@@ -18,7 +18,7 @@ const runnerTemplate = join(
   'src',
   'templates',
   'files',
-  'test-runner.cjs',
+  'runner.cjs',
 );
 
 test('executa testes TypeScript e permanece em watch', async (context) => {

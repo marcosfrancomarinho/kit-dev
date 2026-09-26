@@ -42,12 +42,18 @@ test('executa testes TypeScript e permanece em watch', async (context) => {
       runner.exitCode === null &&
       runner.signalCode === null
     ) {
-      const exit = once(runner, 'exit');
+      const exit = once(runner, 'close');
       runner.kill('SIGTERM');
       await exit;
     }
 
-    await rm(projectPath, { recursive: true, force: true });
+    // Windows may briefly retain directory handles after the child closes.
+    await rm(projectPath, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
   });
 
   await Promise.all([
@@ -100,7 +106,7 @@ test('sum', () => {
   assert.match(output, /sum/);
   assert.match(output, /pass 1/);
 
-  const exit = once(runner, 'exit');
+  const exit = once(runner, 'close');
   runner.kill('SIGTERM');
   const [exitCode, signal] = await exit;
 
@@ -110,7 +116,12 @@ test('sum', () => {
 test('gera teste automaticamente quando recebe um alvo', async (context) => {
   const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-test-command-'));
   const testToolPath = join(projectPath, 'kit-dev', 'test');
-  context.after(() => rm(projectPath, { recursive: true, force: true }));
+  context.after(() => rm(projectPath, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 100,
+  }));
 
   await Promise.all([
     mkdir(join(projectPath, 'src', 'application'), { recursive: true }),
@@ -167,7 +178,7 @@ export class CreateUser {
     output += chunk;
   });
 
-  const [exitCode] = await once(generation, 'exit');
+  const [exitCode] = await once(generation, 'close');
 
   assert.equal(exitCode, 0, output);
   assert.match(output, /Test created: test[\\/]application[\\/]create-user\.test\.ts/);

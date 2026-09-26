@@ -181,7 +181,11 @@ export class CreateUser {
     generated,
     /const repository: ConstructorParameters<typeof CreateUser>\[0\] = \{/,
   );
-  assert.match(generated, /save: t\.mock\.fn\(async/);
+  assert.match(
+    generated,
+    /const repositorySaveMock = t\.mock\.fn\(async/,
+  );
+  assert.match(generated, /save: repositorySaveMock/);
 });
 
 function waitForOutput(child, expected, timeout = 7000) {

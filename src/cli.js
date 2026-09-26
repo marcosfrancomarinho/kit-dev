@@ -1,5 +1,6 @@
-const { join } = require('path');
+const { join, relative } = require('path');
 const { generateProject } = require('./generators/project-generator');
+const { generateTest } = require('./generators/test-generator');
 const {
   detectPackageManager,
   getRunCommand,
@@ -21,9 +22,35 @@ function validateNodeVersion() {
   }
 }
 
+async function runTestGenerator(inputPath) {
+  if (!inputPath) {
+    throw new Error('Usage: create-kit-dev test <src/file.ts>');
+  }
+
+  const result = await generateTest(inputPath);
+
+  console.log(
+    colors.green +
+      '🧪 Test generated for ' +
+      result.className +
+      ':' +
+      colors.reset +
+      ' ' +
+      relative(process.cwd(), result.testPath),
+  );
+}
+
 async function run() {
   try {
     validateNodeVersion();
+
+    const [command, argument] = process.argv.slice(2);
+
+    if (command === 'test') {
+      await runTestGenerator(argument);
+      return;
+    }
+
     const manager = detectPackageManager();
     console.log(colors.magenta + 'Using package manager: ' + manager + colors.reset);
 

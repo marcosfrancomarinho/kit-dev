@@ -5,6 +5,7 @@ const {
   createPackageJson,
   createTsconfig,
   esbuildConfig,
+  exampleTest,
   gitignore,
   mainFile,
 } = require('../templates/project-files');
@@ -35,19 +36,28 @@ async function copyTemplateFile(source, destination, message) {
 
 async function generateProject(projectPath, projectName) {
   const srcPath = join(projectPath, 'src');
+  const testPath = join(projectPath, 'test');
   const kitDevPath = join(projectPath, 'kit-dev');
   const buildPath = join(kitDevPath, 'build');
   const diPath = join(kitDevPath, 'di');
+  const kitTestPath = join(kitDevPath, 'test');
   const templateFilesPath = join(__dirname, '..', 'templates', 'files');
 
   await createDirectory(projectPath);
   await createDirectory(srcPath);
+  await createDirectory(testPath);
   await createDirectory(kitDevPath);
   await createDirectory(buildPath);
   await createDirectory(diPath);
+  await createDirectory(kitTestPath);
 
   await Promise.all([
     createFile(join(srcPath, 'main.ts'), mainFile, '📝 src/main.ts created'),
+    createFile(
+      join(testPath, 'example.test.ts'),
+      exampleTest,
+      '🧪 test/example.test.ts created',
+    ),
     createFile(
       join(projectPath, 'package.json'),
       createPackageJson(projectName),
@@ -64,6 +74,11 @@ async function generateProject(projectPath, projectName) {
       '🛠 kit-dev/build/esbuild.config.cjs created',
     ),
     createFile(join(projectPath, '.gitignore'), gitignore, '🐙 .gitignore created'),
+    copyTemplateFile(
+      join(templateFilesPath, 'test.cjs'),
+      join(kitTestPath, 'test.cjs'),
+      '🧪 Node test runner prepared',
+    ),
     copyTemplateFile(
       join(templateFilesPath, 'di.cjs'),
       join(diPath, 'install.cjs'),

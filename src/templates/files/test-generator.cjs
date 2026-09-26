@@ -21,7 +21,13 @@ async function generateTest(target, projectRoot = process.cwd()) {
     sourcePath,
   );
 
-  const metadata = analyzeClass(ts, sourceFile, checker);
+  const fixtureContext = createFixtureContext(sourcePath);
+  const metadata = analyzeClass(
+    ts,
+    sourceFile,
+    checker,
+    fixtureContext,
+  );
 
   if (!metadata) {
     throw new Error(
@@ -44,6 +50,13 @@ async function generateTest(target, projectRoot = process.cwd()) {
   const content = renderTest({
     ...metadata,
     importPath: getImportPath(destinationPath, sourcePath),
+    fixtureImports: renderFixtureImports(
+      fixtureContext,
+      destinationPath,
+      sourcePath,
+      metadata.className,
+    ),
+    fixtureRequiresAsync: fixtureContext.requiresAsync,
   });
 
   await writeFile(destinationPath, content, 'utf-8');
@@ -116,7 +129,62 @@ function createProgramContext(ts, projectRoot, sourcePath) {
   };
 }
 
-function analyzeClass(ts, sourceFile, checker) {
+function createFixtureContext(rootSourcePath) {
+  return {
+    rootSourcePath: resolve(rootSourcePath),
+    imports: new Map(),
+    classPlanCache: new Map(),
+    requiresAsync: false,
+  };
+}
+
+function registerFixtureImport(context, name, sourcePath) {
+  if (!context || !name || !sourcePath) return;
+
+  const normalizedPath = resolve(sourcePath);
+  let names = context.imports.get(normalizedPath);
+
+  if (!names) {
+    names = new Set();
+    context.imports.set(normalizedPath, names);
+  }
+
+  names.add(name);
+}
+
+function renderFixtureImports(
+  context,
+  destinationPath,
+  rootSourcePath,
+  rootClassName,
+) {
+  if (!context) return [];
+
+  const rootPath = resolve(rootSourcePath);
+  const lines = [];
+
+  for (const [sourcePath, names] of context.imports) {
+    const filtered = [...names]
+      .filter(
+        (name) =>
+          !(sourcePath === rootPath && name === rootClassName),
+      )
+      .sort();
+
+    if (filtered.length === 0) continue;
+
+    lines.push(
+      `import { ${filtered.join(', ')} } from '${getImportPath(
+        destinationPath,
+        sourcePath,
+      )}'`,
+    );
+  }
+
+  return lines;
+}
+
+function analyzeClass(ts, sourceFile, checker, fixtureContext) {
   const classes = sourceFile.statements.filter(ts.isClassDeclaration);
   const classNode =
     classes.find(
@@ -136,6 +204,7 @@ function analyzeClass(ts, sourceFile, checker) {
     checker,
     constructorNode?.parameters || [],
     sourceFile,
+    fixtureContext,
   );
   const propertySources = collectConstructorPropertySources(
     ts,
@@ -149,6 +218,7 @@ function analyzeClass(ts, sourceFile, checker) {
     constructorNode,
     constructorParameters,
     sourceFile,
+    fixtureContext,
   );
   const constructorAccessible =
     !constructorNode ||
@@ -208,6 +278,7 @@ function analyzeClass(ts, sourceFile, checker) {
         constructorNames: knownNames,
         propertySources,
         sourceAliases: creation.sourceAliases,
+        fixtureContext,
       }),
     );
 
@@ -224,6 +295,7 @@ function analyzeParameters(
   checker,
   parameters,
   sourceFile,
+  fixtureContext,
 ) {
   return parameters
     .filter((parameter) => ts.isIdentifier(parameter.name))
@@ -235,6 +307,7 @@ function analyzeParameters(
         parameter,
         name,
         sourceFile,
+        { fixtureContext },
       );
       const optional = Boolean(
         parameter.questionToken || parameter.initializer,
@@ -262,6 +335,7 @@ function findStaticFactory(
   constructorNode,
   constructorParameters,
   sourceFile,
+  fixtureContext,
 ) {
   const className = classNode.name.text;
   const preferredNames = new Map([
@@ -325,6 +399,7 @@ function findStaticFactory(
     checker,
     selected.method.parameters,
     sourceFile,
+    fixtureContext,
   );
 
   return {
@@ -504,6 +579,7 @@ function analyzeMethod({
   constructorNames,
   propertySources,
   sourceAliases,
+  fixtureContext,
 }) {
   const methodName = method.name.text;
   const parameters = method.parameters
@@ -516,6 +592,7 @@ function analyzeMethod({
         parameter,
         name,
         sourceFile,
+        { fixtureContext },
       );
       const optional = Boolean(
         parameter.questionToken || parameter.initializer,
@@ -792,6 +869,7 @@ function renderParameterFixture(
   parameter,
   name,
   sourceFile,
+  options = {},
 ) {
   const initializer = renderInitializerFixture(
     ts,
@@ -813,7 +891,10 @@ function renderParameterFixture(
       name,
       sourceFile,
       0,
-      { preferNull: false },
+      {
+        ...options,
+        preferNull: false,
+      },
     );
   } catch {
     if (parameter.type) {
@@ -1195,6 +1276,18 @@ function renderTypeFixture(
       : '(..._args: unknown[]) => ' + value;
   }
 
+  const classFixture = renderUserClassFixture(
+    ts,
+    checker,
+    type,
+    name,
+    sourceFile,
+    depth,
+    options,
+  );
+
+  if (classFixture !== null) return classFixture;
+
   const properties = checker.getPropertiesOfType(type);
 
   if (properties.length === 0) {
@@ -1276,6 +1369,252 @@ function renderTypeFixture(
   if (fields.length === 0) return '{}';
 
   return '{ ' + fields.join(', ') + ' }';
+}
+
+function renderUserClassFixture(
+  ts,
+  checker,
+  type,
+  name,
+  sourceFile,
+  depth,
+  options,
+) {
+  const declaration = getClassDeclaration(ts, checker, type);
+  if (!declaration || !declaration.name) return null;
+
+  if (
+    hasModifier(ts, declaration, ts.SyntaxKind.AbstractKeyword)
+  ) {
+    return null;
+  }
+
+  const className = declaration.name.text;
+  const classSource = declaration.getSourceFile();
+  const classSourcePath = classSource.fileName;
+  const context = options.fixtureContext;
+  const stack = options.classStack || new Set();
+  const identity = resolve(classSourcePath) + ':' + declaration.pos;
+
+  if (stack.has(identity) || depth >= 4) return null;
+
+  const plan = getClassFixturePlan(
+    ts,
+    checker,
+    declaration,
+    context,
+  );
+
+  if (!plan) return null;
+
+  const nextOptions = {
+    ...options,
+    classStack: new Set([...stack, identity]),
+  };
+  const args = [];
+
+  for (const parameter of plan.parameters) {
+    const parameterName =
+      parameter.name && ts.isIdentifier(parameter.name)
+        ? parameter.name.text
+        : name;
+    const fixtureName = isGenericFixtureName(parameterName)
+      ? name
+      : parameterName;
+    const fixture = renderParameterFixture(
+      ts,
+      checker,
+      parameter,
+      fixtureName,
+      classSource,
+      nextOptions,
+    );
+
+    if (fixture === null) return null;
+    args.push(fixture);
+  }
+
+  registerFixtureImport(
+    context,
+    className,
+    classSourcePath,
+  );
+
+  if (plan.async) {
+    if (context) context.requiresAsync = true;
+
+    return (
+      'await ' +
+      className +
+      '.' +
+      plan.methodName +
+      '(' +
+      args.join(', ') +
+      ')'
+    );
+  }
+
+  if (plan.kind === 'factory') {
+    return (
+      className +
+      '.' +
+      plan.methodName +
+      '(' +
+      args.join(', ') +
+      ')'
+    );
+  }
+
+  return 'new ' + className + '(' + args.join(', ') + ')';
+}
+
+function isGenericFixtureName(name) {
+  return [
+    'value',
+    'input',
+    'data',
+    'props',
+    'payload',
+    'raw',
+  ].includes(String(name).toLowerCase());
+}
+
+function getClassDeclaration(ts, checker, type) {
+  let symbol = type.getSymbol?.() || type.symbol;
+
+  if (
+    symbol &&
+    symbol.flags & ts.SymbolFlags.Alias &&
+    checker.getAliasedSymbol
+  ) {
+    try {
+      symbol = checker.getAliasedSymbol(symbol);
+    } catch {}
+  }
+
+  return symbol?.declarations?.find(ts.isClassDeclaration) || null;
+}
+
+function getClassFixturePlan(
+  ts,
+  checker,
+  classNode,
+  context,
+) {
+  const sourcePath = classNode.getSourceFile().fileName;
+  const cacheKey = resolve(sourcePath) + ':' + classNode.pos;
+
+  if (context?.classPlanCache.has(cacheKey)) {
+    return context.classPlanCache.get(cacheKey);
+  }
+
+  const className = classNode.name?.text;
+  if (!className) return null;
+
+  const factories = classNode.members
+    .filter(
+      (member) =>
+        ts.isMethodDeclaration(member) &&
+        ts.isIdentifier(member.name) &&
+        hasModifier(ts, member, ts.SyntaxKind.StaticKeyword) &&
+        !hasModifier(ts, member, ts.SyntaxKind.PrivateKeyword) &&
+        !hasModifier(ts, member, ts.SyntaxKind.ProtectedKeyword) &&
+        ['create', 'from', 'of', 'build', 'make'].includes(
+          member.name.text.toLowerCase(),
+        ) &&
+        methodReturnsClass(
+          ts,
+          checker,
+          member,
+          className,
+          classNode.getSourceFile(),
+        ),
+    )
+    .map((method) => {
+      const signature = checker.getSignatureFromDeclaration(method);
+      const returnType = signature
+        ? checker.getReturnTypeOfSignature(signature)
+        : null;
+      const promisedType = returnType
+        ? checker.getPromisedTypeOfPromise?.(returnType)
+        : null;
+      const priority = {
+        create: 100,
+        from: 90,
+        of: 80,
+        build: 70,
+        make: 60,
+      };
+
+      return {
+        kind: 'factory',
+        methodName: method.name.text,
+        parameters: [...method.parameters],
+        async: Boolean(
+          promisedType ||
+            method.modifiers?.some(
+              (modifier) =>
+                modifier.kind === ts.SyntaxKind.AsyncKeyword,
+            ),
+        ),
+        score:
+          priority[method.name.text.toLowerCase()] || 10,
+      };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  let plan = factories[0] || null;
+
+  if (!plan) {
+    const constructorNode = classNode.members.find(
+      ts.isConstructorDeclaration,
+    );
+    const hasNonPublicConstructor = Boolean(
+      constructorNode &&
+        (hasModifier(
+          ts,
+          constructorNode,
+          ts.SyntaxKind.PrivateKeyword,
+        ) ||
+          hasModifier(
+            ts,
+            constructorNode,
+            ts.SyntaxKind.ProtectedKeyword,
+          )),
+    );
+    const hasPublicInstanceMethods = classNode.members.some(
+      (member) =>
+        ts.isMethodDeclaration(member) &&
+        !hasModifier(
+          ts,
+          member,
+          ts.SyntaxKind.StaticKeyword,
+        ) &&
+        !hasModifier(
+          ts,
+          member,
+          ts.SyntaxKind.PrivateKeyword,
+        ) &&
+        !hasModifier(
+          ts,
+          member,
+          ts.SyntaxKind.ProtectedKeyword,
+        ),
+    );
+
+    if (!hasNonPublicConstructor && !hasPublicInstanceMethods) {
+      plan = {
+        kind: 'constructor',
+        methodName: null,
+        parameters: [...(constructorNode?.parameters || [])],
+        async: false,
+        score: 0,
+      };
+    }
+  }
+
+  if (context) context.classPlanCache.set(cacheKey, plan);
+  return plan;
 }
 
 function getTypeArgumentsSafe(checker, type) {
@@ -1447,17 +1786,23 @@ function renderTest({
   creation,
   methods,
   importPath,
+  fixtureImports = [],
+  fixtureRequiresAsync = false,
 }) {
   const lines = [
     "import assert from 'node:assert/strict'",
     "import { test } from 'node:test'",
     '',
     `import { ${className} } from '${importPath}'`,
+    ...fixtureImports,
     '',
   ];
 
   if (methods.length === 0) {
-    const callback = creation.async ? 'async ()' : '()';
+    const callback =
+      creation.async || fixtureRequiresAsync
+        ? 'async ()'
+        : '()';
 
     lines.push(
       `test('${className}', ${callback} => {`,
@@ -1486,7 +1831,8 @@ function renderTest({
 
   for (const method of methods) {
     const usesMocks = method.calls.length > 0;
-    const needsAsync = method.async || creation.async;
+    const needsAsync =
+      method.async || creation.async || fixtureRequiresAsync;
     const callback = needsAsync
       ? usesMocks
         ? 'async (t)'

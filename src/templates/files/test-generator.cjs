@@ -278,6 +278,7 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
         method,
         className,
         dependencyNames,
+        constructorParameters,
         constructorNames: knownNames,
         propertySources,
         sourceAliases: creation.sourceAliases,
@@ -729,6 +730,7 @@ function analyzeMethod({
   method,
   className,
   dependencyNames,
+  constructorParameters,
   constructorNames,
   propertySources,
   sourceAliases,
@@ -784,52 +786,114 @@ function analyzeMethod({
         ),
     ]),
   );
+  const collectionDependencies = new Set(
+    (constructorParameters || [])
+      .filter(
+        (parameter) =>
+          parameter.kind === 'dependencyCollection',
+      )
+      .map((parameter) => parameter.name),
+  );
+  const collectionAliases = new Map();
   const calls = new Map();
+
+  function recordCall(
+    node,
+    dependency,
+    callMethod,
+    mockTarget = dependency,
+    collection = false,
+  ) {
+    const key =
+      dependency + '.' + callMethod + ':' + mockTarget;
+    const current = calls.get(key) || {
+      dependency,
+      method: callMethod,
+      mockTarget,
+      collection,
+      awaited: false,
+      returnsPromise: false,
+      returnFixture: 'undefined',
+      expectedArguments: null,
+    };
+
+    const returnInfo = getCallReturnInfo(
+      ts,
+      checker,
+      node,
+      sourceFile,
+      callMethod + 'Result',
+    );
+
+    current.awaited = current.awaited || isAwaited(ts, node);
+    current.returnsPromise =
+      current.returnsPromise || returnInfo.returnsPromise;
+    current.returnFixture = returnInfo.fixture;
+    current.expectedArguments = renderExpectedArguments(
+      ts,
+      node.arguments,
+      parameterMap,
+      sourceFile,
+    );
+    calls.set(key, current);
+  }
 
   function visit(node) {
     if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      ts.isPropertyAccessExpression(node.expression.expression)
+      ts.isForOfStatement(node) &&
+      ts.isVariableDeclarationList(node.initializer) &&
+      node.initializer.declarations.length === 1
     ) {
-      const dependencyAccess = node.expression.expression;
+      const declaration = node.initializer.declarations[0];
+      const expression = node.expression;
 
       if (
-        dependencyAccess.expression.kind === ts.SyntaxKind.ThisKeyword &&
-        ts.isIdentifier(dependencyAccess.name) &&
-        dependencyNames.has(dependencyAccess.name.text)
+        ts.isIdentifier(declaration.name) &&
+        ts.isPropertyAccessExpression(expression) &&
+        expression.expression.kind ===
+          ts.SyntaxKind.ThisKeyword &&
+        collectionDependencies.has(expression.name.text)
       ) {
-        const dependency = dependencyAccess.name.text;
-        const callMethod = node.expression.name.text;
-        const key = dependency + '.' + callMethod;
-        const current = calls.get(key) || {
-          dependency,
-          method: callMethod,
-          awaited: false,
-          returnsPromise: false,
-          returnFixture: 'undefined',
-          expectedArguments: null,
-        };
+        collectionAliases.set(
+          declaration.name.text,
+          expression.name.text,
+        );
+      }
+    }
 
-        const returnInfo = getCallReturnInfo(
-          ts,
-          checker,
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression)
+    ) {
+      const receiver = node.expression.expression;
+      const callMethod = node.expression.name.text;
+
+      if (
+        ts.isPropertyAccessExpression(receiver) &&
+        receiver.expression.kind ===
+          ts.SyntaxKind.ThisKeyword &&
+        ts.isIdentifier(receiver.name) &&
+        dependencyNames.has(receiver.name.text)
+      ) {
+        recordCall(
           node,
-          sourceFile,
-          callMethod + 'Result',
+          receiver.name.text,
+          callMethod,
         );
+      } else if (
+        ts.isIdentifier(receiver) &&
+        collectionAliases.has(receiver.text)
+      ) {
+        const dependency =
+          collectionAliases.get(receiver.text);
 
-        current.awaited = current.awaited || isAwaited(ts, node);
-        current.returnsPromise =
-          current.returnsPromise || returnInfo.returnsPromise;
-        current.returnFixture = returnInfo.fixture;
-        current.expectedArguments = renderExpectedArguments(
-          ts,
-          node.arguments,
-          parameterMap,
-          sourceFile,
+        recordCall(
+          node,
+          dependency,
+          callMethod,
+          receiver.text,
+          true,
         );
-        calls.set(key, current);
       }
     }
 
@@ -2165,7 +2229,9 @@ function renderTest({
 
       for (const call of method.calls) {
         const access =
-          call.dependency + '.' + safePropertyAccess(call.method);
+          (call.mockTarget || call.dependency) +
+          '.' +
+          safePropertyAccess(call.method);
 
         lines.push(
           `  assert.equal(${access}.mock.callCount(), 1)`,

@@ -1,0 +1,144 @@
+const assert = require('node:assert/strict');
+const { spawn } = require('node:child_process');
+const { once } = require('node:events');
+const {
+  copyFile,
+  mkdtemp,
+  mkdir,
+  rm,
+  writeFile,
+} = require('node:fs/promises');
+const { tmpdir } = require('node:os');
+const { join } = require('node:path');
+const test = require('node:test');
+
+const runnerTemplate = join(
+  __dirname,
+  '..',
+  'src',
+  'templates',
+  'files',
+  'test.cjs',
+);
+
+test('executa testes TypeScript e permanece em watch', async (context) => {
+  const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-test-runner-'));
+  const runnerPath = join(projectPath, 'kit-dev', 'test', 'test.cjs');
+  let runner;
+
+  context.after(async () => {
+    if (
+      runner &&
+      runner.exitCode === null &&
+      runner.signalCode === null
+    ) {
+      const exit = once(runner, 'exit');
+      runner.kill('SIGTERM');
+      await exit;
+    }
+
+    await rm(projectPath, { recursive: true, force: true });
+  });
+
+  await Promise.all([
+    mkdir(join(projectPath, 'src'), { recursive: true }),
+    mkdir(join(projectPath, 'test'), { recursive: true }),
+    mkdir(join(projectPath, 'kit-dev', 'test'), { recursive: true }),
+  ]);
+
+  await Promise.all([
+    writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    ),
+    writeFile(
+      join(projectPath, 'src', 'sum.ts'),
+      'export const sum = (a: number, b: number) => a + b;\n',
+      'utf-8',
+    ),
+    writeFile(
+      join(projectPath, 'test', 'sum.test.ts'),
+      `
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { sum } from '../src/sum.js'
+
+test('sum', () => {
+  assert.equal(sum(1, 1), 2)
+})
+`.trimStart(),
+      'utf-8',
+    ),
+    copyFile(runnerTemplate, runnerPath),
+  ]);
+
+  runner = spawn(process.execPath, ['kit-dev/test/test.cjs'], {
+    cwd: projectPath,
+    env: {
+      ...process.env,
+      NODE_PATH: join(__dirname, '..', 'node_modules'),
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  const output = await waitForOutput(
+    runner,
+    'Kit Dev: watching tests for changes...',
+  );
+
+  assert.match(output, /sum/);
+  assert.match(output, /pass 1/);
+
+  const exit = once(runner, 'exit');
+  runner.kill('SIGTERM');
+  const [exitCode, signal] = await exit;
+
+  assert.ok(exitCode === 0 || signal === 'SIGTERM');
+});
+
+function waitForOutput(child, expected, timeout = 7000) {
+  return new Promise((resolve, reject) => {
+    let output = '';
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timed out waiting for test runner output:\n' + output));
+    }, timeout);
+
+    function cleanup() {
+      clearTimeout(timer);
+      child.stdout.off('data', onData);
+      child.stderr.off('data', onData);
+      child.off('exit', onExit);
+    }
+
+    function onData(chunk) {
+      output += chunk;
+
+      if (output.includes(expected)) {
+        cleanup();
+        resolve(output);
+      }
+    }
+
+    function onExit(code, signal) {
+      cleanup();
+      reject(
+        new Error(
+          'Test runner exited before watch mode. code=' +
+            code +
+            ' signal=' +
+            signal +
+            '\n' +
+            output,
+        ),
+      );
+    }
+
+    child.stdout.setEncoding('utf-8');
+    child.stderr.setEncoding('utf-8');
+    child.stdout.on('data', onData);
+    child.stderr.on('data', onData);
+    child.on('exit', onExit);
+  });
+}

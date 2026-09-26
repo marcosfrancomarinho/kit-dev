@@ -338,27 +338,53 @@ function classifyParameterKind(
   parameter,
   fixture,
 ) {
-  if (fixture !== null) return 'value';
-
   try {
     const type = parameter.type
       ? checker.getTypeFromTypeNode(parameter.type)
       : checker.getTypeAtLocation(parameter);
+
+    const interfaceDeclaration = getInterfaceDeclaration(
+      ts,
+      checker,
+      type,
+    );
+
+    if (interfaceDeclaration) {
+      return interfaceHasBehavior(
+        ts,
+        checker,
+        interfaceDeclaration,
+      )
+        ? 'dependency'
+        : 'value';
+    }
+
     const declaration = getClassDeclaration(ts, checker, type);
 
     if (declaration?.name) {
+      if (
+        hasModifier(
+          ts,
+          declaration,
+          ts.SyntaxKind.AbstractKeyword,
+        )
+      ) {
+        return 'dependency';
+      }
+
       const className = declaration.name.text;
       const sourcePath = declaration.getSourceFile().fileName;
 
-      if (
-        !isArchitecturalDependencyClass(className, sourcePath)
-      ) {
-        return 'value';
-      }
+      return isArchitecturalDependencyClass(
+        className,
+        sourcePath,
+      )
+        ? 'dependency'
+        : 'value';
     }
   } catch {}
 
-  return 'dependency';
+  return fixture !== null ? 'value' : 'dependency';
 }
 
 function findStaticFactory(
@@ -1510,6 +1536,61 @@ function isGenericFixtureName(name) {
     'payload',
     'raw',
   ].includes(String(name).toLowerCase());
+}
+
+function getInterfaceDeclaration(ts, checker, type) {
+  let symbol = type.getSymbol?.() || type.symbol;
+
+  if (
+    symbol &&
+    symbol.flags & ts.SymbolFlags.Alias &&
+    checker.getAliasedSymbol
+  ) {
+    try {
+      symbol = checker.getAliasedSymbol(symbol);
+    } catch {}
+  }
+
+  return (
+    symbol?.declarations?.find(ts.isInterfaceDeclaration) ||
+    null
+  );
+}
+
+function interfaceHasBehavior(
+  ts,
+  checker,
+  interfaceDeclaration,
+) {
+  for (const member of interfaceDeclaration.members) {
+    if (
+      ts.isMethodSignature(member) ||
+      ts.isCallSignatureDeclaration(member) ||
+      ts.isConstructSignatureDeclaration(member)
+    ) {
+      return true;
+    }
+
+    if (
+      ts.isPropertySignature(member) &&
+      member.type
+    ) {
+      try {
+        const propertyType = checker.getTypeFromTypeNode(
+          member.type,
+        );
+
+        if (
+          propertyType.getCallSignatures().length > 0 ||
+          propertyType.getConstructSignatures().length > 0
+        ) {
+          return true;
+        }
+      } catch {}
+    }
+  }
+
+  return false;
 }
 
 function getClassDeclaration(ts, checker, type) {

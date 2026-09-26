@@ -105,7 +105,7 @@ async function generateProject(projectPath, projectName) {
       '🧩 DI providers template prepared',
     ),
     copyTemplateFile(
-      join(templateFilesPath, 'test-runner.cjs'),
+      join(templateFilesPath, 'runner.cjs'),
       join(kitDevTestPath, 'test.cjs'),
       '🧪 Native test runner prepared',
     ),

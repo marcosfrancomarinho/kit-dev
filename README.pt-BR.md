@@ -108,16 +108,23 @@ O esbuild transpila os arquivos `.test.ts` e `.spec.ts`, o `node:test` executa o
 
 Um teste inicial é criado em `test/example.test.ts`.
 
-Para gerar um teste a partir de uma classe existente, execute na raiz do projeto:
+Para gerar um teste a partir de uma classe existente, use o mesmo comando `test` com um alvo:
 
 ```bash
-npx create-kit-dev test src/application/use-cases/create-user.ts
+npm test -- src/application/use-cases/create-user.ts
 ```
 
 Também é possível informar apenas um nome de arquivo quando ele for único dentro de `src`:
 
 ```bash
-npx create-kit-dev test create-user
+npm test -- create-user
+```
+
+Com pnpm e Yarn, o argumento pode ser passado diretamente:
+
+```bash
+pnpm test create-user
+yarn test create-user
 ```
 
 O gerador usa a AST do TypeScript para localizar a classe, dependências do construtor, métodos públicos e chamadas como `this.repository.save()`. A partir disso ele cria mocks com `t.mock.fn()` e verificações de chamadas. Quando não consegue inferir um valor com segurança, deixa um `TODO` em vez de inventar uma regra de negócio.
@@ -735,7 +742,8 @@ minha-api/
 │   │   ├── dev.cjs
 │   │   └── esbuild.config.cjs
 │   └── test/
-│       └── test.cjs
+│       ├── test.cjs
+│       └── generator.cjs
 ├── src/
 │   └── main.ts
 ├── test/

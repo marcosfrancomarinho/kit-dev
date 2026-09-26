@@ -446,6 +446,7 @@ function analyzeMethod({
   dependencyNames,
   constructorNames,
   propertySources,
+  sourceAliases,
 }) {
   const methodName = method.name.text;
   const parameters = method.parameters
@@ -552,13 +553,29 @@ function analyzeMethod({
     ),
     parameters,
     calls: [...calls.values()],
-    expectedReturn: detectExpectedReturn(
-      ts,
-      method,
-      propertySources,
-      sourceFile,
+    expectedReturn: translateSourceExpression(
+      detectExpectedReturn(
+        ts,
+        method,
+        propertySources,
+        sourceFile,
+      ),
+      sourceAliases,
     ),
   };
+}
+
+function translateSourceExpression(source, aliases) {
+  if (!source || !aliases) return source;
+
+  const [root, ...rest] = source.split('.');
+  const alias = aliases.get(root);
+
+  if (!alias) return source;
+
+  return rest.length > 0
+    ? alias + '.' + rest.join('.')
+    : alias;
 }
 
 function collectConstructorPropertySources(ts, constructorNode) {

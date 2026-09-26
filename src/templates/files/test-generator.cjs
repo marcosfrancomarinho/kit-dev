@@ -1730,7 +1730,7 @@ function uniqueParameterName(name, methodName, constructorNames) {
 function sampleString(name) {
   const normalized = String(name).toLowerCase();
 
-  if (normalized.includes('email')) return 'marcos@example.com';
+  if (normalized.includes('email')) return 'user@example.com';
   if (normalized.includes('name')) return 'Marcos';
   if (normalized.includes('phone')) return '+5599999999999';
   if (normalized.includes('slug')) return 'example-slug';

@@ -740,15 +740,15 @@ export class User {
     );
     assert.match(
       generated,
-      /email: Email\.create\("email"\)/,
+      /email: Email\.create\("user@example\.com"\)/,
     );
     assert.match(
       generated,
-      /phones: \[Phone\.create\("phone"\)\]/,
+      /phones: \[Phone\.create\("\+5599999999999"\)\]/,
     );
     assert.match(
       generated,
-      /contacts: \[\{ phone: Phone\.create\("phone"\), primary: true \}\]/,
+      /contacts: \[\{ phone: Phone\.create\("\+5599999999999"\), primary: true \}\]/,
     );
     assert.doesNotMatch(
       generated,

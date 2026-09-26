@@ -229,10 +229,10 @@ function analyzeParameters(
     .filter((parameter) => ts.isIdentifier(parameter.name))
     .map((parameter, index) => {
       const name = parameter.name.text;
-      const fixture = renderTypeNodeFixture(
+      const fixture = renderParameterFixture(
         ts,
         checker,
-        parameter.type,
+        parameter,
         name,
         sourceFile,
       );
@@ -245,7 +245,9 @@ function analyzeParameters(
         name,
         type: parameter.type
           ? parameter.type.getText(sourceFile)
-          : 'unknown',
+          : checker.typeToString(
+              checker.getTypeAtLocation(parameter),
+            ),
         optional,
         kind: fixture === null ? 'dependency' : 'value',
         fixture: fixture ?? (optional ? 'undefined' : null),
@@ -472,26 +474,33 @@ function analyzeMethod({
     .filter((parameter) => ts.isIdentifier(parameter.name))
     .map((parameter, index) => {
       const name = parameter.name.text;
-      const fixture = renderTypeNodeFixture(
+      const inferredFixture = renderParameterFixture(
         ts,
         checker,
-        parameter.type,
+        parameter,
         name,
         sourceFile,
       );
-      const simple = fixture !== null && isSimpleFixture(fixture);
+      const optional = Boolean(
+        parameter.questionToken || parameter.initializer,
+      );
+      const fixture =
+        inferredFixture ?? (optional ? 'undefined' : null);
+      const simple =
+        fixture !== null && isSimpleFixture(fixture);
       const variableName = simple
         ? null
-        : uniqueParameterName(name, methodName, constructorNames);
+        : uniqueParameterName(
+            name,
+            methodName,
+            constructorNames,
+          );
 
       return {
         index,
         name,
-        optional: Boolean(parameter.questionToken || parameter.initializer),
-        fixture:
-          parameter.questionToken || parameter.initializer
-            ? 'undefined'
-            : fixture,
+        optional,
+        fixture,
         variableName,
       };
     });
@@ -732,6 +741,39 @@ function getThisPropertyPath(ts, expression) {
   return current.kind === ts.SyntaxKind.ThisKeyword
     ? parts
     : null;
+}
+
+function renderParameterFixture(
+  ts,
+  checker,
+  parameter,
+  name,
+  sourceFile,
+) {
+  try {
+    const type = parameter.type
+      ? checker.getTypeFromTypeNode(parameter.type)
+      : checker.getTypeAtLocation(parameter);
+
+    return renderTypeFixture(
+      ts,
+      checker,
+      type,
+      name,
+      sourceFile,
+      0,
+      { preferNull: false },
+    );
+  } catch {
+    if (parameter.type) {
+      return renderTypeTextFixture(
+        parameter.type.getText(sourceFile),
+        name,
+      );
+    }
+
+    return null;
+  }
 }
 
 function renderTypeNodeFixture(

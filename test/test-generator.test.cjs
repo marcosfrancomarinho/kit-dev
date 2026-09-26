@@ -68,7 +68,7 @@ export class User {
       'utf-8',
     );
 
-    assert.match(generated, /const name = "John Doe"/);
+    assert.match(generated, /const name = "Marcos"/);
     assert.match(generated, /const age = 1/);
     assert.match(generated, /new User\(name, age\)/);
     assert.match(generated, /const result = sut\.getName\(\)/);
@@ -147,7 +147,7 @@ export class CreateUser {
 
     assert.match(
       generated,
-      /const dto = \{ name: "John Doe", email: "user@example\.com" \} satisfies Parameters<CreateUser\['execute'\]>\[0\]/,
+      /const dto = \{ name: "Marcos", email: "user@example\.com" \} satisfies Parameters<CreateUser\['execute'\]>\[0\]/,
     );
     assert.match(
       generated,

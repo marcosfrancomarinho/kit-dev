@@ -129,6 +129,61 @@ function createProgramContext(ts, projectRoot, sourcePath) {
   };
 }
 
+function createFixtureContext(rootSourcePath) {
+  return {
+    rootSourcePath: resolve(rootSourcePath),
+    imports: new Map(),
+    classPlanCache: new Map(),
+    requiresAsync: false,
+  };
+}
+
+function registerFixtureImport(context, name, sourcePath) {
+  if (!context || !name || !sourcePath) return;
+
+  const normalizedPath = resolve(sourcePath);
+  let names = context.imports.get(normalizedPath);
+
+  if (!names) {
+    names = new Set();
+    context.imports.set(normalizedPath, names);
+  }
+
+  names.add(name);
+}
+
+function renderFixtureImports(
+  context,
+  destinationPath,
+  rootSourcePath,
+  rootClassName,
+) {
+  if (!context) return [];
+
+  const rootPath = resolve(rootSourcePath);
+  const lines = [];
+
+  for (const [sourcePath, names] of context.imports) {
+    const filtered = [...names]
+      .filter(
+        (name) =>
+          !(sourcePath === rootPath && name === rootClassName),
+      )
+      .sort();
+
+    if (filtered.length === 0) continue;
+
+    lines.push(
+      `import { ${filtered.join(', ')} } from '${getImportPath(
+        destinationPath,
+        sourcePath,
+      )}'`,
+    );
+  }
+
+  return lines;
+}
+
 function analyzeClass(ts, sourceFile, checker, fixtureContext) {
   const classes = sourceFile.statements.filter(ts.isClassDeclaration);
   const classNode =
@@ -1220,6 +1275,18 @@ function renderTypeFixture(
       ? 'async (..._args: unknown[]) => ' + value
       : '(..._args: unknown[]) => ' + value;
   }
+
+  const classFixture = renderUserClassFixture(
+    ts,
+    checker,
+    type,
+    name,
+    sourceFile,
+    depth,
+    options,
+  );
+
+  if (classFixture !== null) return classFixture;
 
   const properties = checker.getPropertiesOfType(type);
 

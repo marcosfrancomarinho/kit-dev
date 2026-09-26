@@ -472,7 +472,7 @@ export class Token {
 
     assert.match(
       generated,
-      /test\('Token\.getValue', async \(\) => \{/,
+      /it\('verifies the behavior', async \(\) => \{/,
     );
     assert.match(
       generated,
@@ -1260,7 +1260,7 @@ export class Person {
 
     assert.equal(first.destinationPath, second.destinationPath);
     assert.match(secondGenerated, /const age = 1/);
-    assert.match(secondGenerated, /Person\.getAge/);
+    assert.match(secondGenerated, /describe\("getAge"/);
     assert.doesNotMatch(secondGenerated, /Person\.getName/);
   },
 );
@@ -2021,7 +2021,7 @@ export class Age {
 
     assert.match(
       invariantTest,
-      /test\('Age\.create rejects invalid value', \(\) => \{/,
+      /it\("rejects invalid value", \(\) => \{/,
     );
     assert.match(
       invariantTest,
@@ -2029,3 +2029,37 @@ export class Age {
     );
   },
 );
+
+
+test('agrupa cenários e não executa métodos pendentes sem assertions', async (context) => {
+  const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-describe-'));
+  context.after(() => rm(projectPath, { recursive: true, force: true }));
+  await mkdir(join(projectPath, 'src'));
+  await writeFile(join(projectPath, 'src', 'example.ts'), `
+export class Example {
+  constructor(private readonly value: number) {}
+  getValue(): number { return this.value; }
+  unresolved(): void { throw new Error('pending method must not execute'); }
+}
+`);
+  const result = await generateTest('src/example.ts', projectPath);
+  const content = await readFile(result.destinationPath, 'utf-8');
+  assert.match(content, /describe\("Example",/);
+  assert.match(content, /describe\("getValue",/);
+  assert.match(content, /describe\("unresolved",/);
+  assert.match(content, /it\.todo\('verifies the business behavior'\)/);
+  assert.doesNotMatch(content, /^\s*test\(/m);
+  const output = join(projectPath, 'generated.test.cjs');
+  await require('esbuild').build({
+    entryPoints: [result.destinationPath], outfile: output,
+    bundle: true, platform: 'node', format: 'cjs',
+  });
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
+  const execution = require('node:child_process').spawnSync(
+    process.execPath, ['--test', '--test-reporter=tap', output], { encoding: 'utf-8', env },
+  );
+  assert.equal(execution.status, 0, execution.stdout + execution.stderr);
+  assert.match(execution.stdout, /# pass 1/);
+  assert.match(execution.stdout, /# todo 1/);
+});

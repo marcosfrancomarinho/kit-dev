@@ -1182,3 +1182,77 @@ export class User {
     );
   },
 );
+
+
+test(
+  'sobrescreve teste existente ao gerar novamente',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-overwrite-test-generator-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    const sourcePath = join(projectPath, 'src', 'person.ts');
+
+    await writeFile(
+      sourcePath,
+      `
+export class Person {
+  constructor(
+    private readonly name: string,
+  ) {}
+
+  getName(): string {
+    return this.name
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const first = await generateTest('src/person.ts', projectPath);
+    const firstGenerated = await readFile(
+      first.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(firstGenerated, /const name = "Marcos"/);
+
+    await writeFile(
+      sourcePath,
+      `
+export class Person {
+  constructor(
+    private readonly name: string,
+    private readonly age: number,
+  ) {}
+
+  getAge(): number {
+    return this.age
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const second = await generateTest('src/person.ts', projectPath);
+    const secondGenerated = await readFile(
+      second.destinationPath,
+      'utf-8',
+    );
+
+    assert.equal(first.destinationPath, second.destinationPath);
+    assert.match(secondGenerated, /const age = 1/);
+    assert.match(secondGenerated, /Person\.getAge/);
+    assert.doesNotMatch(secondGenerated, /Person\.getName/);
+  },
+);

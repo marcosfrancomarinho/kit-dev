@@ -338,6 +338,8 @@ function classifyParameterKind(
   parameter,
   fixture,
 ) {
+  if (fixture !== null) return 'value';
+
   try {
     const type = parameter.type
       ? checker.getTypeFromTypeNode(parameter.type)

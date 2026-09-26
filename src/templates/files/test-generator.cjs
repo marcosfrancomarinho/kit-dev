@@ -859,17 +859,35 @@ function analyzeMethod({
       const declaration = node.initializer.declarations[0];
       const expression = node.expression;
 
-      if (
-        ts.isIdentifier(declaration.name) &&
-        ts.isPropertyAccessExpression(expression) &&
-        expression.expression.kind ===
-          ts.SyntaxKind.ThisKeyword &&
-        collectionDependencies.has(expression.name.text)
-      ) {
-        collectionAliases.set(
-          declaration.name.text,
-          expression.name.text,
-        );
+      if (ts.isIdentifier(declaration.name)) {
+        if (
+          ts.isPropertyAccessExpression(expression) &&
+          expression.expression.kind ===
+            ts.SyntaxKind.ThisKeyword &&
+          collectionDependencies.has(expression.name.text)
+        ) {
+          collectionAliases.set(
+            declaration.name.text,
+            expression.name.text,
+          );
+        } else if (
+          ts.isCallExpression(expression) &&
+          ts.isPropertyAccessExpression(expression.expression) &&
+          expression.expression.name.text === 'values' &&
+          ts.isPropertyAccessExpression(
+            expression.expression.expression,
+          ) &&
+          expression.expression.expression.expression.kind ===
+            ts.SyntaxKind.ThisKeyword &&
+          collectionDependencies.has(
+            expression.expression.expression.name.text,
+          )
+        ) {
+          collectionAliases.set(
+            declaration.name.text,
+            expression.expression.expression.name.text,
+          );
+        }
       }
     }
 
@@ -2448,8 +2466,18 @@ function renderCreationSetup(
       }
 
       lines.push('  }');
+
+      const container =
+        parameter.collectionBehavior?.container || 'array';
+      const collectionFixture =
+        container === 'set'
+          ? `new Set([${itemName}])`
+          : container === 'map'
+            ? `new Map([["key", ${itemName}]])`
+            : `[${itemName}]`;
+
       lines.push(
-        `  const ${parameter.name} = [${itemName}] as unknown as ${creationParameterType(
+        `  const ${parameter.name} = ${collectionFixture} as unknown as ${creationParameterType(
           className,
           creation,
           parameter.index,

@@ -71,7 +71,7 @@ Os scripts são adicionados automaticamente ao `package.json`.
 |---|---|
 | `npm run dev` | Executa a aplicação em desenvolvimento, observa alterações e reinicia o Node.js |
 | `npm run type` | Mantém o TypeScript verificando erros em tempo real |
-| `npm test` | Executa os testes TypeScript com `node:test` e permanece em watch |
+| `npm test` | Executa os testes em watch; com um alvo, gera o teste automaticamente |
 | `npm run build` | Verifica os tipos e gera o bundle de produção |
 | `npm start` | Executa o bundle já gerado em `dist` |
 | `npm run di` | Instala a DI opcional no projeto |

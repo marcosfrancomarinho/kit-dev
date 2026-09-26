@@ -44,7 +44,6 @@ async function generateTest(target, projectRoot = process.cwd()) {
   }
 
   const destinationPath = getTestPath(projectRoot, sourcePath);
-  await assertDoesNotExist(destinationPath);
   await mkdir(dirname(destinationPath), { recursive: true });
 
   const content = renderTest({
@@ -2413,19 +2412,6 @@ async function isFile(path) {
   } catch {
     return false;
   }
-}
-
-async function assertDoesNotExist(path) {
-  try {
-    await access(path, constants.F_OK);
-  } catch {
-    return;
-  }
-
-  throw new Error(
-    'Test file already exists: ' +
-      relative(process.cwd(), path),
-  );
 }
 
 module.exports = {

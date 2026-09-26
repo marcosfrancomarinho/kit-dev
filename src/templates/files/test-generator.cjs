@@ -361,17 +361,27 @@ function analyzeBehaviorCollection(
       : checker.getTypeAtLocation(parameter);
     const typeArguments = getTypeArgumentsSafe(checker, type);
     const typeText = checker.typeToString(type);
-    const isArray =
+
+    let container = null;
+    let elementType = null;
+
+    if (
       checker.isArrayType?.(type) ||
       typeText.endsWith('[]') ||
-      /^(?:Readonly)?Array<.+>$/.test(typeText);
-
-    if (!isArray) return null;
-
-    const elementType =
-      checker.getElementTypeOfArrayType?.(type) ||
-      typeArguments[0] ||
-      null;
+      /^(?:Readonly)?Array<.+>$/.test(typeText)
+    ) {
+      container = 'array';
+      elementType =
+        checker.getElementTypeOfArrayType?.(type) ||
+        typeArguments[0] ||
+        null;
+    } else if (/^(?:Readonly)?Set<.+>$/.test(typeText)) {
+      container = 'set';
+      elementType = typeArguments[0] || null;
+    } else if (/^(?:Readonly)?Map<.+>$/.test(typeText)) {
+      container = 'map';
+      elementType = typeArguments[1] || null;
+    }
 
     if (!elementType) return null;
 
@@ -391,6 +401,7 @@ function analyzeBehaviorCollection(
     ) {
       return {
         kind: 'interface',
+        container,
         elementType: checker.typeToString(elementType),
       };
     }
@@ -417,6 +428,7 @@ function analyzeBehaviorCollection(
     ) {
       return {
         kind: 'class',
+        container,
         elementType: checker.typeToString(elementType),
       };
     }
@@ -1297,6 +1309,42 @@ function renderTypeFixture(
     return null;
   }
 
+  const enumFixture = renderEnumFixture(
+    ts,
+    checker,
+    type,
+    options.fixtureContext,
+  );
+  if (enumFixture !== null) return enumFixture;
+
+  if (type.isIntersection?.()) {
+    const primitive = type.types.find((item) => {
+      const itemFlags = item.flags || 0;
+      return Boolean(
+        itemFlags & ts.TypeFlags.StringLike ||
+        itemFlags & ts.TypeFlags.NumberLike ||
+        itemFlags & ts.TypeFlags.BooleanLike ||
+        itemFlags & ts.TypeFlags.BigIntLike
+      );
+    });
+
+    if (primitive) {
+      const rendered = renderTypeFixture(
+        ts,
+        checker,
+        primitive,
+        name,
+        sourceFile,
+        depth + 1,
+        options,
+      );
+
+      if (rendered !== null) {
+        return rendered + ' as never';
+      }
+    }
+  }
+
   if (type.isUnion?.()) {
     const nullType = type.types.find(
       (item) => item.flags & ts.TypeFlags.Null,
@@ -1588,6 +1636,54 @@ function renderTypeFixture(
   return '{ ' + fields.join(', ') + ' }';
 }
 
+function renderEnumFixture(
+  ts,
+  checker,
+  type,
+  fixtureContext,
+) {
+  const symbol = type.getSymbol?.() || type.symbol;
+  const declaration = symbol?.declarations?.find(
+    (item) =>
+      ts.isEnumMember(item) ||
+      ts.isEnumDeclaration(item),
+  );
+
+  let enumDeclaration = null;
+  let member = null;
+
+  if (declaration && ts.isEnumMember(declaration)) {
+    member = declaration;
+    enumDeclaration = declaration.parent;
+  } else if (declaration && ts.isEnumDeclaration(declaration)) {
+    enumDeclaration = declaration;
+    member = declaration.members[0] || null;
+  } else {
+    const alias = type.aliasSymbol;
+    enumDeclaration = alias?.declarations?.find(
+      ts.isEnumDeclaration,
+    ) || null;
+    member = enumDeclaration?.members?.[0] || null;
+  }
+
+  if (!enumDeclaration || !enumDeclaration.name || !member) {
+    return null;
+  }
+
+  const enumName = enumDeclaration.name.text;
+  const memberName = member.name.getText(
+    enumDeclaration.getSourceFile(),
+  );
+
+  registerFixtureImport(
+    fixtureContext,
+    enumName,
+    enumDeclaration.getSourceFile().fileName,
+  );
+
+  return enumName + '.' + memberName;
+}
+
 function renderUserClassFixture(
   ts,
   checker,
@@ -1719,7 +1815,14 @@ function interfaceHasBehavior(
   ts,
   checker,
   interfaceDeclaration,
+  visited = new Set(),
 ) {
+  if (!interfaceDeclaration || visited.has(interfaceDeclaration)) {
+    return false;
+  }
+
+  visited.add(interfaceDeclaration);
+
   for (const member of interfaceDeclaration.members) {
     if (
       ts.isMethodSignature(member) ||
@@ -1747,6 +1850,33 @@ function interfaceHasBehavior(
       } catch {}
     }
   }
+
+  try {
+    const interfaceType = checker.getTypeAtLocation(
+      interfaceDeclaration,
+    );
+    const baseTypes = checker.getBaseTypes?.(interfaceType) || [];
+
+    for (const baseType of baseTypes) {
+      const baseDeclaration = getInterfaceDeclaration(
+        ts,
+        checker,
+        baseType,
+      );
+
+      if (
+        baseDeclaration &&
+        interfaceHasBehavior(
+          ts,
+          checker,
+          baseDeclaration,
+          visited,
+        )
+      ) {
+        return true;
+      }
+    }
+  } catch {}
 
   return false;
 }

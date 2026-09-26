@@ -1582,27 +1582,10 @@ function getClassFixturePlan(
             ts.SyntaxKind.ProtectedKeyword,
           )),
     );
-    const hasPublicInstanceMethods = classNode.members.some(
-      (member) =>
-        ts.isMethodDeclaration(member) &&
-        !hasModifier(
-          ts,
-          member,
-          ts.SyntaxKind.StaticKeyword,
-        ) &&
-        !hasModifier(
-          ts,
-          member,
-          ts.SyntaxKind.PrivateKeyword,
-        ) &&
-        !hasModifier(
-          ts,
-          member,
-          ts.SyntaxKind.ProtectedKeyword,
-        ),
-    );
-
-    if (!hasNonPublicConstructor && !hasPublicInstanceMethods) {
+    if (
+      !hasNonPublicConstructor &&
+      !isArchitecturalDependencyClass(className, sourcePath)
+    ) {
       plan = {
         kind: 'constructor',
         methodName: null,
@@ -1615,6 +1598,66 @@ function getClassFixturePlan(
 
   if (context) context.classPlanCache.set(cacheKey, plan);
   return plan;
+}
+
+function isArchitecturalDependencyClass(
+  className,
+  sourcePath,
+) {
+  const name = String(className).toLowerCase();
+  const normalizedPath = String(sourcePath)
+    .replace(/\\/g, '/')
+    .toLowerCase();
+
+  const dependencySuffixes = [
+    'repository',
+    'gateway',
+    'port',
+    'service',
+    'client',
+    'adapter',
+    'provider',
+    'publisher',
+    'subscriber',
+    'consumer',
+    'producer',
+    'bus',
+    'broker',
+    'transport',
+    'handler',
+    'controller',
+    'resolver',
+    'middleware',
+    'strategy',
+    'factory',
+  ];
+
+  if (
+    dependencySuffixes.some(
+      (suffix) =>
+        name === suffix || name.endsWith(suffix),
+    )
+  ) {
+    return true;
+  }
+
+  const infrastructureSegments = [
+    '/infra/',
+    '/infrastructure/',
+    '/adapters/',
+    '/ports/',
+    '/gateways/',
+    '/repositories/',
+    '/controllers/',
+    '/http/',
+    '/database/',
+    '/persistence/',
+    '/messaging/',
+  ];
+
+  return infrastructureSegments.some((segment) =>
+    normalizedPath.includes(segment),
+  );
 }
 
 function getTypeArgumentsSafe(checker, type) {

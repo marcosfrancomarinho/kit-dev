@@ -1090,7 +1090,7 @@ function renderTypeFixture(
           ts,
           checker,
           typeArguments[0],
-          name + 'Item',
+          singularizeName(name),
           sourceFile,
           depth + 1,
           options,

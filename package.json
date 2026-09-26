@@ -41,7 +41,16 @@
     "ast",
     "dependency-injection",
     "di-container",
-    "inversion-of-control"
+    "inversion-of-control",
+    "clean-architecture",
+    "hexagonal-architecture",
+    "ports-and-adapters",
+    "software-architecture",
+    "design-patterns",
+    "solid",
+    "dependency-inversion",
+    "repository-pattern",
+    "clean-code"
   ],
   "engines": {
     "node": ">=22"

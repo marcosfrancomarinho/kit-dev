@@ -65,7 +65,6 @@ yarn test create-user
 
 El generador analiza el AST de TypeScript para identificar la clase, sus dependencias, métodos públicos y llamadas como `this.repository.save()`. Crea mocks con `t.mock.fn()` y verificaciones de llamadas cuando puede inferirlas.
 
-Los archivos generados usan un único `describe` para la clase y un `it` con el nombre de cada método. Cuando no puede inferir las verificaciones de negocio, conserva el método ejecutable y añade un comentario `// TODO`. No genera `it.todo` ni cuerpos de prueba comentados. Revisa las pruebas y completa las reglas de negocio.
 
 ## Compilación para producción
 

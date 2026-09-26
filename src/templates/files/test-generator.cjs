@@ -734,9 +734,13 @@ function renderTypeNodeFixture(
       name,
       sourceFile,
       0,
+      { preferNull: false },
     );
   } catch {
-    return renderTypeTextFixture(typeNode.getText(sourceFile), name);
+    return renderTypeTextFixture(
+      typeNode.getText(sourceFile),
+      name,
+    );
   }
 }
 
@@ -747,8 +751,9 @@ function renderTypeFixture(
   name,
   sourceFile,
   depth,
+  options = {},
 ) {
-  if (!type || depth > 3) return null;
+  if (!type || depth > 4) return null;
 
   if (type.isStringLiteral?.()) {
     return JSON.stringify(type.value);
@@ -760,6 +765,13 @@ function renderTypeFixture(
 
   const flags = type.flags || 0;
 
+  if (
+    ts.TypeFlags.BooleanLiteral &&
+    flags & ts.TypeFlags.BooleanLiteral
+  ) {
+    return type.intrinsicName === 'false' ? 'false' : 'true';
+  }
+
   if (flags & ts.TypeFlags.StringLike) {
     return JSON.stringify(sampleString(name));
   }
@@ -767,18 +779,39 @@ function renderTypeFixture(
   if (flags & ts.TypeFlags.NumberLike) return '1';
   if (flags & ts.TypeFlags.BooleanLike) return 'true';
   if (flags & ts.TypeFlags.BigIntLike) return '1n';
+
+  const symbolFlags =
+    (ts.TypeFlags.ESSymbolLike || 0) |
+    (ts.TypeFlags.UniqueESSymbol || 0);
+  if (symbolFlags && flags & symbolFlags) {
+    return "Symbol('test')";
+  }
+
   if (flags & ts.TypeFlags.Null) return 'null';
   if (flags & ts.TypeFlags.Undefined) return 'undefined';
   if (flags & ts.TypeFlags.Void) return 'undefined';
+
+  if (
+    (ts.TypeFlags.Any && flags & ts.TypeFlags.Any) ||
+    (ts.TypeFlags.Unknown && flags & ts.TypeFlags.Unknown) ||
+    (ts.TypeFlags.Never && flags & ts.TypeFlags.Never)
+  ) {
+    return null;
+  }
 
   if (type.isUnion?.()) {
     const nullType = type.types.find(
       (item) => item.flags & ts.TypeFlags.Null,
     );
-    if (nullType) return 'null';
+    const undefinedType = type.types.find(
+      (item) => item.flags & ts.TypeFlags.Undefined,
+    );
+
+    if (options.preferNull && nullType) return 'null';
 
     const candidates = type.types.filter(
       (item) =>
+        !(item.flags & ts.TypeFlags.Null) &&
         !(item.flags & ts.TypeFlags.Undefined) &&
         !(item.flags & ts.TypeFlags.Never),
     );
@@ -791,10 +824,14 @@ function renderTypeFixture(
         name,
         sourceFile,
         depth + 1,
+        options,
       );
 
       if (rendered !== null) return rendered;
     }
+
+    if (nullType) return 'null';
+    if (undefinedType) return 'undefined';
 
     return null;
   }
@@ -805,17 +842,122 @@ function renderTypeFixture(
     return "new Date('2026-01-01T00:00:00.000Z')";
   }
 
+  if (typeText === 'RegExp') return '/test/';
+  if (typeText === 'URL') {
+    return "new URL('https://example.com')";
+  }
+  if (typeText === 'Buffer') {
+    return "Buffer.from('test')";
+  }
+  if (typeText === 'Error') {
+    return "new Error('test')";
+  }
+
+  if (/^(?:Readonly)?Map<.+>$/.test(typeText)) {
+    return 'new Map()';
+  }
+  if (/^(?:Readonly)?Set<.+>$/.test(typeText)) {
+    return 'new Set()';
+  }
+  if (/^WeakMap<.+>$/.test(typeText)) {
+    return 'new WeakMap()';
+  }
+  if (/^WeakSet<.+>$/.test(typeText)) {
+    return 'new WeakSet()';
+  }
+  if (
+    /^(?:Uint|Int|Float|BigInt|BigUint)\d*Array$/.test(typeText)
+  ) {
+    return `new ${typeText}()`;
+  }
+
+  if (checker.isTupleType?.(type)) {
+    const items = checker.getTypeArguments?.(type) || [];
+    const renderedItems = items.map((item, index) =>
+      renderTypeFixture(
+        ts,
+        checker,
+        item,
+        name + (index + 1),
+        sourceFile,
+        depth + 1,
+        options,
+      ) ?? 'undefined',
+    );
+
+    return '[' + renderedItems.join(', ') + ']';
+  }
+
   if (
     checker.isArrayType?.(type) ||
     typeText.endsWith('[]') ||
-    /^Array<.+>$/.test(typeText)
+    /^(?:Readonly)?Array<.+>$/.test(typeText)
   ) {
     return '[]';
+  }
+
+  const promisedType = checker.getPromisedTypeOfPromise?.(type);
+  if (promisedType) {
+    const value =
+      renderTypeFixture(
+        ts,
+        checker,
+        promisedType,
+        name,
+        sourceFile,
+        depth + 1,
+        options,
+      ) ?? 'undefined';
+
+    return 'Promise.resolve(' + value + ')';
+  }
+
+  const callSignatures = type.getCallSignatures?.() || [];
+  if (callSignatures.length > 0) {
+    const returnType = checker.getReturnTypeOfSignature(
+      callSignatures[0],
+    );
+    const promisedReturn =
+      checker.getPromisedTypeOfPromise?.(returnType);
+    const value =
+      renderTypeFixture(
+        ts,
+        checker,
+        promisedReturn || returnType,
+        name + 'Result',
+        sourceFile,
+        depth + 1,
+        options,
+      ) ?? 'undefined';
+
+    return promisedReturn
+      ? 'async (..._args: unknown[]) => ' + value
+      : '(..._args: unknown[]) => ' + value;
   }
 
   const properties = checker.getPropertiesOfType(type);
 
   if (properties.length === 0) {
+    const stringIndex = checker.getIndexTypeOfType?.(
+      type,
+      ts.IndexKind.String,
+    );
+
+    if (stringIndex) {
+      const value =
+        renderTypeFixture(
+          ts,
+          checker,
+          stringIndex,
+          'value',
+          sourceFile,
+          depth + 1,
+          options,
+        ) ?? 'undefined';
+
+      return '{ key: ' + value + ' }';
+    }
+
     return renderTypeTextFixture(typeText, name);
   }
 
@@ -825,14 +967,15 @@ function renderTypeFixture(
     if (property.flags & ts.SymbolFlags.Method) return null;
 
     const declaration =
-      property.valueDeclaration || property.declarations?.[0] || sourceFile;
+      property.valueDeclaration ||
+      property.declarations?.[0] ||
+      sourceFile;
     const propertyType = checker.getTypeOfSymbolAtLocation(
       property,
       declaration,
     );
 
     if (propertyType.getCallSignatures().length > 0) return null;
-    if (property.flags & ts.SymbolFlags.Optional) continue;
 
     const propertyName = property.getName();
 
@@ -850,13 +993,23 @@ function renderTypeFixture(
       propertyName,
       sourceFile,
       depth + 1,
+      options,
     );
+
+    if (
+      rendered === null &&
+      property.flags & ts.SymbolFlags.Optional
+    ) {
+      continue;
+    }
 
     fields.push(
       safePropertyName(propertyName) +
         ': ' +
         (rendered ??
-          '{} as never /* TODO: provide ' + propertyName + ' */'),
+          '{} as never /* TODO: provide ' +
+            propertyName +
+            ' */'),
     );
   }
 
@@ -868,17 +1021,39 @@ function renderTypeFixture(
 function renderTypeTextFixture(type, name) {
   const normalized = String(type).replace(/\s+/g, '');
 
-  if (normalized === 'string') return JSON.stringify(sampleString(name));
+  if (normalized === 'string') {
+    return JSON.stringify(sampleString(name));
+  }
   if (normalized === 'number') return '1';
   if (normalized === 'boolean') return 'true';
   if (normalized === 'bigint') return '1n';
+  if (normalized === 'symbol') return "Symbol('test')";
+  if (normalized === 'null') return 'null';
+  if (normalized === 'undefined' || normalized === 'void') {
+    return 'undefined';
+  }
   if (normalized === 'Date') {
     return "new Date('2026-01-01T00:00:00.000Z')";
   }
-  if (normalized.endsWith('[]') || /^Array<.+>$/.test(normalized)) {
+  if (normalized === 'RegExp') return '/test/';
+  if (normalized === 'URL') {
+    return "new URL('https://example.com')";
+  }
+  if (normalized === 'Buffer') {
+    return "Buffer.from('test')";
+  }
+  if (
+    normalized.endsWith('[]') ||
+    /^(?:Readonly)?Array<.+>$/.test(normalized)
+  ) {
     return '[]';
   }
-  if (normalized.includes('|undefined')) return 'undefined';
+  if (/^(?:Readonly)?Map<.+>$/.test(normalized)) {
+    return 'new Map()';
+  }
+  if (/^(?:Readonly)?Set<.+>$/.test(normalized)) {
+    return 'new Set()';
+  }
 
   return null;
 }

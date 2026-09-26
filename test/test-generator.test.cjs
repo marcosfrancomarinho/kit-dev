@@ -1395,3 +1395,150 @@ export class Runner {
     );
   },
 );
+
+
+test(
+  'distingue interface de dados de interface comportamental',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-interface-classification-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'application'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'application', 'use-case.ts'),
+      `
+interface CreateUserInput {
+  name: string
+  email: string
+  active: boolean
+}
+
+interface UserRepository {
+  save(input: CreateUserInput): Promise<void>
+}
+
+export class CreateUser {
+  constructor(
+    private readonly repository: UserRepository,
+  ) {}
+
+  async execute(input: CreateUserInput): Promise<void> {
+    await this.repository.save(input)
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest(
+      'src/application/use-case.ts',
+      projectPath,
+    );
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /const input: Parameters<CreateUser\['execute'\]>\[0\] = \{ name: "Marcos", email: "user@example\.com", active: true \}/,
+    );
+    assert.match(
+      generated,
+      /save: t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+    );
+    assert.match(
+      generated,
+      /repository as unknown as ConstructorParameters<typeof CreateUser>\[0\]/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /input as unknown as/,
+    );
+  },
+);
+
+test(
+  'mantém classe concreta de domínio sem fixture inferível como valor tipado e não mock',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-domain-fallback-value-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'domain'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'secret.ts'),
+      `
+export class Secret {
+  private constructor(
+    private readonly value: string,
+  ) {}
+
+  reveal(): string {
+    return this.value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'entity.ts'),
+      `
+import { Secret } from './secret.js'
+
+export class Entity {
+  constructor(
+    private readonly secret: Secret,
+  ) {}
+
+  getSecret(): Secret {
+    return this.secret
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest(
+      'src/domain/entity.ts',
+      projectPath,
+    );
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /const secret: ConstructorParameters<typeof Entity>\[0\] = \{\} as ConstructorParameters<typeof Entity>\[0\] \/\* TODO: provide secret \*\//,
+    );
+    assert.doesNotMatch(
+      generated,
+      /reveal: t\.mock\.fn/,
+    );
+  },
+);

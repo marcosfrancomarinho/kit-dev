@@ -1,6 +1,6 @@
 {
   "name": "create-kit-dev",
-  "version": "1.1.22",
+  "version": "1.1.23",
   "description": "CLI para criar um projeto Node.js moderno com TypeScript, esbuild e estrutura inicial configurada.",
   "bin": {
     "create-kit-dev": "index.js"
@@ -31,6 +31,7 @@
     "prepare": "node normalize-eol.js"
   },
   "devDependencies": {
+    "@typescript/typescript6": "6.0.2",
     "esbuild": "^0.28.2",
     "typescript": "7.0.2"
   },

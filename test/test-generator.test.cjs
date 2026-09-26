@@ -625,3 +625,278 @@ export class User {
     assert.doesNotMatch(generated, /new User\(/);
   },
 );
+
+
+test(
+  'gera Value Objects por factory inclusive dentro de arrays e objetos',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-ddd-value-object-fixtures-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'domain'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'email.ts'),
+      `
+export class Email {
+  private constructor(
+    private readonly value: string,
+  ) {}
+
+  static create(value: string): Email {
+    return new Email(value)
+  }
+
+  toString(): string {
+    return this.value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'phone.ts'),
+      `
+export class Phone {
+  private constructor(
+    private readonly value: string,
+  ) {}
+
+  static create(value: string): Phone {
+    return new Phone(value)
+  }
+
+  toString(): string {
+    return this.value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'user.ts'),
+      `
+import { Email } from './email.js'
+import { Phone } from './phone.js'
+
+type Contact = {
+  phone: Phone
+  primary: boolean
+}
+
+type UserProps = {
+  name: string
+  email: Email
+  phones: Phone[]
+  contacts: Contact[]
+}
+
+export class User {
+  private constructor(
+    private readonly props: UserProps,
+  ) {}
+
+  static create(props: UserProps): User {
+    return new User(props)
+  }
+
+  getName(): string {
+    return this.props.name
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest(
+      'src/domain/user.ts',
+      projectPath,
+    );
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /import \{ Email \} from '..\/..\/src\/domain\/email\.js'/,
+    );
+    assert.match(
+      generated,
+      /import \{ Phone \} from '..\/..\/src\/domain\/phone\.js'/,
+    );
+    assert.match(
+      generated,
+      /email: Email\.create\("email"\)/,
+    );
+    assert.match(
+      generated,
+      /phones: \[Phone\.create\("phone"\)\]/,
+    );
+    assert.match(
+      generated,
+      /contacts: \[\{ phone: Phone\.create\("phone"\), primary: true \}\]/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /email: \{\} as never/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /phones: \[\]/,
+    );
+  },
+);
+
+test(
+  'instancia Command e Query simples sem acoplar ports e repositories concretos',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-cqrs-clean-fixtures-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'application'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'application', 'create-user-command.ts'),
+      `
+export class CreateUserCommand {
+  constructor(
+    readonly name: string,
+    readonly email: string,
+  ) {}
+}
+`,
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'application', 'handler.ts'),
+      `
+import { CreateUserCommand } from './create-user-command.js'
+
+export interface UserRepository {
+  save(command: CreateUserCommand): Promise<void>
+}
+
+export class CreateUserHandler {
+  constructor(
+    private readonly repository: UserRepository,
+  ) {}
+
+  async execute(command: CreateUserCommand): Promise<void> {
+    await this.repository.save(command)
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest(
+      'src/application/handler.ts',
+      projectPath,
+    );
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /import \{ CreateUserCommand \} from '..\/..\/src\/application\/create-user-command\.js'/,
+    );
+    assert.match(
+      generated,
+      /const command: Parameters<CreateUserHandler\['execute'\]>\[0\] = new CreateUserCommand\("Marcos", "user@example\.com"\)/,
+    );
+    assert.match(
+      generated,
+      /repository as unknown as ConstructorParameters<typeof CreateUserHandler>\[0\]/,
+    );
+    assert.match(
+      generated,
+      /repository\.save\.mock\.callCount\(\), 1/,
+    );
+  },
+);
+
+test(
+  'limita recursão de tipos de domínio autorreferentes',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-recursive-domain-fixtures-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'category.ts'),
+      `
+type CategoryProps = {
+  name: string
+  parent?: Category
+}
+
+export class Category {
+  private constructor(
+    private readonly props: CategoryProps,
+  ) {}
+
+  static create(props: CategoryProps): Category {
+    return new Category(props)
+  }
+
+  getName(): string {
+    return this.props.name
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const startedAt = Date.now();
+    const result = await generateTest(
+      'src/category.ts',
+      projectPath,
+    );
+    const elapsed = Date.now() - startedAt;
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.ok(elapsed < 5000);
+    assert.match(generated, /Category\.create/);
+    assert.ok(generated.length < 12000);
+  },
+);

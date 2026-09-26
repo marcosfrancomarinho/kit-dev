@@ -163,22 +163,26 @@ export class CreateUser {
       generated,
       /const repository: ConstructorParameters<typeof CreateUser>\[0\] = \{/,
     );
+    assert.match(
+      generated,
+      /const repositoryFindByNameMock = t\.mock\.fn\(async/,
+    );
     assert.match(generated, /await sut\.execute\(dto\)/);
     assert.match(
       generated,
-      /repository\.findByName\.mock\.callCount\(\), 1/,
+      /repositoryFindByNameMock\\.mock\\.callCount\(\), 1/,
     );
     assert.match(
       generated,
-      /repository\.create\.mock\.callCount\(\), 1/,
+      /repositoryCreateMock\\.mock\\.callCount\(\), 1/,
     );
     assert.match(
       generated,
-      /repository\.findByName\.mock\.calls\[0\]\.arguments, \[dto\.name\]/,
+      /repositoryFindByNameMock\\.mock\\.calls\[0\]\.arguments, \[dto\.name\]/,
     );
     assert.match(
       generated,
-      /repository\.create\.mock\.calls\[0\]\.arguments, \[dto\]/,
+      /repositoryCreateMock\\.mock\\.calls\[0\]\.arguments, \[dto\]/,
     );
   },
 );
@@ -840,7 +844,7 @@ export class CreateUserHandler {
     );
     assert.match(
       generated,
-      /repository\.save\.mock\.callCount\(\), 1/,
+      /repositorySaveMock\\.mock\\.callCount\(\), 1/,
     );
   },
 );
@@ -1648,11 +1652,11 @@ export class Checkout {
     );
     assert.match(
       strategyTest,
-      /strategy\.calculate\.mock\.callCount\(\), 1/,
+      /strategyCalculateMock\\.mock\\.callCount\(\), 1/,
     );
     assert.match(
       strategyTest,
-      /strategy\.calculate\.mock\.calls\[0\]\.arguments, \[1\]/,
+      /strategyCalculateMock\\.mock\\.calls\[0\]\.arguments, \[1\]/,
     );
 
     await writeFile(
@@ -1690,7 +1694,7 @@ export class ProductFilter {
     );
     assert.match(
       specificationTest,
-      /specification\.isSatisfiedBy\.mock\.callCount\(\), 1/,
+      /specificationIsSatisfiedByMock\\.mock\\.callCount\(\), 1/,
     );
 
     await writeFile(
@@ -1728,7 +1732,7 @@ export class LoggingDecorator {
     );
     assert.match(
       decoratorTest,
-      /inner\.execute\.mock\.callCount\(\), 1/,
+      /innerExecuteMock\\.mock\\.callCount\(\), 1/,
     );
 
     await writeFile(
@@ -1766,7 +1770,7 @@ export class PaymentAdapter {
     );
     assert.match(
       adapterTest,
-      /port\.charge\.mock\.callCount\(\), 1/,
+      /portChargeMock\\.mock\\.callCount\(\), 1/,
     );
 
     await writeFile(

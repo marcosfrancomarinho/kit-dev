@@ -109,6 +109,11 @@ async function generateProject(projectPath, projectName) {
       join(kitDevTestPath, 'test.cjs'),
       '🧪 Native test runner prepared',
     ),
+    copyTemplateFile(
+      join(templateFilesPath, 'test-generator.cjs'),
+      join(kitDevTestPath, 'generator.cjs'),
+      '🧪 Automatic test generator prepared',
+    ),
   ]);
 }
 

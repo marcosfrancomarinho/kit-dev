@@ -1,6 +1,15 @@
 <p align="center">
-  <a href="./README.md">English</a> ·
-  <a href="./README.pt-BR.md"><strong>Português (Brasil)</strong></a>
+  <a href="./README.md" lang="en">English</a> ·
+  <a href="./README.pt-BR.md" lang="pt-BR"><strong>Português (Brasil)</strong></a> ·
+  <a href="./README.zh-CN.md" lang="zh-CN">简体中文</a> ·
+  <a href="./README.es.md" lang="es">Español</a> ·
+  <a href="./README.hi.md" lang="hi">हिन्दी</a> ·
+  <a href="./README.ar.md" lang="ar">العربية</a> ·
+  <a href="./README.fr.md" lang="fr">Français</a> ·
+  <a href="./README.bn.md" lang="bn">বাংলা</a> ·
+  <a href="./README.ru.md" lang="ru">Русский</a> ·
+  <a href="./README.de.md" lang="de">Deutsch</a> ·
+  <a href="./README.ja.md" lang="ja">日本語</a>
 </p>
 
 <h1 align="center">🚀 Kit Dev</h1>

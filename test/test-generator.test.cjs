@@ -147,7 +147,7 @@ export class CreateUser {
 
     assert.match(
       generated,
-      /const dto = \{ name: "Marcos", email: "user@example\.com" \} satisfies Parameters<CreateUser\['execute'\]>\[0\]/,
+      /const dto: Parameters<CreateUser\['execute'\]>\[0\] = \{ name: "Marcos", email: "user@example\.com" \}/,
     );
     assert.match(
       generated,
@@ -367,20 +367,29 @@ export class FixtureCatalog {
     );
     assert.match(generated, /const nullable = null/);
     assert.match(generated, /const missing = undefined/);
-    assert.match(generated, /const marker = Symbol\('test'\)/);
+    assert.match(
+      generated,
+      /const marker: ConstructorParameters<typeof FixtureCatalog>\[7\] = Symbol\('test'\)/,
+    );
     assert.match(
       generated,
       /const tags: ConstructorParameters<typeof FixtureCatalog>\[8\] = \["tag"\]/,
     );
-    assert.match(generated, /const pair = \["pair1", 1\]/);
+    assert.match(
+      generated,
+      /const pair: ConstructorParameters<typeof FixtureCatalog>\[9\] = \["pair1", 1\]/,
+    );
     assert.match(
       generated,
       /const metadata: ConstructorParameters<typeof FixtureCatalog>\[10\] = \{ key: "value" \}/,
     );
-    assert.match(generated, /const pattern = \/test\//);
     assert.match(
       generated,
-      /const endpoint = new URL\('https:\/\/example\.com'\)/,
+      /const pattern: ConstructorParameters<typeof FixtureCatalog>\[11\] = \/test\//,
+    );
+    assert.match(
+      generated,
+      /const endpoint: ConstructorParameters<typeof FixtureCatalog>\[12\] = new URL\('https:\/\/example\.com'\)/,
     );
     assert.match(
       generated,

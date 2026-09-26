@@ -3,6 +3,7 @@ const { runCommand } = require('../utils/run-command');
 
 const dependencies = [
   'typescript@7.0.2',
+  '@typescript/typescript6@6.0.2',
   'esbuild@0.28.2',
   '@types/node@22',
 ];

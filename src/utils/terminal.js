@@ -50,6 +50,15 @@ function showFinalInstructions(projectName, runCommand) {
       '\n  ' +
       colors.yellow +
       runCommand +
+      ' test' +
+      colors.reset +
+      '      ' +
+      colors.gray +
+      '# Run tests in watch mode' +
+      colors.reset +
+      '\n  ' +
+      colors.yellow +
+      runCommand +
       ' build' +
       colors.reset +
       '     ' +

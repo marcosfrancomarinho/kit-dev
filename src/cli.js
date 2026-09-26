@@ -1,5 +1,6 @@
-const { join } = require('path');
+const { join, relative } = require('path');
 const { generateProject } = require('./generators/project-generator');
+const { generateTest } = require('./generators/automatic-test-generator');
 const {
   detectPackageManager,
   getRunCommand,
@@ -24,6 +25,21 @@ function validateNodeVersion() {
 async function run() {
   try {
     validateNodeVersion();
+
+    const args = process.argv.slice(2);
+
+    if (args[0] === 'test') {
+      const result = await generateTest(args[1], process.cwd());
+      console.log(
+        colors.green +
+          '🧪 Test created:' +
+          colors.reset +
+          ' ' +
+          relative(process.cwd(), result.destinationPath),
+      );
+      return;
+    }
+
     const manager = detectPackageManager();
     console.log(colors.magenta + 'Using package manager: ' + manager + colors.reset);
 

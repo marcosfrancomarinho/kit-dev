@@ -387,16 +387,18 @@ async function collectSourceFiles(directory) {
 }
 
 function loadTypeScript(projectRoot) {
+  const projectRequire = createRequire(join(projectRoot, 'package.json'));
+
   try {
-    const projectRequire = createRequire(join(projectRoot, 'package.json'));
-    return projectRequire('typescript');
+    return projectRequire('@typescript/typescript6');
   } catch {}
 
   try {
-    return require('typescript');
+    return require('@typescript/typescript6');
   } catch {
     throw new Error(
-      'TypeScript is required to generate tests. Install project dependencies first.',
+      'The TypeScript AST compatibility package is required to generate tests. ' +
+        'Run your package manager install command and try again.',
     );
   }
 }

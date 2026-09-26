@@ -68,7 +68,7 @@ The scripts are added automatically to `package.json`.
 | Command | Purpose |
 |---|---|
 | `npm run dev` | Runs the application in development, watches changes, and restarts Node.js |
-| `npm run type` | Keeps TypeScript checking errors in real time |
+| `npm test` | Runs `node:test` in watch mode |\n| `npm run type` | Keeps TypeScript checking errors in real time |
 | `npm run build` | Checks types and creates the production bundle |
 | `npm start` | Runs the generated bundle from `dist` |
 | `npm run di` | Installs the optional DI setup |
@@ -93,7 +93,7 @@ npm run type
 
 The `type` command is optional. `build` already performs a type check before generating the bundle.
 
-### Production build
+### Tests\n\nProjects include `node:test` and `node:assert/strict` without an additional test framework. esbuild transpiles `*.test.ts` and `*.spec.ts` files under `test/` and reruns them when tests or source code change.\n\n```bash\nnpm test\n```\n\nTo generate a test scaffold from an existing TypeScript class:\n\n```bash\nnpx create-kit-dev test src/application/create-user.ts\n```\n\nThe generator analyzes the class AST, identifies constructor dependencies and used methods, creates mocks with `t.mock.fn()`, and leaves `TODO` markers where business behavior cannot be inferred safely.\n\n### Production build
 
 ```bash
 npm run build

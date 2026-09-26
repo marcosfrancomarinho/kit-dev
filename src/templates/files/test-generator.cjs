@@ -959,7 +959,7 @@ function sampleString(name) {
   const normalized = String(name).toLowerCase();
 
   if (normalized.includes('email')) return 'user@example.com';
-  if (normalized.includes('name')) return 'John Doe';
+  if (normalized.includes('name')) return 'Marcos';
   if (normalized.includes('id')) return 'test-id';
   if (normalized.includes('url')) return 'https://example.com';
 

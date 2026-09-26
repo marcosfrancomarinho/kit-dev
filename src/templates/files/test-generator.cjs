@@ -44,7 +44,6 @@ async function generateTest(target, projectRoot = process.cwd()) {
   }
 
   const destinationPath = getTestPath(projectRoot, sourcePath);
-  await assertDoesNotExist(destinationPath);
   await mkdir(dirname(destinationPath), { recursive: true });
 
   const content = renderTest({
@@ -1519,9 +1518,6 @@ function getClassFixturePlan(
         hasModifier(ts, member, ts.SyntaxKind.StaticKeyword) &&
         !hasModifier(ts, member, ts.SyntaxKind.PrivateKeyword) &&
         !hasModifier(ts, member, ts.SyntaxKind.ProtectedKeyword) &&
-        ['create', 'from', 'of', 'build', 'make'].includes(
-          member.name.text.toLowerCase(),
-        ) &&
         methodReturnsClass(
           ts,
           checker,
@@ -1540,10 +1536,14 @@ function getClassFixturePlan(
         : null;
       const priority = {
         create: 100,
+        criar: 100,
         from: 90,
+        de: 90,
         of: 80,
         build: 70,
+        construir: 70,
         make: 60,
+        fazer: 60,
       };
 
       return {
@@ -1558,7 +1558,8 @@ function getClassFixturePlan(
             ),
         ),
         score:
-          priority[method.name.text.toLowerCase()] || 10,
+          (priority[method.name.text.toLowerCase()] || 10) +
+          (containsNewClass(ts, method, className) ? 10 : 0),
       };
     })
     .sort((a, b) => b.score - a.score);
@@ -2411,19 +2412,6 @@ async function isFile(path) {
   } catch {
     return false;
   }
-}
-
-async function assertDoesNotExist(path) {
-  try {
-    await access(path, constants.F_OK);
-  } catch {
-    return;
-  }
-
-  throw new Error(
-    'Test file already exists: ' +
-      relative(process.cwd(), path),
-  );
 }
 
 module.exports = {

@@ -1072,3 +1072,187 @@ export class UseCase {
     );
   },
 );
+
+
+test(
+  'usa factory estática em português para Value Object aninhado',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-nested-portuguese-factory-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'domain', 'value-objects'), {
+      recursive: true,
+    });
+    await mkdir(join(projectPath, 'src', 'domain', 'entities'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(
+        projectPath,
+        'src',
+        'domain',
+        'value-objects',
+        'name.ts',
+      ),
+      `
+export class Name {
+  private constructor(
+    private readonly value: string,
+  ) {}
+
+  static criar(value: string): Name {
+    return new Name(value)
+  }
+
+  getValue(): string {
+    return this.value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    await writeFile(
+      join(
+        projectPath,
+        'src',
+        'domain',
+        'entities',
+        'user.ts',
+      ),
+      `
+import { Name } from '../value-objects/name.js'
+
+export class User {
+  private constructor(
+    private readonly name: Name,
+    private readonly age: number,
+  ) {}
+
+  static criar(name: Name, age: number): User {
+    return new User(name, age)
+  }
+
+  getName(): string {
+    return this.name.getValue()
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest(
+      'src/domain/entities/user.ts',
+      projectPath,
+    );
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /import \{ Name \} from '..\/..\/..\/src\/domain\/value-objects\/name\.js'/,
+    );
+    assert.match(
+      generated,
+      /const name: Parameters<typeof User\.criar>\[0\] = Name\.criar\("Marcos"\)/,
+    );
+    assert.match(
+      generated,
+      /const sut = User\.criar\(name, age\)/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /getValue: t\.mock\.fn/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /name as unknown as Parameters<typeof User\.criar>\[0\]/,
+    );
+  },
+);
+
+
+test(
+  'sobrescreve teste existente ao gerar novamente',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-overwrite-test-generator-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    const sourcePath = join(projectPath, 'src', 'person.ts');
+
+    await writeFile(
+      sourcePath,
+      `
+export class Person {
+  constructor(
+    private readonly name: string,
+  ) {}
+
+  getName(): string {
+    return this.name
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const first = await generateTest('src/person.ts', projectPath);
+    const firstGenerated = await readFile(
+      first.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(firstGenerated, /const name = "Marcos"/);
+
+    await writeFile(
+      sourcePath,
+      `
+export class Person {
+  constructor(
+    private readonly name: string,
+    private readonly age: number,
+  ) {}
+
+  getAge(): number {
+    return this.age
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const second = await generateTest('src/person.ts', projectPath);
+    const secondGenerated = await readFile(
+      second.destinationPath,
+      'utf-8',
+    );
+
+    assert.equal(first.destinationPath, second.destinationPath);
+    assert.match(secondGenerated, /const age = 1/);
+    assert.match(secondGenerated, /Person\.getAge/);
+    assert.doesNotMatch(secondGenerated, /Person\.getName/);
+  },
+);

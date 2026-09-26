@@ -321,10 +321,44 @@ function analyzeParameters(
               checker.getTypeAtLocation(parameter),
             ),
         optional,
-        kind: fixture === null ? 'dependency' : 'value',
+        kind: classifyParameterKind(
+          ts,
+          checker,
+          parameter,
+          fixture,
+        ),
         fixture: fixture ?? (optional ? 'undefined' : null),
       };
     });
+}
+
+function classifyParameterKind(
+  ts,
+  checker,
+  parameter,
+  fixture,
+) {
+  if (fixture !== null) return 'value';
+
+  try {
+    const type = parameter.type
+      ? checker.getTypeFromTypeNode(parameter.type)
+      : checker.getTypeAtLocation(parameter);
+    const declaration = getClassDeclaration(ts, checker, type);
+
+    if (declaration?.name) {
+      const className = declaration.name.text;
+      const sourcePath = declaration.getSourceFile().fileName;
+
+      if (
+        !isArchitecturalDependencyClass(className, sourcePath)
+      ) {
+        return 'value';
+      }
+    }
+  } catch {}
+
+  return 'dependency';
 }
 
 function findStaticFactory(

@@ -53,11 +53,13 @@ const exampleTest = [
   "import assert from 'node:assert/strict'",
   "import { test } from 'node:test'",
   '',
-  "test('example', () => {",
-  '  assert.equal(1 + 1, 2)',
+  "test('should sum two numbers', () => {",
+  '  const result = 1 + 1',
+  '',
+  '  assert.equal(result, 2)',
   '})',
   '',
-].join('\\n');
+].join('\n');
 
 const esbuildConfig = [
   "const { execSync } = require('child_process');",

@@ -900,3 +900,175 @@ export class Category {
     assert.ok(generated.length < 12000);
   },
 );
+
+
+test(
+  'instancia Value Object concreto com construtor público mesmo com métodos',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-public-vo-fixture-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'domain', 'value-objects'), {
+      recursive: true,
+    });
+    await mkdir(join(projectPath, 'src', 'domain', 'entities'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(
+        projectPath,
+        'src',
+        'domain',
+        'value-objects',
+        'name.ts',
+      ),
+      `
+export class Name {
+  constructor(
+    private readonly value: string,
+  ) {}
+
+  getValue(): string {
+    return this.value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    await writeFile(
+      join(
+        projectPath,
+        'src',
+        'domain',
+        'entities',
+        'product.ts',
+      ),
+      `
+import { Name } from '../value-objects/name.js'
+
+export class Product {
+  constructor(
+    private readonly name: Name,
+  ) {}
+
+  getName(): Name {
+    return this.name
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest(
+      'src/domain/entities/product.ts',
+      projectPath,
+    );
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /import \{ Name \} from '..\/..\/..\/src\/domain\/value-objects\/name\.js'/,
+    );
+    assert.match(
+      generated,
+      /const name: ConstructorParameters<typeof Product>\[0\] = new Name\("Marcos"\)/,
+    );
+    assert.match(
+      generated,
+      /const sut = new Product\(name\)/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /const name = \{\}/,
+    );
+  },
+);
+
+test(
+  'mantém classes de infraestrutura como dependências em vez de instanciá-las',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-architectural-dependency-fixture-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'application'), {
+      recursive: true,
+    });
+    await mkdir(join(projectPath, 'src', 'infrastructure'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(
+        projectPath,
+        'src',
+        'infrastructure',
+        'user-repository.ts',
+      ),
+      `
+export class UserRepository {
+  async save(name: string): Promise<void> {}
+}
+`,
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'application', 'use-case.ts'),
+      `
+import { UserRepository } from '../infrastructure/user-repository.js'
+
+export class UseCase {
+  constructor(
+    private readonly repository: UserRepository,
+  ) {}
+
+  async execute(name: string): Promise<void> {
+    await this.repository.save(name)
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest(
+      'src/application/use-case.ts',
+      projectPath,
+    );
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /repository as unknown as ConstructorParameters<typeof UseCase>\[0\]/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /new UserRepository\(/,
+    );
+  },
+);

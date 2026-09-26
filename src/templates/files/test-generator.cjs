@@ -1019,7 +1019,8 @@ function analyzeMethod({
         receiver.expression.kind ===
           ts.SyntaxKind.ThisKeyword &&
         ts.isIdentifier(receiver.name) &&
-        dependencyNames.has(receiver.name.text)
+        dependencyNames.has(receiver.name.text) &&
+        !collectionDependencies.has(receiver.name.text)
       ) {
         recordCall(
           node,

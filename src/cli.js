@@ -1,6 +1,6 @@
 const { join, relative } = require('path');
 const { generateProject } = require('./generators/project-generator');
-const { generateTest } = require('./generators/test-generator');
+const { generateTest } = require('./generators/automatic-test-generator');
 const {
   detectPackageManager,
   getRunCommand,

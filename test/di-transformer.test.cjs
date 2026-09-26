@@ -49,6 +49,7 @@ test('configura o desenvolvimento somente com esbuild', () => {
     packageJson.scripts.build,
     'node kit-dev/build/esbuild.config.cjs',
   );
+  assert.equal(packageJson.scripts.test, 'node kit-dev/test/test.cjs');
   assert.equal(packageJson.scripts.di, 'node kit-dev/di/install.cjs');
   assert.doesNotMatch(JSON.stringify(packageJson), /\btsx\b/);
 });
@@ -63,11 +64,19 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   assert.deepEqual((await readdir(join(projectPath, 'kit-dev'))).sort(), [
     'build',
     'di',
+    'test',
   ]);
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'build'))).sort(),
     ['dev.cjs', 'esbuild.config.cjs'],
   );
+  assert.deepEqual(
+    (await readdir(join(projectPath, 'kit-dev', 'test'))).sort(),
+    ['test.cjs'],
+  );
+  assert.deepEqual((await readdir(join(projectPath, 'test'))).sort(), [
+    'example.test.ts',
+  ]);
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'di'))).sort(),
     [

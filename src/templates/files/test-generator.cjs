@@ -132,6 +132,7 @@ function analyzeClass(ts, sourceFile, checker) {
   const propertySources = collectConstructorPropertySources(
     ts,
     constructorNode,
+    sourceFile,
   );
   const factory = findStaticFactory(
     ts,
@@ -578,7 +579,11 @@ function translateSourceExpression(source, aliases) {
     : alias;
 }
 
-function collectConstructorPropertySources(ts, constructorNode) {
+function collectConstructorPropertySources(
+  ts,
+  constructorNode,
+  sourceFile,
+) {
   const sources = new Map();
 
   if (!constructorNode) return sources;
@@ -610,11 +615,18 @@ function collectConstructorPropertySources(ts, constructorNode) {
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
       ts.isPropertyAccessExpression(node.left) &&
-      node.left.expression.kind === ts.SyntaxKind.ThisKeyword &&
-      ts.isIdentifier(node.right) &&
-      parameterNames.has(node.right.text)
+      node.left.expression.kind === ts.SyntaxKind.ThisKeyword
     ) {
-      sources.set(node.left.name.text, node.right.text);
+      const source = renderParameterSourceExpression(
+        ts,
+        node.right,
+        parameterNames,
+        sourceFile,
+      );
+
+      if (source) {
+        sources.set(node.left.name.text, source);
+      }
     }
 
     ts.forEachChild(node, visit);
@@ -625,20 +637,56 @@ function collectConstructorPropertySources(ts, constructorNode) {
   return sources;
 }
 
-function detectExpectedReturn(ts, method, propertySources, sourceFile) {
+function renderParameterSourceExpression(
+  ts,
+  node,
+  parameterNames,
+  sourceFile,
+) {
+  let current = node;
+
+  while (
+    ts.isPropertyAccessExpression(current) ||
+    ts.isElementAccessExpression(current)
+  ) {
+    current = current.expression;
+  }
+
+  if (
+    ts.isIdentifier(current) &&
+    parameterNames.has(current.text)
+  ) {
+    return node.getText(sourceFile);
+  }
+
+  return null;
+}
+
+function detectExpectedReturn(
+  ts,
+  method,
+  propertySources,
+  sourceFile,
+) {
   if (!method.body || method.body.statements.length !== 1) return null;
 
   const statement = method.body.statements[0];
-  if (!ts.isReturnStatement(statement) || !statement.expression) return null;
+  if (!ts.isReturnStatement(statement) || !statement.expression) {
+    return null;
+  }
 
   const expression = statement.expression;
+  const thisPath = getThisPropertyPath(ts, expression);
 
-  if (
-    ts.isPropertyAccessExpression(expression) &&
-    expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
-    propertySources.has(expression.name.text)
-  ) {
-    return propertySources.get(expression.name.text);
+  if (thisPath && thisPath.length > 0) {
+    const [root, ...rest] = thisPath;
+    const source = propertySources.get(root);
+
+    if (source) {
+      return rest.length > 0
+        ? source + '.' + rest.join('.')
+        : source;
+    }
   }
 
   if (
@@ -652,6 +700,20 @@ function detectExpectedReturn(ts, method, propertySources, sourceFile) {
   }
 
   return null;
+}
+
+function getThisPropertyPath(ts, expression) {
+  const parts = [];
+  let current = expression;
+
+  while (ts.isPropertyAccessExpression(current)) {
+    parts.unshift(current.name.text);
+    current = current.expression;
+  }
+
+  return current.kind === ts.SyntaxKind.ThisKeyword
+    ? parts
+    : null;
 }
 
 function renderTypeNodeFixture(

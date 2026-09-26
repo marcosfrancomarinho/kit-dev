@@ -10,6 +10,7 @@ function createPackageJson(projectName) {
         dev: 'node kit-dev/build/dev.cjs',
         build: 'node kit-dev/build/esbuild.config.cjs',
         type: 'tsc --watch --noEmit',
+        test: 'node kit-dev/test/test.cjs',
         di: 'node kit-dev/di/install.cjs',
       },
       dependencies: {},
@@ -47,6 +48,14 @@ function createTsconfig() {
 }
 
 const mainFile = "console.log('Hello World!');";
+
+const exampleTest = `import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+test('example', () => {
+  assert.equal(1 + 1, 2);
+});
+`;
 
 const esbuildConfig = [
   "const { execSync } = require('child_process');",
@@ -153,6 +162,7 @@ const gitignore = [
   '.DS_Store',
   '*.tsbuildinfo',
   'kit-dev/build/.cache/',
+  'kit-dev/test/.cache/',
   '',
 ].join('\n');
 
@@ -160,6 +170,7 @@ module.exports = {
   createPackageJson,
   createTsconfig,
   esbuildConfig,
+  exampleTest,
   gitignore,
   mainFile,
 };

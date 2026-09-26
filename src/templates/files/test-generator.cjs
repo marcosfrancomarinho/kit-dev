@@ -428,6 +428,42 @@ function mapFactoryArgumentsToConstructor(
     const argument = argumentsList[index];
     if (!argument) return;
 
+    if (ts.isObjectLiteralExpression(argument)) {
+      for (const property of argument.properties) {
+        if (
+          ts.isShorthandPropertyAssignment(property) &&
+          ts.isIdentifier(property.name)
+        ) {
+          aliases.set(
+            parameter.name + '.' + property.name.text,
+            property.name.text,
+          );
+          continue;
+        }
+
+        if (
+          ts.isPropertyAssignment(property) &&
+          (ts.isIdentifier(property.name) ||
+            ts.isStringLiteral(property.name))
+        ) {
+          const rendered = renderFactorySourceExpression(
+            ts,
+            property.initializer,
+            sourceFile,
+          );
+
+          if (rendered) {
+            aliases.set(
+              parameter.name + '.' + property.name.text,
+              rendered,
+            );
+          }
+        }
+      }
+
+      return;
+    }
+
     const rendered = renderFactorySourceExpression(
       ts,
       argument,
@@ -596,14 +632,21 @@ function analyzeMethod({
 function translateSourceExpression(source, aliases) {
   if (!source || !aliases) return source;
 
-  const [root, ...rest] = source.split('.');
-  const alias = aliases.get(root);
+  const parts = source.split('.');
 
-  if (!alias) return source;
+  for (let length = parts.length; length > 0; length -= 1) {
+    const prefix = parts.slice(0, length).join('.');
+    const alias = aliases.get(prefix);
 
-  return rest.length > 0
-    ? alias + '.' + rest.join('.')
-    : alias;
+    if (!alias) continue;
+
+    const rest = parts.slice(length);
+    return rest.length > 0
+      ? alias + '.' + rest.join('.')
+      : alias;
+  }
+
+  return aliases.size > 0 ? null : source;
 }
 
 function collectConstructorPropertySources(

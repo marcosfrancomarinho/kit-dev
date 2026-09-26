@@ -177,7 +177,10 @@ export class CreateUser {
     'utf-8',
   );
 
-  assert.match(generated, /new CreateUser\(repository\)/);
+  assert.match(
+    generated,
+    /repository as unknown as ConstructorParameters<typeof CreateUser>\[0\]/,
+  );
   assert.match(generated, /save: t\.mock\.fn\(async/);
 });
 

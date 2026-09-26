@@ -76,8 +76,11 @@ async function runTests() {
 
   console.log('\n🧪 Tests\n');
 
+  const { NODE_TEST_CONTEXT: _nodeTestContext, ...env } = process.env;
+
   const child = spawn(process.execPath, ['--test', ...files], {
     cwd: projectRoot,
+    env,
     stdio: 'inherit',
   });
 

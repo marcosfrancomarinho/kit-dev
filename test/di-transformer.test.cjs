@@ -77,6 +77,18 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   assert.deepEqual(await readdir(join(projectPath, 'test')), [
     'example.test.ts',
   ]);
+
+  const exampleTest = await readFile(
+    join(projectPath, 'test', 'example.test.ts'),
+    'utf-8',
+  );
+  assert.match(exampleTest, /test\('should sum two numbers'/);
+  assert.doesNotMatch(exampleTest, /\\\\n/);
+  await transform(exampleTest, {
+    loader: 'ts',
+    format: 'esm',
+    target: 'es2022',
+  });
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'di'))).sort(),
     [

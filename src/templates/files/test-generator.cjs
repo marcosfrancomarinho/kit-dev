@@ -2598,11 +2598,11 @@ function renderCreationSetup(
     if (parameter.kind === 'dependencyCollection') {
       if (dependencyCalls.length === 0) {
         lines.push(
-          `  const ${parameter.name} = [] as unknown as ${creationParameterType(
+          `  const ${parameter.name}: ${creationParameterType(
             className,
             creation,
             parameter.index,
-          )}`,
+          )} = []`,
         );
         continue;
       }
@@ -2634,21 +2634,33 @@ function renderCreationSetup(
             : `[${itemName}]`;
 
       lines.push(
-        `  const ${parameter.name} = ${collectionFixture} as unknown as ${creationParameterType(
+        `  const ${parameter.name}: ${creationParameterType(
           className,
           creation,
           parameter.index,
-        )}`,
+        )} = ${collectionFixture}`,
       );
       continue;
     }
 
     if (dependencyCalls.length === 0) {
-      lines.push(`  const ${parameter.name} = {}`);
+      lines.push(
+        `  const ${parameter.name} = {} as ${creationParameterType(
+          className,
+          creation,
+          parameter.index,
+        )} /* TODO: provide ${parameter.name} */`,
+      );
       continue;
     }
 
-    lines.push(`  const ${parameter.name} = {`);
+    lines.push(
+      `  const ${parameter.name}: ${creationParameterType(
+        className,
+        creation,
+        parameter.index,
+      )} = {`,
+    );
 
     for (const call of dependencyCalls) {
       const asyncKeyword =
@@ -2667,24 +2679,7 @@ function renderCreationSetup(
 
 function renderCreationExpression(className, creation) {
   const argumentsList = creation.parameters
-    .map((parameter) => {
-      if (
-        parameter.kind === 'value' ||
-        parameter.kind === 'dependencyCollection'
-      ) {
-        return parameter.name;
-      }
-
-      return (
-        parameter.name +
-        ' as unknown as ' +
-        creationParameterType(
-          className,
-          creation,
-          parameter.index,
-        )
-      );
-    })
+    .map((parameter) => parameter.name)
     .join(', ');
 
   if (creation.kind === 'factory') {
@@ -2709,28 +2704,11 @@ function renderCreationExpressionWithOverride(
   overrideFixture,
 ) {
   const argumentsList = creation.parameters
-    .map((parameter) => {
-      if (parameter.index === overrideIndex) {
-        return overrideFixture;
-      }
-
-      if (
-        parameter.kind === 'value' ||
-        parameter.kind === 'dependencyCollection'
-      ) {
-        return parameter.name;
-      }
-
-      return (
-        parameter.name +
-        ' as unknown as ' +
-        creationParameterType(
-          className,
-          creation,
-          parameter.index,
-        )
-      );
-    })
+    .map((parameter) =>
+      parameter.index === overrideIndex
+        ? overrideFixture
+        : parameter.name,
+    )
     .join(', ');
 
   return (
@@ -2752,9 +2730,9 @@ function creationParameterType(
     return (
       'Parameters<typeof ' +
       className +
-      '.' +
+      "['" +
       creation.methodName +
-      '>[' +
+      "']>[" +
       index +
       ']'
     );

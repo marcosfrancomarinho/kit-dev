@@ -179,7 +179,7 @@ export class CreateUser {
 
   assert.match(
     generated,
-    /repository as unknown as ConstructorParameters<typeof CreateUser>\[0\]/,
+    /const repository: ConstructorParameters<typeof CreateUser>\[0\] = \{/,
   );
   assert.match(generated, /save: t\.mock\.fn\(async/);
 });

@@ -161,7 +161,7 @@ export class CreateUser {
     );
     assert.match(
       generated,
-      /repository as unknown as ConstructorParameters<typeof CreateUser>\[0\]/,
+      /const repository: ConstructorParameters<typeof CreateUser>\[0\] = \{/,
     );
     assert.match(generated, /await sut\.execute\(dto\)/);
     assert.match(
@@ -277,7 +277,7 @@ export class User {
     assert.match(generated, /const age = 1/);
     assert.match(
       generated,
-      /const createdAt: Parameters<typeof User\.create>\[3\] = new Date\('2026-01-01T00:00:00\.000Z'\)/,
+      /const createdAt: Parameters<typeof User\['create'\]>\[3\] = new Date\('2026-01-01T00:00:00\.000Z'\)/,
     );
     assert.match(generated, /const isActive = true/);
     assert.match(generated, /const deletedAt = null/);
@@ -605,15 +605,15 @@ export class User {
 
     assert.match(
       generated,
-      /const createdAt: Parameters<typeof User\.create>\[3\] = new Date\('2026-01-01T00:00:00\.000Z'\)/,
+      /const createdAt: Parameters<typeof User\['create'\]>\[3\] = new Date\('2026-01-01T00:00:00\.000Z'\)/,
     );
     assert.match(
       generated,
-      /const parents: Parameters<typeof User\.create>\[5\] = \[\{ name: "Marcos", bornAt: new Date\('2026-01-01T00:00:00\.000Z'\), active: true, meta: \{ city: "city" \} \}\]/,
+      /const parents: Parameters<typeof User\['create'\]>\[5\] = \[\{ name: "Marcos", bornAt: new Date\('2026-01-01T00:00:00\.000Z'\), active: true, meta: \{ city: "city" \} \}\]/,
     );
     assert.match(
       generated,
-      /const profile: Parameters<typeof User\.create>\[6\] = \{ address: \{ city: "city" \}, tags: \["tag"\] \}/,
+      /const profile: Parameters<typeof User\['create'\]>\[6\] = \{ address: \{ city: "city" \}, tags: \["tag"\] \}/,
     );
     assert.match(
       generated,
@@ -836,7 +836,7 @@ export class CreateUserHandler {
     );
     assert.match(
       generated,
-      /repository as unknown as ConstructorParameters<typeof CreateUserHandler>\[0\]/,
+      /const repository: ConstructorParameters<typeof CreateUserHandler>\[0\] = \{/,
     );
     assert.match(
       generated,
@@ -1066,7 +1066,7 @@ export class UseCase {
 
     assert.match(
       generated,
-      /repository as unknown as ConstructorParameters<typeof UseCase>\[0\]/,
+      /const repository: ConstructorParameters<typeof UseCase>\[0\] = \{/,
     );
     assert.doesNotMatch(
       generated,
@@ -1168,7 +1168,7 @@ export class User {
     );
     assert.match(
       generated,
-      /const name: Parameters<typeof User\.criar>\[0\] = Name\.criar\("Marcos"\)/,
+      /const name: Parameters<typeof User\['criar'\]>\[0\] = Name\.criar\("Marcos"\)/,
     );
     assert.match(
       generated,
@@ -1180,7 +1180,7 @@ export class User {
     );
     assert.doesNotMatch(
       generated,
-      /name as unknown as Parameters<typeof User\.criar>\[0\]/,
+      /name as unknown as Parameters<typeof User\['criar'\]>\[0\]/,
     );
   },
 );
@@ -1332,7 +1332,7 @@ export class UserService {
     );
     assert.match(
       generated,
-      /repository as unknown as ConstructorParameters<typeof UserService>\[1\]/,
+      /const repository: ConstructorParameters<typeof UserService>\[1\] = \{/,
     );
     assert.doesNotMatch(
       generated,
@@ -1393,7 +1393,7 @@ export class Runner {
     );
     assert.match(
       generated,
-      /port as unknown as ConstructorParameters<typeof Runner>\[0\]/,
+      /const port: ConstructorParameters<typeof Runner>\[0\] = \{/,
     );
   },
 );
@@ -1463,7 +1463,7 @@ export class CreateUser {
     );
     assert.match(
       generated,
-      /repository as unknown as ConstructorParameters<typeof CreateUser>\[0\]/,
+      /const repository: ConstructorParameters<typeof CreateUser>\[0\] = \{/,
     );
     assert.doesNotMatch(
       generated,
@@ -1606,7 +1606,7 @@ export class Subject {
     );
     assert.match(
       observerTest,
-      /const observers = \[observer\] as unknown as ConstructorParameters<typeof Subject>\[0\]/,
+      /const observers: ConstructorParameters<typeof Subject>\[0\] = \[observer\]/,
     );
     assert.match(
       observerTest,
@@ -1962,11 +1962,11 @@ export class Broadcaster {
 
     assert.match(
       collectionTest,
-      /new Set\(\[observer\]\) as unknown as ConstructorParameters<typeof Broadcaster>\[0\]/,
+      /const setObservers: ConstructorParameters<typeof Broadcaster>\[0\] = new Set\(\[observer\]\)/,
     );
     assert.match(
       collectionTest,
-      /new Map\(\[\["key", observer\]\]\) as unknown as ConstructorParameters<typeof Broadcaster>\[1\]/,
+      /const mapObservers: ConstructorParameters<typeof Broadcaster>\[1\] = new Map\(\[\["key", observer\]\]\)/,
     );
     assert.match(
       collectionTest,

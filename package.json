@@ -1,7 +1,7 @@
 {
   "name": "create-kit-dev",
   "version": "1.1.23",
-  "description": "CLI para criar um projeto Node.js moderno com TypeScript, esbuild e estrutura inicial configurada.",
+  "description": "Fast Node.js + TypeScript project generator with esbuild, native testing, automatic test generation, optional dependency injection, and a zero-config developer workflow.",
   "bin": {
     "create-kit-dev": "index.js"
   },
@@ -12,15 +12,28 @@
   "author": "marcosmarinho",
   "license": "MIT",
   "keywords": [
+    "create-kit-dev",
+    "kit-dev",
     "typescript",
+    "typescript-7",
+    "node",
+    "nodejs",
     "cli",
     "scaffold",
+    "scaffolding",
     "project-generator",
-    "dependency-injection",
-    "app-config",
+    "starter-kit",
+    "boilerplate",
     "esbuild",
-    "node",
-    "starter-kit"
+    "node-test",
+    "testing",
+    "test-generator",
+    "ast",
+    "dependency-injection",
+    "di-container",
+    "inversion-of-control",
+    "developer-tools",
+    "backend"
   ],
   "engines": {
     "node": ">=22"

@@ -655,26 +655,72 @@ function lineLengthWithReplacement(source, start, end, replacement) {
 
 function listFormattingInfo(node) {
   if (ts.isArrayLiteralExpression(node)) {
-    return { items: node.elements, threshold: 4, kind: 'array' };
+    return {
+      items: node.elements,
+      threshold: 4,
+      kind: 'array',
+      open: '[',
+      close: ']',
+      padded: false,
+    };
   }
 
   if (ts.isObjectLiteralExpression(node)) {
-    return { items: node.properties, threshold: 3, kind: 'object' };
+    return {
+      items: node.properties,
+      threshold: 3,
+      kind: 'object',
+      open: '{',
+      close: '}',
+      padded: true,
+    };
   }
 
-  if (ts.isArrayBindingPattern(node) || ts.isObjectBindingPattern(node)) {
-    return { items: node.elements, threshold: 4, kind: 'binding' };
+  if (ts.isArrayBindingPattern(node)) {
+    return {
+      items: node.elements,
+      threshold: 4,
+      kind: 'array-binding',
+      open: '[',
+      close: ']',
+      padded: false,
+    };
+  }
+
+  if (ts.isObjectBindingPattern(node)) {
+    return {
+      items: node.elements,
+      threshold: 4,
+      kind: 'object-binding',
+      open: '{',
+      close: '}',
+      padded: true,
+    };
   }
 
   if (ts.isNamedImports(node) || ts.isNamedExports(node)) {
-    return { items: node.elements, threshold: 5, kind: 'named' };
+    return {
+      items: node.elements,
+      threshold: 5,
+      kind: 'named',
+      open: '{',
+      close: '}',
+      padded: true,
+    };
   }
 
   if (
     (ts.isCallExpression(node) || ts.isNewExpression(node)) &&
     node.arguments
   ) {
-    return { items: node.arguments, threshold: 4, kind: 'arguments' };
+    return {
+      items: node.arguments,
+      threshold: 4,
+      kind: 'arguments',
+      open: '(',
+      close: ')',
+      padded: false,
+    };
   }
 
   if (
@@ -682,7 +728,14 @@ function listFormattingInfo(node) {
     typeof node.parameters.length === 'number' &&
     !ts.isSourceFile(node)
   ) {
-    return { items: node.parameters, threshold: 4, kind: 'parameters' };
+    return {
+      items: node.parameters,
+      threshold: 4,
+      kind: 'parameters',
+      open: '(',
+      close: ')',
+      padded: false,
+    };
   }
 
   return null;
@@ -690,6 +743,35 @@ function listFormattingInfo(node) {
 
 function shouldSkipListItem(item) {
   return ts.isOmittedExpression(item);
+}
+
+function findListBounds(source, sourceFile, node, info) {
+  const nodeStart = node.getStart(sourceFile);
+  const nodeEnd = node.getEnd();
+  const firstPosition =
+    info.items.length > 0
+      ? info.items[0].getStart(sourceFile)
+      : info.items.pos;
+  const lastPosition =
+    info.items.length > 0
+      ? info.items[info.items.length - 1].getEnd()
+      : info.items.end;
+  const openIndex = source.lastIndexOf(info.open, firstPosition);
+  const closeIndex = source.indexOf(info.close, lastPosition);
+
+  if (
+    openIndex < nodeStart ||
+    closeIndex < 0 ||
+    closeIndex >= nodeEnd ||
+    openIndex >= closeIndex
+  ) {
+    return null;
+  }
+
+  return {
+    start: openIndex + 1,
+    end: closeIndex,
+  };
 }
 
 function formatDelimitedListsOnce(
@@ -709,79 +791,68 @@ function formatDelimitedListsOnce(
   function visit(node, depth = 0) {
     const info = listFormattingInfo(node);
 
-    if (
-      info &&
-      info.kind === 'arguments' &&
-      info.items.length === 0
-    ) {
-      const nodeStart = node.getStart(sourceFile);
-      const nodeEnd = node.getEnd();
-      const openParen = source.lastIndexOf('(', info.items.pos);
-      const closeParen = source.indexOf(')', info.items.end);
+    if (info && !info.items.hasTrailingComma) {
+      const bounds = findListBounds(source, sourceFile, node, info);
 
-      if (
-        openParen >= nodeStart &&
-        closeParen >= 0 &&
-        closeParen < nodeEnd &&
-        source.slice(openParen + 1, closeParen).trim() === '' &&
-        (source.slice(openParen + 1, closeParen).includes('\n') ||
-          source.slice(openParen + 1, closeParen).includes('\r'))
-      ) {
-        candidates.push({
-          start: openParen + 1,
-          end: closeParen,
-          value: '',
-          depth,
-        });
-      }
-    }
+      if (bounds) {
+        const rawInterior = source.slice(bounds.start, bounds.end);
+        const nodeText = source.slice(node.getStart(sourceFile), node.getEnd());
 
-    if (info && info.items.length > 0 && !info.items.hasTrailingComma) {
-      const interiorStart = info.items.pos;
-      const interiorEnd = info.items.end;
-      const rawInterior = source.slice(interiorStart, interiorEnd);
-      const nodeText = source.slice(node.getStart(sourceFile), node.getEnd());
-
-      if (!containsComment(nodeText)) {
-        const itemTexts = info.items.map((item) =>
-          source.slice(item.getStart(sourceFile), item.getEnd()),
-        );
-
-        if (
-          itemTexts.length > 0 &&
-          !itemTexts.some((text, index) =>
-            shouldSkipListItem(info.items[index], text),
-          )
-        ) {
-          const compact = itemTexts.join(', ');
-          const hasMultilineItem = itemTexts.some(
-            (text) => text.includes('\n') || text.includes('\r'),
-          );
-          const projectedLength = lineLengthWithReplacement(
-            source,
-            interiorStart,
-            interiorEnd,
-            compact,
-          );
-          const shouldExpand =
-            info.items.length >= info.threshold ||
-            projectedLength > maxLineLength;
-
-          let value = null;
-
-          if (shouldExpand) {
-            value = '\n' + itemTexts.join(',\n') + '\n';
-          } else if (!hasMultilineItem) {
-            value = compact;
-          }
-
-          if (value !== null && value !== rawInterior) {
+        if (info.items.length === 0) {
+          if (
+            info.kind === 'arguments' &&
+            rawInterior.trim() === '' &&
+            (rawInterior.includes('\n') || rawInterior.includes('\r'))
+          ) {
             candidates.push({
-              start: interiorStart,
-              end: interiorEnd,
-              value,
+              start: bounds.start,
+              end: bounds.end,
+              value: '',
               depth,
             });
+          }
+        } else if (!containsComment(nodeText)) {
+          const itemTexts = info.items.map((item) =>
+            source.slice(item.getStart(sourceFile), item.getEnd()),
+          );
+
+          if (
+            itemTexts.length > 0 &&
+            !itemTexts.some((text, index) =>
+              shouldSkipListItem(info.items[index], text),
+            )
+          ) {
+            const joined = itemTexts.join(', ');
+            const compact = info.padded ? ' ' + joined + ' ' : joined;
+            const hasMultilineItem = itemTexts.some(
+              (text) => text.includes('\n') || text.includes('\r'),
+            );
+            const projectedLength = lineLengthWithReplacement(
+              source,
+              bounds.start,
+              bounds.end,
+              compact,
+            );
+            const shouldExpand =
+              info.items.length >= info.threshold ||
+              projectedLength > maxLineLength;
+
+            let value = null;
+
+            if (shouldExpand) {
+              value = '\n' + itemTexts.join(',\n') + '\n';
+            } else if (!hasMultilineItem) {
+              value = compact;
+            }
+
+            if (value !== null && value !== rawInterior) {
+              candidates.push({
+                start: bounds.start,
+                end: bounds.end,
+                value,
+                depth,
+              });
+            }
           }
         }
       }

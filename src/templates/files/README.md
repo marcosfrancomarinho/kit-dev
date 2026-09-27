@@ -462,6 +462,7 @@ my-api/
 │   └── main.ts
 ├── test/
 │   └── example.test.ts
+├── README.md
 ├── package.json
 └── tsconfig.json
 ```

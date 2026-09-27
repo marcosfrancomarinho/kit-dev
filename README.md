@@ -149,13 +149,19 @@ After installation, the project gets the container and `src/di/providers.ts`. Th
 A common case is a class depending on a repository interface.
 
 ```ts
+export class User {
+  constructor(
+    readonly name: string,
+  ) {}
+}
+
 export interface UserRepository {
-  save(name: string): Promise<void>
+  save(user: User): Promise<void>
 }
 
 export class UserRepositoryMemory implements UserRepository {
-  async save(name: string): Promise<void> {
-    console.log(name)
+  async save(user: User): Promise<void> {
+    console.log(user.name)
   }
 }
 
@@ -164,8 +170,8 @@ export class CreateUser {
     private readonly repository: UserRepository,
   ) {}
 
-  execute(name: string) {
-    return this.repository.save(name)
+  execute(user: User) {
+    return this.repository.save(user)
   }
 }
 ```
@@ -184,8 +190,9 @@ Usage:
 
 ```ts
 const createUser = container.get(CreateUser)
+const user = new User('Marcos')
 
-await createUser.execute('Marcos')
+await createUser.execute(user)
 ```
 
 Kit Dev can infer the constructor dependency and connect the contract to the registered implementation.
@@ -241,11 +248,11 @@ Abstract class as token:
 
 ```ts
 export abstract class UserRepository {
-  abstract save(name: string): Promise<void>
+  abstract save(user: User): Promise<void>
 }
 
 export class UserRepositoryDatabase extends UserRepository {
-  async save(name: string): Promise<void> {
+  async save(user: User): Promise<void> {
     // ...
   }
 }

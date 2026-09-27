@@ -99,7 +99,7 @@ npm run fmt -- src/application/create-user.ts
 ```
 
 
-O comando `fmt` é leve e não adiciona uma biblioteca externa de formatação. Ele atua somente nos arquivos JavaScript e TypeScript de `src/` e `test/`, corrigindo a identação, expandindo blocos compactos como `function teste(){console.log()}`, adicionando ponto e vírgula aos statements reconhecidos e convertendo strings com aspas duplas para aspas simples. Objetos literais não são expandidos. O comando também remove bindings de import confirmados como não usados; imports com efeito colateral são preservados e `import type` sem uso é removido sem criar import de runtime. Imports com comentários internos não são reescritos. Template strings com crase, regex, comentários e atributos JSX com aspas permanecem intactos.
+O comando `fmt` é leve e não adiciona uma biblioteca externa de formatação. Ele atua somente nos arquivos JavaScript e TypeScript de `src/` e `test/`, corrigindo a identação, expandindo blocos compactos como `function teste(){console.log()}`, adicionando ponto e vírgula aos statements reconhecidos e convertendo strings com aspas duplas para aspas simples. Objetos literais não são expandidos. O comando também remove bindings de import confirmados como não usados e apaga completamente imports com bindings quando nenhum deles é utilizado. Imports escritos originalmente apenas por efeito colateral, como `import './setup';`, são preservados. `import type` sem uso é removido sem criar import de runtime. Imports com comentários internos não são reescritos. Template strings com crase, regex, comentários e atributos JSX com aspas permanecem intactos.
 
 ## Testes automáticos
 

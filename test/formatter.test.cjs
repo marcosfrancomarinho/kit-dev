@@ -225,7 +225,7 @@ describe('source formatter', () => {
       '',
     ].join('\n');
 
-    assert.equal(compactShortCalls(source, 'example.ts'), source);
+    assert.equal(formatSource(source, 'example.ts'), source);
   });
 
   it('keeps calls with comments multiline', () => {
@@ -278,6 +278,30 @@ describe('source formatter', () => {
       compactShortCalls(source, 'example.ts'),
       [
         "const url = build('https://example.com/a//b', '/*literal*/');",
+        '',
+      ].join('\n'),
+    );
+  });
+
+
+  it('preserves callback arguments without exploding describe and it calls', () => {
+    const source = [
+      "describe('Name', () => {",
+      "it('constructor', () => {",
+      'assert.ok(true);',
+      '});',
+      '});',
+      '',
+    ].join('\n');
+
+    assert.equal(
+      formatSource(source, 'example.test.ts'),
+      [
+        "describe('Name', () => {",
+        "  it('constructor', () => {",
+        '    assert.ok(true);',
+        '  });',
+        '});',
         '',
       ].join('\n'),
     );

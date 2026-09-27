@@ -73,14 +73,14 @@ pnpm dev
 | `type` | Acompanha erros de TypeScript |
 | `di` | Instala a injeção de dependência opcional |
 
-Exemplos com Yarn:
+Exemplos com npm:
 
 ```bash
-yarn dev
-yarn test
-yarn test create-user
-yarn build
-yarn start
+npm run dev
+npm test
+npm test -- create-user
+npm run build
+npm start
 ```
 
 ## Testes automáticos
@@ -90,19 +90,19 @@ Todo projeto gerado já possui um runner de testes.
 Execute:
 
 ```bash
-yarn test
+npm test
 ```
 
 Para gerar um teste a partir de uma classe:
 
 ```bash
-yarn test create-user
+npm test -- create-user
 ```
 
 ou:
 
 ```bash
-yarn test src/application/create-user.ts
+npm test -- src/application/create-user.ts
 ```
 
 O Kit Dev analisa a classe, as dependências do construtor e os métodos públicos para criar uma boa base de teste. Quando não consegue inferir com segurança uma regra de negócio, deixa um `TODO` em vez de inventar uma assertion.
@@ -114,7 +114,7 @@ Um teste já gerado pode ser criado novamente quando a classe mudar.
 Execute:
 
 ```bash
-yarn build
+npm run build
 ```
 
 O build verifica o projeto e gera:
@@ -127,7 +127,7 @@ dist/bundle.cjs.map
 Depois, execute a aplicação com:
 
 ```bash
-yarn start
+npm start
 ```
 
 O bundle é otimizado, mas continua legível.
@@ -139,7 +139,7 @@ A DI é opcional. Você pode usar o Kit Dev normalmente sem ela.
 Para habilitar, execute uma única vez:
 
 ```bash
-yarn di
+npm run di
 ```
 
 Depois da instalação, o projeto passa a ter o container e o arquivo `src/di/providers.ts`. O script `di` é removido porque a configuração já foi instalada.
@@ -462,6 +462,7 @@ minha-api/
 │   └── main.ts
 ├── test/
 │   └── example.test.ts
+├── README.md
 ├── package.json
 └── tsconfig.json
 ```

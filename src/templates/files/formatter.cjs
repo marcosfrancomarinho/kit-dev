@@ -146,8 +146,14 @@ function indentSource(source) {
   const formatted = lines.map((line) => {
     if (line.trim() === '') return '';
 
+    const wasInsideTemplate = state.template;
     const trimmed = line.trim();
-    const structure = scanStructure(trimmed, state);
+    const structure = scanStructure(wasInsideTemplate ? line : trimmed, state);
+
+    if (wasInsideTemplate) {
+      return line;
+    }
+
     const lineDepth = Math.max(0, depth - structure.leadingClosers);
     depth = Math.max(0, depth + structure.opens - structure.closes);
 
@@ -193,8 +199,14 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error('\n❌ Format failed');
-  console.error(error && error.message ? error.message : error);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error('\n❌ Format failed');
+    console.error(error && error.message ? error.message : error);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  indentSource,
+};

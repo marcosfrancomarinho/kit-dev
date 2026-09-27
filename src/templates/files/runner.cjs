@@ -240,8 +240,12 @@ async function main() {
     scheduleStructureRefresh,
   );
 
-  process.on('SIGINT', close);
-  process.on('SIGTERM', close);
+  process.on('SIGINT', () => {
+    close(0).catch(fail);
+  });
+  process.on('SIGTERM', () => {
+    close(0).catch(fail);
+  });
 }
 
 main().catch(fail);

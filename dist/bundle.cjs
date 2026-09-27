@@ -592,6 +592,7 @@ var TerminalAdapter = class {
 \u{1F680} Available commands:
   ` + this.formatCommand(runCommand, "dev", "Start development server") + `
   ` + this.formatCommand(runCommand, "test", "Run tests in watch mode") + `
+  ` + this.formatCommand(runCommand, "fmt", "Format src/ and test/ code") + `
   ` + this.formatCommand(runCommand, "build", "Build the project") + `
   ` + this.formatCommand(runCommand, "start", "Run bundled output") + `
   ` + this.formatCommand(runCommand, "type", "Check TypeScript types") + `

@@ -836,10 +836,12 @@ function formatDelimitedListsOnce(
             const shouldExpand =
               info.items.length >= info.threshold ||
               projectedLength > maxLineLength;
+            const preserveMultilineItems =
+              hasMultilineItem && info.kind !== 'array';
 
             let value = null;
 
-            if (shouldExpand) {
+            if (!preserveMultilineItems && shouldExpand) {
               value = '\n' + itemTexts.join(',\n') + '\n';
             } else if (!hasMultilineItem) {
               value = compact;

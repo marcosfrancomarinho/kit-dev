@@ -149,13 +149,19 @@ After installation, the project gets the container and `src/di/providers.ts`. Th
 A common case is a class depending on a repository interface.
 
 ```ts
+export class User {
+  constructor(
+    readonly name: string,
+  ) {}
+}
+
 export interface UserRepository {
-  save(name: string): Promise<void>
+  save(user: User): Promise<void>
 }
 
 export class UserRepositoryMemory implements UserRepository {
-  async save(name: string): Promise<void> {
-    console.log(name)
+  async save(user: User): Promise<void> {
+    console.log(user.name)
   }
 }
 
@@ -164,8 +170,8 @@ export class CreateUser {
     private readonly repository: UserRepository,
   ) {}
 
-  execute(name: string) {
-    return this.repository.save(name)
+  execute(user: User) {
+    return this.repository.save(user)
   }
 }
 ```
@@ -184,8 +190,9 @@ Usage:
 
 ```ts
 const createUser = container.get(CreateUser)
+const user = new User('Marcos')
 
-await createUser.execute('Marcos')
+await createUser.execute(user)
 ```
 
 Kit Dev can infer the constructor dependency and connect the contract to the registered implementation.
@@ -197,8 +204,9 @@ Use it for classes the container should create.
 Concrete class:
 
 ```ts
-providers.useClass(Logger)
-providers.useClass(UserService)
+providers
+  .useClass(Logger)
+  .useClass(UserService)
 ```
 
 Interface contract:
@@ -240,11 +248,11 @@ Abstract class as token:
 
 ```ts
 export abstract class UserRepository {
-  abstract save(name: string): Promise<void>
+  abstract save(user: User): Promise<void>
 }
 
 export class UserRepositoryDatabase extends UserRepository {
-  async save(name: string): Promise<void> {
+  async save(user: User): Promise<void> {
     // ...
   }
 }
@@ -263,8 +271,9 @@ class ConfigService {
   constructor(readonly appName: string) {}
 }
 
-providers.useValue(APP_NAME, 'My API')
-providers.useClass(ConfigService, [APP_NAME])
+providers
+  .useValue(APP_NAME, 'My API')
+  .useClass(ConfigService, [APP_NAME])
 ```
 
 This also works for interface and abstract-class registrations:
@@ -284,8 +293,9 @@ Use tokens when a dependency has no runtime class.
 const DATABASE_URL = createToken<string>('DATABASE_URL')
 const PORT = createToken<number>('PORT')
 
-providers.useValue(DATABASE_URL, process.env.DATABASE_URL!)
-providers.useValue(PORT, 3000)
+providers
+  .useValue(DATABASE_URL, process.env.DATABASE_URL!)
+  .useValue(PORT, 3000)
 ```
 
 Always reuse the same token constant.
@@ -297,8 +307,9 @@ Use it when a value or instance already exists.
 ```ts
 const APP_NAME = createToken<string>('APP_NAME')
 
-providers.useValue(APP_NAME, 'Kit Dev')
-providers.useValue(Logger, new Logger())
+providers
+  .useValue(APP_NAME, 'Kit Dev')
+  .useValue(Logger, new Logger())
 ```
 
 ### `useFactory()`
@@ -308,16 +319,16 @@ Use it when creation needs custom logic.
 ```ts
 const DATABASE_URL = createToken<string>('DATABASE_URL')
 
-providers.useValue(
-  DATABASE_URL,
-  process.env.DATABASE_URL!,
-)
+providers
+  .useValue(
+    DATABASE_URL,
+    process.env.DATABASE_URL!,
+  )
+  .useFactory(Database, (container) => {
+    const url = container.get(DATABASE_URL)
 
-providers.useFactory(Database, (container) => {
-  const url = container.get(DATABASE_URL)
-
-  return new Database(url)
-})
+    return new Database(url)
+  })
 ```
 
 Prefer `useClass()` for normal creation. Use `useFactory()` when you need full control over construction.
@@ -330,8 +341,9 @@ Use it when two tokens should resolve to the same instance.
 const PRIMARY_DATABASE =
   createToken<Database>('PRIMARY_DATABASE')
 
-providers.useClass(Database)
-providers.useExisting(PRIMARY_DATABASE, Database)
+providers
+  .useClass(Database)
+  .useExisting(PRIMARY_DATABASE, Database)
 ```
 
 ### `imports()`
@@ -395,17 +407,17 @@ providers.useClass(
 It also works with factories and contract registrations:
 
 ```ts
-providers.useFactory(
-  RequestId,
-  () => new RequestId(),
-  { scope: 'transient' },
-)
-
-providers.useClass<UserRepository>(
-  UserRepositoryMemory,
-  [],
-  { scope: 'transient' },
-)
+providers
+  .useFactory(
+    RequestId,
+    () => new RequestId(),
+    { scope: 'transient' },
+  )
+  .useClass<UserRepository>(
+    UserRepositoryMemory,
+    [],
+    { scope: 'transient' },
+  )
 ```
 
 ### Container methods

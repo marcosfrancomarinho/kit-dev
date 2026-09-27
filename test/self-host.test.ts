@@ -77,11 +77,14 @@ describe('self-hosted architecture', () => {
   });
 
   it('detects Yarn from the package-manager environment', () => {
-    const detector = new NodePackageManagerDetector({
-      npm_config_user_agent: 'yarn/1.22.22 npm/? node/v22',
-    });
+    const detector = new NodePackageManagerDetector();
 
-    assert.equal(detector.detect(), 'yarn');
+    assert.equal(
+      detector.detect({
+        npm_config_user_agent: 'yarn/1.22.22 npm/? node/v22',
+      }),
+      'yarn',
+    );
   });
 
   it('requires Node.js 22 or newer', () => {

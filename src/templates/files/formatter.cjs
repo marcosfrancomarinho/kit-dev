@@ -348,6 +348,42 @@ function addSemicolons(source, fileName = 'source.ts') {
   return result;
 }
 
+function expandCompactBlocks(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const insertions = new Set();
+
+  function visit(node) {
+    if (ts.isBlock(node) && node.statements.length > 0) {
+      const openBrace = node.getStart(sourceFile);
+      const closeBrace = node.getEnd() - 1;
+      const blockText = source.slice(openBrace, closeBrace + 1);
+
+      if (!blockText.includes('\n') && !blockText.includes('\r')) {
+        insertions.add(openBrace + 1);
+        insertions.add(closeBrace);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const position of [...insertions].sort((a, b) => b - a)) {
+    result = result.slice(0, position) + '\n' + result.slice(position);
+  }
+
+  return result;
+}
+
 function indentSource(source) {
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   const hadFinalNewline = source.endsWith('\n');
@@ -402,7 +438,9 @@ async function main() {
   for (const file of files) {
     const source = await readFile(file, 'utf8');
     const quoted = useSingleQuotes(source, file);
-    const formatted = indentSource(addSemicolons(quoted, file));
+    const withSemicolons = addSemicolons(quoted, file);
+    const expanded = expandCompactBlocks(withSemicolons, file);
+    const formatted = indentSource(expanded);
 
     if (formatted === source) continue;
 
@@ -428,6 +466,7 @@ if (require.main === module) {
 
 module.exports = {
   addSemicolons,
+  expandCompactBlocks,
   indentSource,
   useSingleQuotes,
 };

@@ -270,8 +270,7 @@ function isIdentifierReference(node, sourceFile) {
 
   if (
     ts.isPropertyAssignment(parent) &&
-    parent.name === node &&
-    !parent.initializer === node
+    parent.name === node
   ) {
     return false;
   }
@@ -342,11 +341,21 @@ function removeUnusedImports(source, fileName = 'source.ts') {
 
     if (!clause) continue;
 
+    const original = source.slice(
+      statement.getStart(sourceFile),
+      statement.getEnd(),
+    );
+
+    if (original.includes('//') || original.includes('/*')) {
+      continue;
+    }
+
     const moduleText = source.slice(
       statement.moduleSpecifier.getStart(sourceFile),
       statement.moduleSpecifier.getEnd(),
     );
     const parts = [];
+    let hasRuntimeBinding = Boolean(clause.name) && !clause.isTypeOnly;
 
     if (clause.name && references.has(clause.name.text)) {
       parts.push(clause.name.text);
@@ -355,11 +364,18 @@ function removeUnusedImports(source, fileName = 'source.ts') {
     if (clause.namedBindings) {
       if (ts.isNamespaceImport(clause.namedBindings)) {
         const local = clause.namedBindings.name.text;
+        hasRuntimeBinding = hasRuntimeBinding || !clause.isTypeOnly;
 
         if (references.has(local)) {
           parts.push('* as ' + local);
         }
       } else {
+        hasRuntimeBinding =
+          hasRuntimeBinding ||
+          clause.namedBindings.elements.some(
+            (element) => !clause.isTypeOnly && !element.isTypeOnly,
+          );
+
         const used = clause.namedBindings.elements.filter((element) =>
           references.has(element.name.text),
         );
@@ -383,7 +399,9 @@ function removeUnusedImports(source, fileName = 'source.ts') {
     let replacement;
 
     if (parts.length === 0) {
-      replacement = 'import ' + moduleText + ';';
+      replacement = hasRuntimeBinding
+        ? 'import ' + moduleText + ';'
+        : '';
     } else {
       const typePrefix = clause.isTypeOnly ? 'type ' : '';
       replacement =
@@ -394,11 +412,6 @@ function removeUnusedImports(source, fileName = 'source.ts') {
         moduleText +
         ';';
     }
-
-    const original = source.slice(
-      statement.getStart(sourceFile),
-      statement.getEnd(),
-    );
 
     if (replacement !== original) {
       replacements.push({

@@ -177,6 +177,68 @@ function scanStructure(line, state) {
 }
 
 
+
+function toSingleQuotedString(value) {
+  return (
+    "'" +
+    value
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\r/g, '\\r')
+      .replace(/\n/g, '\\n')
+      .replace(/\u2028/g, '\\u2028')
+      .replace(/\u2029/g, '\\u2029') +
+    "'"
+  );
+}
+
+function useSingleQuotes(source, fileName = 'source.ts') {
+  const scriptKind = /\.(?:js|jsx|mjs|cjs)$/i.test(fileName)
+    ? ts.ScriptKind.JS
+    : /\.tsx$/i.test(fileName)
+      ? ts.ScriptKind.TSX
+      : /\.jsx$/i.test(fileName)
+        ? ts.ScriptKind.JSX
+        : ts.ScriptKind.TS;
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKind,
+  );
+  const replacements = [];
+
+  function visit(node) {
+    if (ts.isStringLiteral(node)) {
+      const raw = source.slice(node.getStart(sourceFile), node.getEnd());
+
+      if (raw.startsWith('"') && raw.endsWith('"')) {
+        replacements.push({
+          start: node.getStart(sourceFile),
+          end: node.getEnd(),
+          value: toSingleQuotedString(node.text),
+        });
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, replacement.start) +
+      replacement.value +
+      result.slice(replacement.end);
+  }
+
+  return result;
+}
+
 function shouldEndWithSemicolon(node) {
   return (
     ts.isVariableStatement(node) ||
@@ -289,7 +351,8 @@ async function main() {
 
   for (const file of files) {
     const source = await readFile(file, 'utf8');
-    const formatted = indentSource(addSemicolons(source, file));
+    const quoted = useSingleQuotes(source, file);
+    const formatted = indentSource(addSemicolons(quoted, file));
 
     if (formatted === source) continue;
 
@@ -316,4 +379,5 @@ if (require.main === module) {
 module.exports = {
   addSemicolons,
   indentSource,
+  useSingleQuotes,
 };

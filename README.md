@@ -93,7 +93,7 @@ Run:
 npm run fmt
 ```
 
-The `fmt` command is lightweight and does not add an external formatting library. It only processes JavaScript and TypeScript files in `src/` and `test/`, fixing indentation, adding semicolons to recognized statements, and converting double-quoted strings to single quotes. Backtick template strings, regexes, comments, and quoted JSX attributes are left unchanged.
+The `fmt` command is lightweight and does not add an external formatting library. It only processes JavaScript and TypeScript files in `src/` and `test/`, fixing indentation, expanding compact code blocks such as `function teste(){console.log()}`, adding semicolons to recognized statements, and converting double-quoted strings to single quotes. Object literals are not expanded. Backtick template strings, regexes, comments, and quoted JSX attributes are left unchanged.
 
 ## Automatic tests
 

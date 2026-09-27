@@ -1,0 +1,183 @@
+export class ProjectTemplateCatalog {
+  packageJson(projectName: string): string {
+    return JSON.stringify(
+      {
+        name: projectName,
+        version: '1.0.0',
+        type: 'module',
+        main: 'src/main.ts',
+        scripts: {
+          start: 'node --enable-source-maps dist/bundle.cjs',
+          dev: 'node kit-dev/build/dev.cjs',
+          build: 'node kit-dev/build/esbuild.config.cjs',
+          type: 'tsc --watch --noEmit',
+          test: 'node kit-dev/test/test.cjs',
+          di: 'node kit-dev/di/install.cjs',
+        },
+        dependencies: {},
+        devDependencies: {},
+        engines: {
+          node: '>=22',
+        },
+        license: 'MIT',
+      },
+      null,
+      2,
+    );
+  }
+
+  tsconfig(): string {
+    return JSON.stringify(
+      {
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
+          rootDir: './src',
+          outDir: './dist',
+          strict: true,
+          esModuleInterop: true,
+          skipLibCheck: true,
+          forceConsistentCasingInFileNames: true,
+          types: ['node'],
+        },
+        include: ['src'],
+      },
+      null,
+      2,
+    );
+  }
+
+  mainFile(): string {
+    return "console.log('Hello World!');";
+  }
+
+  exampleTest(): string {
+    return [
+      "import assert from 'node:assert/strict'",
+      "import { describe, it } from 'node:test'",
+      '',
+      "describe('addition', () => {",
+      "  it('should sum two numbers', () => {",
+      '    const result = 1 + 1',
+      '',
+      '    assert.equal(result, 2)',
+      '  })',
+      '})',
+      '',
+    ].join('\n');
+  }
+
+  esbuildConfig(): string {
+    return [
+      "const { execSync } = require('child_process');",
+      "const { resolve } = require('path');",
+      "const { build } = require('esbuild');",
+      "const { kitDevDiPlugin } = require('../di/transformer.cjs');",
+      '',
+      "const projectRoot = resolve(__dirname, '..', '..');",
+      "const { dependencies = {}, devDependencies = {}, main } = require(resolve(projectRoot, 'package.json'));",
+      '',
+      'const buildOptions = {',
+      '  absWorkingDir: projectRoot,',
+      '  entryPoints: [main],',
+      '  bundle: true,',
+      "  outfile: resolve(projectRoot, 'dist', 'bundle.cjs'),",
+      '  minifySyntax: true,',
+      '  minifyWhitespace: true,',
+      '  minifyIdentifiers: false,',
+      '  keepNames: true,',
+      '  sourcemap: true,',
+      '  metafile: true,',
+      "  logLevel: 'warning',",
+      "  platform: 'node',",
+      "  format: 'cjs',",
+      '  external: [...Object.keys(dependencies), ...Object.keys(devDependencies)],',
+      '  target: ["node22"],',
+      '  plugins: [kitDevDiPlugin()],',
+      '};',
+      '',
+      'function checkTypes() {',
+      "  console.log('\\n🔎 TypeScript');",
+      '',
+      '  try {',
+      "    execSync('tsc --noEmit', {",
+      '      cwd: projectRoot,',
+      "      stdio: 'inherit',",
+      '    });',
+      '  } catch {',
+      "    console.error('\\n❌ Build cancelled: TypeScript errors found.');",
+      '    return false;',
+      '  }',
+      '',
+      "  console.log('✅ No type errors');",
+      '  return true;',
+      '}',
+      '',
+      'function formatBytes(bytes) {',
+      "  if (bytes < 1024) return bytes + ' B';",
+      "  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';",
+      "  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';",
+      '}',
+      '',
+      'function printBundleAnalysis(metafile) {',
+      '  const outputs = Object.entries(metafile.outputs);',
+      '  const bundleEntry = outputs.find(([file, output]) =>',
+      "    output.entryPoint && !file.endsWith('.map'),",
+      '  );',
+      '',
+      '  if (!bundleEntry) return;',
+      '',
+      '  const [, bundleOutput] = bundleEntry;',
+      '',
+      "  console.log('\\n📊 Bundle analysis');",
+      "  console.log('Size: ' + formatBytes(bundleOutput.bytes));",
+      "  console.log('Inputs: ' + Object.keys(metafile.inputs).length);",
+      '}',
+      '',
+      'async function runBuild() {',
+      '  const startedAt = Date.now();',
+      '',
+      '  if (!checkTypes()) {',
+      '    process.exitCode = 1;',
+      '    return;',
+      '  }',
+      '',
+      "  console.log('\\n📦 Build');",
+      '  const result = await build(buildOptions);',
+      "  console.log('✅ Generated files:');",
+      "  console.log('   📄 dist/bundle.cjs');",
+      "  console.log('   🗺️  dist/bundle.cjs.map');",
+      '  printBundleAnalysis(result.metafile);',
+      "  console.log('\\n⚡ Completed in ' + (Date.now() - startedAt) + 'ms');",
+      '}',
+      '',
+      'if (require.main === module) {',
+      '  runBuild().catch((error) => {',
+      "    console.error('\\n❌ Build failed');",
+      '    if (error && error.message) console.error(error.message);',
+      '    process.exitCode = 1;',
+      '  });',
+      '}',
+      '',
+      'module.exports = { buildOptions };',
+      '',
+    ].join('\n');
+  }
+
+  gitignore(): string {
+    return [
+      'node_modules/',
+      'dist/',
+      '.env',
+      '*.log',
+      '.vscode/',
+      '.idea/',
+      '.DS_Store',
+      '*.tsbuildinfo',
+      'kit-dev/build/.cache/',
+      'kit-dev/test/.cache/',
+      '',
+    ].join('\n');
+  }
+}

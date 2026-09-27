@@ -713,7 +713,7 @@ function formatDelimitedListsOnce(
   function visit(node, depth = 0) {
     const info = listFormattingInfo(node);
 
-    if (info && info.items.length > 0) {
+    if (info && info.items.length > 0 && !info.items.hasTrailingComma) {
       const interiorStart = info.items.pos;
       const interiorEnd = info.items.end;
       const rawInterior = source.slice(interiorStart, interiorEnd);

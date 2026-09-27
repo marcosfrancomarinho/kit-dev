@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ProjectScaffolder } from '../../application/ports/project-scaffolder.js';
@@ -127,7 +128,26 @@ export class ProjectPaths {
   }
 
   templates(): string {
-    return join(__dirname, '..', '..', 'templates', 'files');
+    const productionPath = join(
+      __dirname,
+      '..',
+      'src',
+      'templates',
+      'files',
+    );
+    const developmentPath = join(
+      __dirname,
+      '..',
+      '..',
+      '..',
+      'src',
+      'templates',
+      'files',
+    );
+
+    return existsSync(productionPath)
+      ? productionPath
+      : developmentPath;
   }
 
   directories(): string[] {

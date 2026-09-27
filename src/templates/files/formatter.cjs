@@ -247,6 +247,180 @@ function convertDoubleQuotedLiteral(raw) {
   return result + "'";
 }
 
+function isIdentifierReference(node, sourceFile) {
+  const parent = node.parent;
+
+  if (!parent) return true;
+
+  if (
+    ts.isImportClause(parent) ||
+    ts.isImportSpecifier(parent) ||
+    ts.isNamespaceImport(parent) ||
+    ts.isImportEqualsDeclaration(parent)
+  ) {
+    return false;
+  }
+
+  if (
+    ts.isPropertyAccessExpression(parent) &&
+    parent.name === node
+  ) {
+    return false;
+  }
+
+  if (
+    ts.isPropertyAssignment(parent) &&
+    parent.name === node &&
+    !parent.initializer === node
+  ) {
+    return false;
+  }
+
+  if (
+    (ts.isPropertyDeclaration(parent) ||
+      ts.isPropertySignature(parent) ||
+      ts.isMethodDeclaration(parent) ||
+      ts.isMethodSignature(parent)) &&
+    parent.name === node
+  ) {
+    return false;
+  }
+
+  if (
+    ts.isBindingElement(parent) &&
+    parent.propertyName === node
+  ) {
+    return false;
+  }
+
+  if (
+    ts.isLabeledStatement(parent) ||
+    ts.isBreakStatement(parent) ||
+    ts.isContinueStatement(parent)
+  ) {
+    return false;
+  }
+
+  return node.getSourceFile() === sourceFile;
+}
+
+function collectReferencedIdentifiers(sourceFile) {
+  const references = new Set();
+
+  function visit(node) {
+    if (ts.isIdentifier(node) && isIdentifierReference(node, sourceFile)) {
+      references.add(node.text);
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) {
+      visit(statement);
+    }
+  }
+
+  return references;
+}
+
+function removeUnusedImports(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const references = collectReferencedIdentifiers(sourceFile);
+  const replacements = [];
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+
+    const clause = statement.importClause;
+
+    if (!clause) continue;
+
+    const moduleText = source.slice(
+      statement.moduleSpecifier.getStart(sourceFile),
+      statement.moduleSpecifier.getEnd(),
+    );
+    const parts = [];
+
+    if (clause.name && references.has(clause.name.text)) {
+      parts.push(clause.name.text);
+    }
+
+    if (clause.namedBindings) {
+      if (ts.isNamespaceImport(clause.namedBindings)) {
+        const local = clause.namedBindings.name.text;
+
+        if (references.has(local)) {
+          parts.push('* as ' + local);
+        }
+      } else {
+        const used = clause.namedBindings.elements.filter((element) =>
+          references.has(element.name.text),
+        );
+
+        if (used.length > 0) {
+          const names = used.map((element) => {
+            const imported = element.propertyName?.text;
+            const local = element.name.text;
+            const typePrefix = element.isTypeOnly ? 'type ' : '';
+
+            return imported && imported !== local
+              ? typePrefix + imported + ' as ' + local
+              : typePrefix + local;
+          });
+
+          parts.push('{ ' + names.join(', ') + ' }');
+        }
+      }
+    }
+
+    let replacement;
+
+    if (parts.length === 0) {
+      replacement = 'import ' + moduleText + ';';
+    } else {
+      const typePrefix = clause.isTypeOnly ? 'type ' : '';
+      replacement =
+        'import ' +
+        typePrefix +
+        parts.join(', ') +
+        ' from ' +
+        moduleText +
+        ';';
+    }
+
+    const original = source.slice(
+      statement.getStart(sourceFile),
+      statement.getEnd(),
+    );
+
+    if (replacement !== original) {
+      replacements.push({
+        start: statement.getStart(sourceFile),
+        end: statement.getEnd(),
+        value: replacement,
+      });
+    }
+  }
+
+  let result = source;
+
+  for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, replacement.start) +
+      replacement.value +
+      result.slice(replacement.end);
+  }
+
+  return result;
+}
+
 function useSingleQuotes(source, fileName = 'source.ts') {
   const sourceFile = ts.createSourceFile(
     fileName,
@@ -437,7 +611,8 @@ async function main() {
 
   for (const file of files) {
     const source = await readFile(file, 'utf8');
-    const quoted = useSingleQuotes(source, file);
+    const withoutUnusedImports = removeUnusedImports(source, file);
+    const quoted = useSingleQuotes(withoutUnusedImports, file);
     const withSemicolons = addSemicolons(quoted, file);
     const expanded = expandCompactBlocks(withSemicolons, file);
     const formatted = indentSource(expanded);
@@ -468,5 +643,6 @@ module.exports = {
   addSemicolons,
   expandCompactBlocks,
   indentSource,
+  removeUnusedImports,
   useSingleQuotes,
 };

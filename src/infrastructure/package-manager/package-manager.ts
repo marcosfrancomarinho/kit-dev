@@ -39,11 +39,11 @@ export class PackageManagerRegistry {
 }
 
 export class NodePackageManagerDetector implements PackageManagerDetector {
-  constructor(private readonly environment: NodeJS.ProcessEnv = process.env) {}
+  private readonly environment = process.env;
 
-  detect(): PackageManagerName {
-    const execPath = this.environment.npm_execpath ?? '';
-    const userAgent = this.environment.npm_config_user_agent ?? '';
+  detect(environment: NodeJS.ProcessEnv = this.environment): PackageManagerName {
+    const execPath = environment.npm_execpath ?? '';
+    const userAgent = environment.npm_config_user_agent ?? '';
 
     if (userAgent.startsWith('pnpm')) return 'pnpm';
     if (userAgent.startsWith('yarn')) return 'yarn';

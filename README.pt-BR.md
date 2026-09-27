@@ -144,29 +144,21 @@ yarn di
 
 Depois da instalação, o projeto passa a ter o container e o arquivo `src/di/providers.ts`. O script `di` é removido porque a configuração já foi instalada.
 
-### Exemplo básico
+### Fluxo básico
 
-Contrato:
+Um caso comum é uma classe depender de um repository por interface.
 
 ```ts
 export interface UserRepository {
   save(name: string): Promise<void>
 }
-```
 
-Implementação:
-
-```ts
 export class UserRepositoryMemory implements UserRepository {
   async save(name: string): Promise<void> {
     console.log(name)
   }
 }
-```
 
-Caso de uso:
-
-```ts
 export class CreateUser {
   constructor(
     private readonly repository: UserRepository,
@@ -182,9 +174,8 @@ Registro:
 
 ```ts
 const providers = new AppConfig()
-
-providers.useClass<UserRepository>(UserRepositoryMemory)
-providers.useClass(CreateUser)
+  .useClass<UserRepository>(UserRepositoryMemory)
+  .useClass(CreateUser)
 
 export const container = createApplicationContext(providers)
 ```
@@ -197,11 +188,214 @@ const createUser = container.get(CreateUser)
 await createUser.execute('Marcos')
 ```
 
-Para dependências normais de classes, prefira `useClass()`. O Kit Dev consegue inferir dependências do construtor quando os tipos são suportados.
+O Kit Dev consegue inferir a dependência do construtor e ligar o contrato à implementação registrada.
 
-Use `useFactory()` quando a criação realmente precisar de lógica personalizada.
+### `useClass()`
 
-### Formas de registro
+É a forma principal de registrar classes.
+
+Classe concreta:
+
+```ts
+providers.useClass(Logger)
+providers.useClass(UserService)
+```
+
+Interface como contrato:
+
+```ts
+providers.useClass<UserRepository>(UserRepositoryDatabase)
+```
+
+Classe abstrata como token:
+
+```ts
+export abstract class UserRepository {
+  abstract save(name: string): Promise<void>
+}
+
+export class UserRepositoryDatabase extends UserRepository {
+  async save(name: string): Promise<void> {
+    // ...
+  }
+}
+
+providers.useClass(UserRepository, UserRepositoryDatabase)
+```
+
+### Dependências manuais com `[]`
+
+Quando o Kit Dev não consegue inferir uma dependência, informe os tokens manualmente na mesma ordem do construtor.
+
+```ts
+const APP_NAME = createToken<string>('APP_NAME')
+
+class ConfigService {
+  constructor(readonly appName: string) {}
+}
+
+providers.useValue(APP_NAME, 'Minha API')
+providers.useClass(ConfigService, [APP_NAME])
+```
+
+Também funciona ao registrar uma interface ou classe abstrata:
+
+```ts
+providers.useClass<UserRepository>(
+  UserRepositoryDatabase,
+  [DATABASE],
+)
+```
+
+### `createToken<T>()`
+
+Use tokens quando a dependência não possui uma classe que possa representá-la em runtime.
+
+```ts
+const DATABASE_URL = createToken<string>('DATABASE_URL')
+const PORT = createToken<number>('PORT')
+
+providers.useValue(DATABASE_URL, process.env.DATABASE_URL!)
+providers.useValue(PORT, 3000)
+```
+
+Sempre reutilize a mesma constante do token.
+
+### `useValue()`
+
+Use quando o valor ou a instância já existe.
+
+```ts
+const APP_NAME = createToken<string>('APP_NAME')
+
+providers.useValue(APP_NAME, 'Kit Dev')
+providers.useValue(Logger, new Logger())
+```
+
+### `useFactory()`
+
+Use quando a criação precisa de lógica personalizada.
+
+```ts
+const DATABASE_URL = createToken<string>('DATABASE_URL')
+
+providers.useValue(
+  DATABASE_URL,
+  process.env.DATABASE_URL!,
+)
+
+providers.useFactory(Database, (container) => {
+  const url = container.get(DATABASE_URL)
+
+  return new Database(url)
+})
+```
+
+Use `useClass()` quando a criação for simples. Use `useFactory()` quando você realmente precisar controlar como a instância será criada.
+
+### `useExisting()`
+
+Use para fazer dois tokens apontarem para a mesma instância.
+
+```ts
+const PRIMARY_DATABASE =
+  createToken<Database>('PRIMARY_DATABASE')
+
+providers.useClass(Database)
+providers.useExisting(PRIMARY_DATABASE, Database)
+```
+
+### `imports()`
+
+Você pode dividir os registros por módulos.
+
+```ts
+// database-providers.ts
+export const databaseProviders = new AppConfig()
+  .useValue(DATABASE_URL, process.env.DATABASE_URL!)
+  .useClass(Database, [DATABASE_URL])
+```
+
+```ts
+// user-providers.ts
+export const userProviders = new AppConfig()
+  .useClass<UserRepository>(UserRepositoryDatabase)
+  .useClass(CreateUser)
+```
+
+Depois combine tudo no arquivo principal:
+
+```ts
+const providers = new AppConfig()
+  .imports(
+    databaseProviders,
+    userProviders,
+  )
+
+export const container =
+  createApplicationContext(providers)
+```
+
+### Scopes
+
+O scope padrão é `singleton`.
+
+```ts
+providers.useClass(Database)
+```
+
+A instância é criada na primeira resolução e reutilizada:
+
+```ts
+const first = container.get(Database)
+const second = container.get(Database)
+
+console.log(first === second) // true
+```
+
+Para criar uma nova instância em cada resolução, use `transient`:
+
+```ts
+providers.useClass(
+  RequestContext,
+  [],
+  { scope: 'transient' },
+)
+```
+
+Também funciona com factory e registros por contrato:
+
+```ts
+providers.useFactory(
+  RequestId,
+  () => new RequestId(),
+  { scope: 'transient' },
+)
+
+providers.useClass<UserRepository>(
+  UserRepositoryMemory,
+  [],
+  { scope: 'transient' },
+)
+```
+
+### Métodos do container
+
+```ts
+container.get(Service)
+container.getOptional(Service)
+container.has(Service)
+container.clearInstances()
+await container.close()
+```
+
+- `get()` resolve uma dependência;
+- `getOptional()` retorna `undefined` quando ela não existe;
+- `has()` verifica se um token está registrado;
+- `clearInstances()` limpa instâncias em cache sem apagar os providers;
+- `close()` encerra recursos que tenham `dispose()` ou `close()`.
+
+### Resumo dos registros
 
 | Método | Quando usar |
 |---|---|
@@ -212,17 +406,6 @@ Use `useFactory()` quando a criação realmente precisar de lógica personalizad
 | `createToken<T>()` | A dependência não possui classe em runtime |
 | `imports()` | Você quer separar providers por módulos |
 
-O escopo padrão é `singleton`. Use `transient` quando precisar de uma nova instância em cada resolução.
-
-Métodos úteis do container:
-
-```ts
-container.get(Service)
-container.getOptional(Service)
-container.has(Service)
-container.clearInstances()
-await container.close()
-```
 
 ## Estrutura gerada
 

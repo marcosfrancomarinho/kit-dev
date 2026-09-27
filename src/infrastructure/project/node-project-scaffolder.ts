@@ -4,6 +4,7 @@ import type { ProjectScaffolder } from '../../application/ports/project-scaffold
 import type { Terminal } from '../../application/ports/terminal.js';
 import { ProjectTemplateCatalog } from '../../templates/project-files.js';
 import { ProjectPaths } from './project-paths.js';
+import { ProjectPaths } from './project-paths.js';
 
 export class NodeProjectScaffolder implements ProjectScaffolder {
   constructor(

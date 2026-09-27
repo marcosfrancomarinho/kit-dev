@@ -99,7 +99,7 @@ npm run fmt -- src/application/create-user.ts
 ```
 
 
-The `fmt` command is lightweight and does not add an external formatting library. It only processes JavaScript and TypeScript files in `src/` and `test/`, fixing indentation, expanding compact code blocks such as `function teste(){console.log()}`, adding semicolons to recognized statements, and converting double-quoted strings to single quotes. Object literals are not expanded. The command also removes import bindings confirmed as unused and removes an import declaration entirely when none of its bindings are used. Imports originally written only for side effects, such as `import './setup';`, are preserved. Unused `import type` declarations are removed without creating runtime imports. Imports containing internal comments are not rewritten. Backtick template strings, regexes, comments, and quoted JSX attributes are left unchanged.
+The `fmt` command is lightweight and does not add an external formatting library. It only processes JavaScript and TypeScript files in `src/` and `test/`, fixing indentation, expanding compact code blocks such as `function teste(){console.log()}`, adding semicolons to recognized statements, converting double-quoted strings to single quotes, separating independent statements that share one line, compacting short multiline calls, and expanding medium or large arrays, objects, argument lists, function parameters, constructor parameters, destructuring lists, and named import/export lists when needed for readability. The formatter preserves comments, template strings, regexes, JSX quoted attributes, trailing-comma multiline lists, and `for` statement semicolons. It also removes import bindings confirmed as unused and removes an import declaration entirely when none of its bindings are used.
 
 ## Automatic tests
 
@@ -308,6 +308,8 @@ providers.useClass<UserRepository>(
 Use tokens when a dependency has no runtime class.
 
 ```ts
+import { createToken } from '../../kit-dev/di/container.js'
+
 const DATABASE_URL = createToken<string>('DATABASE_URL')
 const PORT = createToken<number>('PORT')
 

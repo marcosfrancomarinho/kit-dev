@@ -86,9 +86,14 @@ async function runTests() {
 
   testProcess = child;
 
-  child.once('exit', () => {
+  child.once('exit', (code) => {
     if (testProcess === child) {
       testProcess = undefined;
+    }
+
+    if (process.env.CI) {
+      close(code ?? 1).catch(fail);
+      return;
     }
 
     if (!closing) {
@@ -179,7 +184,7 @@ function scheduleStructureRefresh() {
   }, 100);
 }
 
-async function close() {
+async function close(exitCode = 0) {
   if (closing) return;
   closing = true;
 
@@ -191,7 +196,7 @@ async function close() {
     await buildContext.dispose();
   }
 
-  process.exit(0);
+  process.exit(exitCode);
 }
 
 function fail(error) {

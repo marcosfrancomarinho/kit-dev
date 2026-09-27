@@ -27,11 +27,26 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
+      - name: Install Yarn
+        run: npm install --global yarn@1.22.22
+
       - name: Install dependencies
-        run: npm install
+        run: yarn install --non-interactive
 
       - name: Test
-        run: npm test
+        run: yarn test
+
+      - name: Build
+        run: yarn build
 
       - name: Check package
         run: npm pack --dry-run
+
+      - name: Upload bundle
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 22
+        uses: actions/upload-artifact@v4
+        with:
+          name: kit-dev-bundle
+          path: |
+            dist/bundle.cjs
+            dist/bundle.cjs.map

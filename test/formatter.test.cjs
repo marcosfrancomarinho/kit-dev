@@ -5,6 +5,7 @@ const {
   addSemicolons,
   compactShortCalls,
   expandCompactBlocks,
+  formatDelimitedLists,
   formatSource,
   indentSource,
   removeUnusedImports,
@@ -130,10 +131,10 @@ describe('source formatter', () => {
     assert.equal(
       splitSameLineStatements(source, 'example.ts'),
       [
-        "const first = 'first'; ",
+        "const first = 'first';",
         "const last = 'last';",
-        'let one = 1; ',
-        'let two = 2; ',
+        'let one = 1;',
+        'let two = 2;',
         'let three = 3;',
         '',
       ].join('\n'),
@@ -151,8 +152,8 @@ describe('source formatter', () => {
 
     const result = splitSameLineStatements(source, 'example.ts');
 
-    assert.match(result, /const first = 'first'; \nconst last = 'last';/);
-    assert.match(result, /console\.log\(first\); \nconsole\.log\(last\);/);
+    assert.match(result, /const first = 'first';\nconst last = 'last';/);
+    assert.match(result, /console\.log\(first\);\nconsole\.log\(last\);/);
   });
 
   it('does not split semicolons that belong to for statements', () => {
@@ -345,6 +346,186 @@ describe('source formatter', () => {
 
     assert.match(result, /title="hello"/);
     assert.match(result, /const first = 'first';\n  const last = 'last';/);
+  });
+
+
+  it('formats medium and large arrays vertically', () => {
+    const source = [
+      "const values = ['one', 'two', 'three', 'four'];",
+      '',
+    ].join('\n');
+
+    assert.equal(
+      formatSource(source, 'example.ts'),
+      [
+        'const values = [',
+        "  'one',",
+        "  'two',",
+        "  'three',",
+        "  'four'",
+        '];',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('formats medium objects with one property per line', () => {
+    const source = [
+      "const user = { name: 'Marcos', age: 27, active: true };",
+      '',
+    ].join('\n');
+
+    assert.equal(
+      formatSource(source, 'example.ts'),
+      [
+        'const user = {',
+        "  name: 'Marcos',",
+        '  age: 27,',
+        '  active: true',
+        '};',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('formats long function parameters vertically', () => {
+    const source = [
+      'function createUser(name: string, email: string, age: number, active: boolean) {',
+      'return name',
+      '}',
+      '',
+    ].join('\n');
+
+    assert.equal(
+      formatSource(source, 'example.ts'),
+      [
+        'function createUser(',
+        '  name: string,',
+        '  email: string,',
+        '  age: number,',
+        '  active: boolean',
+        ') {',
+        '  return name;',
+        '}',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('formats constructor parameters vertically', () => {
+    const source = [
+      'class User {',
+      'constructor(name: string, email: string, age: number, active: boolean) {}',
+      '}',
+      '',
+    ].join('\n');
+
+    assert.equal(
+      formatSource(source, 'example.ts'),
+      [
+        'class User {',
+        '  constructor(',
+        '    name: string,',
+        '    email: string,',
+        '    age: number,',
+        '    active: boolean',
+        '  ) {}',
+        '}',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('formats long call arguments vertically', () => {
+    const source = [
+      "createUser('Marcos', 'marcos@example.com', 27, true);",
+      '',
+    ].join('\n');
+
+    assert.equal(
+      formatSource(source, 'example.ts'),
+      [
+        'createUser(',
+        "  'Marcos',",
+        "  'marcos@example.com',",
+        '  27,',
+        '  true',
+        ');',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('formats nested arrays and objects without corrupting nesting', () => {
+    const source = [
+      "const data = [{ name: 'A', age: 1, active: true }, { name: 'B', age: 2, active: false }, { name: 'C', age: 3, active: true }, { name: 'D', age: 4, active: false }];",
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /const data = \[/);
+    assert.match(result, /name: 'A'/);
+    assert.match(result, /name: 'D'/);
+    assert.doesNotMatch(result, /undefined/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('keeps small arrays and objects compact', () => {
+    const source = [
+      "const pair = ['a', 'b'];",
+      "const user = { name: 'Marcos', active: true };",
+      '',
+    ].join('\n');
+
+    assert.equal(formatSource(source, 'example.ts'), source);
+  });
+
+  it('preserves trailing commas in multiline lists', () => {
+    const source = [
+      'const values = [',
+      "  'one',",
+      "  'two',",
+      '];',
+      'run(',
+      "  'one',",
+      "  'two',",
+      ');',
+      '',
+    ].join('\n');
+
+    assert.equal(formatDelimitedLists(source, 'example.ts'), source);
+  });
+
+  it('preserves comments inside arrays objects parameters and calls', () => {
+    const source = [
+      'const values = [1, 2, /* keep */ 3, 4];',
+      "const user = { name: 'Marcos', /* keep */ age: 27, active: true };",
+      'function run(first: string, /* keep */ second: string, third: string, fourth: string) {}',
+      "createUser('a', 'b', /* keep */ 'c', 'd');",
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /\/\* keep \*\//);
+    assert.match(result, /const values = \[1, 2, \/\* keep \*\/ 3, 4\];/);
+    assert.match(result, /function run\(first: string, \/\* keep \*\/ second: string, third: string, fourth: string\)/);
+  });
+
+  it('formats object and array destructuring safely', () => {
+    const source = [
+      'const { first, second, third, fourth } = source;',
+      'const [one, two, three, four] = values;',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /const \{/);
+    assert.match(result, /first,/);
+    assert.match(result, /const \[/);
+    assert.equal(formatSource(result, 'example.ts'), result);
   });
 
   it('removes unused import bindings and fully unused imports', () => {

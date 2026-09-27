@@ -1,6 +1,6 @@
 const { readdir, readFile, writeFile } = require('node:fs/promises');
 const { createRequire } = require('node:module');
-const { join, relative } = require('node:path');
+const { isAbsolute, join, relative, resolve, sep } = require('node:path');
 
 const projectRoot = join(__dirname, '..', '..');
 const roots = [
@@ -247,6 +247,193 @@ function convertDoubleQuotedLiteral(raw) {
   return result + "'";
 }
 
+function isIdentifierReference(node, sourceFile) {
+  const parent = node.parent;
+
+  if (!parent) return true;
+
+  if (
+    ts.isImportClause(parent) ||
+    ts.isImportSpecifier(parent) ||
+    ts.isNamespaceImport(parent) ||
+    ts.isImportEqualsDeclaration(parent)
+  ) {
+    return false;
+  }
+
+  if (
+    ts.isPropertyAccessExpression(parent) &&
+    parent.name === node
+  ) {
+    return false;
+  }
+
+  if (
+    ts.isPropertyAssignment(parent) &&
+    parent.name === node
+  ) {
+    return false;
+  }
+
+  if (
+    (ts.isPropertyDeclaration(parent) ||
+      ts.isPropertySignature(parent) ||
+      ts.isMethodDeclaration(parent) ||
+      ts.isMethodSignature(parent)) &&
+    parent.name === node
+  ) {
+    return false;
+  }
+
+  if (
+    ts.isBindingElement(parent) &&
+    parent.propertyName === node
+  ) {
+    return false;
+  }
+
+  if (
+    ts.isLabeledStatement(parent) ||
+    ts.isBreakStatement(parent) ||
+    ts.isContinueStatement(parent)
+  ) {
+    return false;
+  }
+
+  return node.getSourceFile() === sourceFile;
+}
+
+function collectReferencedIdentifiers(sourceFile) {
+  const references = new Set();
+
+  function visit(node) {
+    if (ts.isIdentifier(node) && isIdentifierReference(node, sourceFile)) {
+      references.add(node.text);
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) {
+      visit(statement);
+    }
+  }
+
+  return references;
+}
+
+function removeUnusedImports(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const references = collectReferencedIdentifiers(sourceFile);
+  const replacements = [];
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+
+    const clause = statement.importClause;
+
+    if (!clause) continue;
+
+    const original = source.slice(
+      statement.getStart(sourceFile),
+      statement.getEnd(),
+    );
+
+    if (original.includes('//') || original.includes('/*')) {
+      continue;
+    }
+
+    const moduleText = source.slice(
+      statement.moduleSpecifier.getStart(sourceFile),
+      statement.moduleSpecifier.getEnd(),
+    );
+    const parts = [];
+    let hasRuntimeBinding = Boolean(clause.name) && !clause.isTypeOnly;
+
+    if (clause.name && references.has(clause.name.text)) {
+      parts.push(clause.name.text);
+    }
+
+    if (clause.namedBindings) {
+      if (ts.isNamespaceImport(clause.namedBindings)) {
+        const local = clause.namedBindings.name.text;
+        hasRuntimeBinding = hasRuntimeBinding || !clause.isTypeOnly;
+
+        if (references.has(local)) {
+          parts.push('* as ' + local);
+        }
+      } else {
+        hasRuntimeBinding =
+          hasRuntimeBinding ||
+          clause.namedBindings.elements.some(
+            (element) => !clause.isTypeOnly && !element.isTypeOnly,
+          );
+
+        const used = clause.namedBindings.elements.filter((element) =>
+          references.has(element.name.text),
+        );
+
+        if (used.length > 0) {
+          const names = used.map((element) => {
+            const imported = element.propertyName?.text;
+            const local = element.name.text;
+            const typePrefix = element.isTypeOnly ? 'type ' : '';
+
+            return imported && imported !== local
+              ? typePrefix + imported + ' as ' + local
+              : typePrefix + local;
+          });
+
+          parts.push('{ ' + names.join(', ') + ' }');
+        }
+      }
+    }
+
+    let replacement;
+
+    if (parts.length === 0) {
+      replacement = hasRuntimeBinding
+        ? 'import ' + moduleText + ';'
+        : '';
+    } else {
+      const typePrefix = clause.isTypeOnly ? 'type ' : '';
+      replacement =
+        'import ' +
+        typePrefix +
+        parts.join(', ') +
+        ' from ' +
+        moduleText +
+        ';';
+    }
+
+    if (replacement !== original) {
+      replacements.push({
+        start: statement.getStart(sourceFile),
+        end: statement.getEnd(),
+        value: replacement,
+      });
+    }
+  }
+
+  let result = source;
+
+  for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, replacement.start) +
+      replacement.value +
+      result.slice(replacement.end);
+  }
+
+  return result;
+}
+
 function useSingleQuotes(source, fileName = 'source.ts') {
   const sourceFile = ts.createSourceFile(
     fileName,
@@ -348,6 +535,42 @@ function addSemicolons(source, fileName = 'source.ts') {
   return result;
 }
 
+function expandCompactBlocks(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const insertions = new Set();
+
+  function visit(node) {
+    if (ts.isBlock(node) && node.statements.length > 0) {
+      const openBrace = node.getStart(sourceFile);
+      const closeBrace = node.getEnd() - 1;
+      const blockText = source.slice(openBrace, closeBrace + 1);
+
+      if (!blockText.includes('\n') && !blockText.includes('\r')) {
+        insertions.add(openBrace + 1);
+        insertions.add(closeBrace);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const position of [...insertions].sort((a, b) => b - a)) {
+    result = result.slice(0, position) + '\n' + result.slice(position);
+  }
+
+  return result;
+}
+
 function indentSource(source) {
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   const hadFinalNewline = source.endsWith('\n');
@@ -387,7 +610,67 @@ function indentSource(source) {
   return result;
 }
 
+function isInsideAllowedRoots(path) {
+  const normalized = resolve(path);
+
+  return roots.some((root) => {
+    const normalizedRoot = resolve(root);
+    return (
+      normalized === normalizedRoot ||
+      normalized.startsWith(normalizedRoot + sep)
+    );
+  });
+}
+
+function resolveTarget(target) {
+  const candidate = isAbsolute(target)
+    ? resolve(target)
+    : resolve(projectRoot, target);
+
+  if (!isInsideAllowedRoots(candidate)) {
+    throw new Error('fmt only accepts files inside src/ or test/.');
+  }
+
+  if (!supported.test(candidate)) {
+    throw new Error(
+      'fmt only supports JavaScript and TypeScript source files.',
+    );
+  }
+
+  return candidate;
+}
+
+async function formatFile(file) {
+  const source = await readFile(file, 'utf8');
+  const withoutUnusedImports = removeUnusedImports(source, file);
+  const quoted = useSingleQuotes(withoutUnusedImports, file);
+  const withSemicolons = addSemicolons(quoted, file);
+  const expanded = expandCompactBlocks(withSemicolons, file);
+  const formatted = indentSource(expanded);
+
+  if (formatted === source) {
+    return false;
+  }
+
+  await writeFile(file, formatted, 'utf8');
+  console.log('✨ ' + relative(projectRoot, file));
+  return true;
+}
+
 async function main() {
+  const target = process.argv[2];
+
+  if (target) {
+    const file = resolveTarget(target);
+    const changed = await formatFile(file);
+
+    if (!changed) {
+      console.log('✨ ' + relative(projectRoot, file) + ' is already formatted.');
+    }
+
+    return;
+  }
+
   const files = (
     await Promise.all(roots.map((root) => collectFiles(root)))
   ).flat().sort();
@@ -400,15 +683,9 @@ async function main() {
   let changed = 0;
 
   for (const file of files) {
-    const source = await readFile(file, 'utf8');
-    const quoted = useSingleQuotes(source, file);
-    const formatted = indentSource(addSemicolons(quoted, file));
-
-    if (formatted === source) continue;
-
-    await writeFile(file, formatted, 'utf8');
-    changed += 1;
-    console.log('✨ ' + relative(projectRoot, file));
+    if (await formatFile(file)) {
+      changed += 1;
+    }
   }
 
   console.log(
@@ -428,6 +705,9 @@ if (require.main === module) {
 
 module.exports = {
   addSemicolons,
+  expandCompactBlocks,
   indentSource,
+  removeUnusedImports,
+  resolveTarget,
   useSingleQuotes,
 };

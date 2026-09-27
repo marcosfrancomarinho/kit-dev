@@ -68,7 +68,7 @@ pnpm dev
 | `dev` | Runs the application and watches for changes |
 | `test` | Runs tests in watch mode |
 | `test <file>` | Generates or updates a test for a class |
-| `fmt` | Formats JavaScript/TypeScript files in `src/` and `test/`: indentation, `;` and single quotes |
+| `fmt [file]` | Formats all of `src/` and `test/` or only one provided file |
 | `build` | Checks types and creates the production bundle |
 | `start` | Runs the generated bundle |
 | `type` | Watches TypeScript errors |
@@ -92,8 +92,14 @@ Run:
 ```bash
 npm run fmt
 ```
+To format only one file:
 
-The `fmt` command is lightweight and does not add an external formatting library. It only processes JavaScript and TypeScript files in `src/` and `test/`, fixing indentation, adding semicolons to recognized statements, and converting double-quoted strings to single quotes. Backtick template strings, regexes, comments, and quoted JSX attributes are left unchanged.
+```bash
+npm run fmt -- src/application/create-user.ts
+```
+
+
+The `fmt` command is lightweight and does not add an external formatting library. It only processes JavaScript and TypeScript files in `src/` and `test/`, fixing indentation, expanding compact code blocks such as `function teste(){console.log()}`, adding semicolons to recognized statements, and converting double-quoted strings to single quotes. Object literals are not expanded. The command also removes import bindings confirmed as unused; side-effect imports are preserved, and unused `import type` declarations are removed without creating runtime imports. Imports containing internal comments are not rewritten. Backtick template strings, regexes, comments, and quoted JSX attributes are left unchanged.
 
 ## Automatic tests
 

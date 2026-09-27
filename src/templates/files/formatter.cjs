@@ -2,7 +2,10 @@ const { readdir, readFile, writeFile } = require('node:fs/promises');
 const { join, relative } = require('node:path');
 
 const projectRoot = join(__dirname, '..', '..');
-const sourceRoot = join(projectRoot, 'src');
+const roots = [
+  join(projectRoot, 'src'),
+  join(projectRoot, 'test'),
+];
 const supported = /\.(?:js|jsx|mjs|cjs|ts|tsx|mts|cts)$/i;
 const indentUnit = '  ';
 
@@ -161,10 +164,12 @@ function indentSource(source) {
 }
 
 async function main() {
-  const files = (await collectFiles(sourceRoot)).sort();
+  const files = (
+    await Promise.all(roots.map((root) => collectFiles(root)))
+  ).flat().sort();
 
   if (files.length === 0) {
-    console.log('✨ No JavaScript or TypeScript files found in src/.');
+    console.log('✨ No JavaScript or TypeScript files found in src/ or test/.');
     return;
   }
 
@@ -184,7 +189,7 @@ async function main() {
   console.log(
     changed === 0
       ? '✨ src/ is already indented.'
-      : '\n✨ Indented ' + changed + ' file' + (changed === 1 ? '' : 's') + ' in src/.',
+      : '\n✨ Indented ' + changed + ' file' + (changed === 1 ? '' : 's') + ' in src/ and test/.',
   );
 }
 

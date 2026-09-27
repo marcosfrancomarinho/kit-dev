@@ -27,7 +27,34 @@ describe('source formatter', () => {
         '',
       ].join('\n'),
     );
+    it('ignores braces inside regular expressions', () => {
+    const source = [
+      'function match(){',
+      'const pattern = /a{2,3}/',
+      'if(pattern.test("aaa")){',
+      'return true',
+      '}',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = indentSource(source);
+
+    assert.equal(
+      result,
+      [
+        'function match(){',
+        '  const pattern = /a{2,3}/',
+        '  if(pattern.test("aaa")){',
+        '    return true',
+        '  }',
+        '}',
+        '',
+      ].join('\n'),
+    );
   });
+
+});
 
   it('preserves multiline template string contents', () => {
     const source = [

@@ -709,4 +709,405 @@ describe('source formatter', () => {
     assert.match(result, /\/"hello"\//);
     assert.match(result, /title="hello"/);
   });
+  it('formats if else and else if chains without drifting indentation', () => {
+    const source = [
+      'function run(value: number) {',
+      'if (value > 10) {',
+      "console.log('big')",
+      '} else if (value > 5) {',
+      "console.log('medium')",
+      '} else {',
+      "console.log('small')",
+      '}',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.equal(
+      result,
+      [
+        'function run(value: number) {',
+        '  if (value > 10) {',
+        "    console.log('big');",
+        '  } else if (value > 5) {',
+        "    console.log('medium');",
+        '  } else {',
+        "    console.log('small');",
+        '  }',
+        '}',
+        '',
+      ].join('\n'),
+    );
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('formats switch case default and nested blocks safely', () => {
+    const source = [
+      'function choose(value: string) {',
+      'switch (value) {',
+      "case 'a':",
+      "console.log('a')",
+      'break',
+      "case 'b': {",
+      "const result = 'b'",
+      'return result',
+      '}',
+      'default:',
+      "throw new Error('unknown')",
+      '}',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /switch \(value\) \{/);
+    assert.match(result, /case 'a':/);
+    assert.match(result, /default:/);
+    assert.match(result, /throw new Error\('unknown'\);/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('formats try catch finally with nested statements', () => {
+    const source = [
+      'async function run() {',
+      'try {',
+      'await execute()',
+      '} catch (error) {',
+      'if (error instanceof Error) {',
+      'console.error(error.message)',
+      '}',
+      '} finally {',
+      'cleanup()',
+      '}',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /  try \{/);
+    assert.match(result, /  } catch \(error\) \{/);
+    assert.match(result, /  } finally \{/);
+    assert.match(result, /    cleanup\(\);/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('formats for of for in while and do while loops', () => {
+    const source = [
+      'function loops(values: string[], obj: Record<string, string>) {',
+      'for (const value of values) {',
+      'console.log(value)',
+      '}',
+      'for (const key in obj) {',
+      'console.log(key)',
+      '}',
+      'let index = 0',
+      'while (index < values.length) {',
+      'index += 1',
+      '}',
+      'do {',
+      'index -= 1',
+      '} while (index > 0)',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /for \(const value of values\) \{/);
+    assert.match(result, /for \(const key in obj\) \{/);
+    assert.match(result, /while \(index < values\.length\) \{/);
+    assert.match(result, /} while \(index > 0\);/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('preserves labeled statements and labeled break continue', () => {
+    const source = [
+      'outer: for (let i = 0; i < 3; i += 1) {',
+      'inner: for (let j = 0; j < 3; j += 1) {',
+      'if (j === 1) {',
+      'continue inner',
+      '}',
+      'if (i === 2) {',
+      'break outer',
+      '}',
+      '}',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /outer: for/);
+    assert.match(result, /continue inner;/);
+    assert.match(result, /break outer;/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('formats class members getters setters static blocks and private fields', () => {
+    const source = [
+      'class User {',
+      "static #prefix = 'user'",
+      'static {',
+      "console.log('init')",
+      '}',
+      '#name: string',
+      'constructor(name: string) {',
+      'this.#name = name',
+      '}',
+      'get name() {',
+      'return this.#name',
+      '}',
+      'set name(value: string) {',
+      'this.#name = value',
+      '}',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /static #prefix = 'user';/);
+    assert.match(result, /  static \{/);
+    assert.match(result, /  get name\(\) \{/);
+    assert.match(result, /  set name\(value: string\) \{/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('preserves interfaces enums namespaces and declaration-style blocks', () => {
+    const source = [
+      'interface User {',
+      'name: string',
+      'age?: number',
+      '}',
+      'enum Status {',
+      "Active = 'active',",
+      "Disabled = 'disabled',",
+      '}',
+      'namespace App {',
+      'export interface Config {',
+      'port: number',
+      '}',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /interface User \{/);
+    assert.match(result, /  name: string;/);
+    assert.match(result, /enum Status \{/);
+    assert.match(result, /namespace App \{/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('preserves complex generics conditional mapped and indexed types', () => {
+    const source = [
+      'type DeepReadonly<T> = {',
+      'readonly [K in keyof T]: T[K] extends object ? DeepReadonly<T[K]> : T[K]',
+      '}',
+      'type Result<T extends { id: string }> = T[\'id\'] extends string ? T : never',
+      'function identity<T extends Record<string, unknown>>(value: T): T {',
+      'return value',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /readonly \[K in keyof T\]/);
+    assert.match(result, /T\['id'\] extends string/);
+    assert.match(result, /function identity<T extends Record<string, unknown>>/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('preserves optional chaining nullish coalescing non-null assertions and satisfies', () => {
+    const source = [
+      "const name = user?.profile?.name ?? 'unknown'",
+      'const length = user!.items?.length ?? 0',
+      "const config = { port: 3000, host: 'localhost' } satisfies Record<string, string | number>",
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /user\?\.profile\?\.name \?\? 'unknown';/);
+    assert.match(result, /user!\.items\?\.length \?\? 0;/);
+    assert.match(result, /satisfies Record<string, string \| number>;/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('preserves ternaries and logical expressions across multiple lines', () => {
+    const source = [
+      'const value = condition',
+      "? 'yes'",
+      ": otherCondition",
+      "? 'maybe'",
+      ": 'no'",
+      '',
+      'const result = enabled &&',
+      'ready &&',
+      'execute()',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /const value = condition/);
+    assert.match(result, /\? 'yes'/);
+    assert.match(result, /execute\(\);/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('preserves arrow functions that return object literals and nested callbacks', () => {
+    const source = [
+      'const mapper = (value: string) => ({',
+      'name: value,',
+      'meta: { active: true, count: 1, source: value },',
+      '})',
+      '',
+      'const result = values.map((value) => {',
+      'return mapper(value)',
+      '})',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /=> \(\{/);
+    assert.match(result, /values\.map\(\(value\) => \{/);
+    assert.match(result, /return mapper\(value\);/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('preserves spread rest computed properties and shorthand properties', () => {
+    const source = [
+      'const merged = { ...base, [dynamicKey]: value, shorthand, extra: true }',
+      'const values = [first, ...rest, last, another]',
+      'function collect(first: string, ...items: string[]) {',
+      'return [first, ...items]',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /\.\.\.base/);
+    assert.match(result, /\[dynamicKey\]: value/);
+    assert.match(result, /\.\.\.items/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('preserves async generators yield and await expressions', () => {
+    const source = [
+      'async function* stream(values: Promise<string[]>) {',
+      'const resolved = await values',
+      'for (const value of resolved) {',
+      'yield value',
+      '}',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /async function\* stream/);
+    assert.match(result, /const resolved = await values;/);
+    assert.match(result, /yield value;/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('preserves nested JSX fragments expressions and callbacks', () => {
+    const source = [
+      'export function View() {',
+      'return (',
+      '<>',
+      '<section>',
+      '<h1 title="hello">Title</h1>',
+      '{items.map((item) => (',
+      '<div key={item.id}>',
+      '{item.name}',
+      '</div>',
+      '))}',
+      '</section>',
+      '</>',
+      ')',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.tsx');
+
+    assert.match(result, /title="hello"/);
+    assert.match(result, /items\.map/);
+    assert.match(result, /<div key=\{item\.id\}>/);
+    assert.equal(formatSource(result, 'example.tsx'), result);
+  });
+
+  it('preserves decorators and decorated class members', () => {
+    const source = [
+      '@sealed',
+      'class Service {',
+      '@inject()',
+      'constructor(private readonly repo: Repository) {}',
+      '@log',
+      'execute() {',
+      'return this.repo.run()',
+      '}',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /@sealed/);
+    assert.match(result, /@inject\(\)/);
+    assert.match(result, /@log/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('preserves CRLF input and remains idempotent', () => {
+    const source = [
+      'function run(){',
+      'if(true){',
+      "console.log('ok')",
+      '}',
+      '}',
+      '',
+    ].join('\r\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.ok(result.includes('\r\n'));
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('handles deeply nested mixed delimiters without indentation drift', () => {
+    const source = [
+      'function run() {',
+      'const value = call({',
+      'items: [',
+      '{ key: nested(first, second), active: true, count: 1 },',
+      '{ key: nested(third, fourth), active: false, count: 2 },',
+      '],',
+      'callback: () => {',
+      'return another({ a: 1, b: 2, c: 3 })',
+      '},',
+      '})',
+      'return value',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /callback: \(\) => \{/);
+    assert.match(result, /return another/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+
 });

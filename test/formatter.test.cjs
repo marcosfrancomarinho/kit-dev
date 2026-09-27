@@ -152,6 +152,32 @@ describe('source formatter', () => {
     assert.match(result, /import \{ User \} from 'domain';/);
   });
 
+
+  it('removes unused type-only imports without creating runtime imports', () => {
+    const source = [
+      "import type { User } from 'domain-types';",
+      'const value = 1;',
+      '',
+    ].join('\n');
+
+    const result = removeUnusedImports(source, 'example.ts');
+
+    assert.doesNotMatch(result, /domain-types/);
+  });
+
+  it('does not rewrite imports that contain comments', () => {
+    const source = [
+      "import { /* keep */ unused } from 'pkg';",
+      'const value = 1;',
+      '',
+    ].join('\n');
+
+    const result = removeUnusedImports(source, 'example.ts');
+
+    assert.match(result, /\/\* keep \*\//);
+    assert.match(result, /unused/);
+  });
+
   it('adds semicolons to statements without changing blocks', () => {
     const source = [
       "const name = 'Marcos'",

@@ -1,230 +1,165 @@
 <p align="center">
   <a href="./README.md" lang="en">English</a> ·
-  <a href="./README.pt-BR.md" lang="pt-BR"><strong>Português (Brasil)</strong></a> ·
-  <a href="./README.zh-CN.md" lang="zh-CN">简体中文</a> ·
-  <a href="./README.es.md" lang="es">Español</a> ·
-  <a href="./README.hi.md" lang="hi">हिन्दी</a> ·
-  <a href="./README.ar.md" lang="ar">العربية</a> ·
-  <a href="./README.fr.md" lang="fr">Français</a> ·
-  <a href="./README.bn.md" lang="bn">বাংলা</a> ·
-  <a href="./README.ru.md" lang="ru">Русский</a> ·
-  <a href="./README.de.md" lang="de">Deutsch</a> ·
-  <a href="./README.ja.md" lang="ja">日本語</a>
+  <a href="./README.pt-BR.md" lang="pt-BR"><strong>Português (Brasil)</strong></a>
 </p>
 
 <h1 align="center">🚀 Kit Dev</h1>
 
-<p align="center">Crie projetos Node.js + TypeScript com desenvolvimento, build e DI opcional já configurados.</p>
+<p align="center">Comece um projeto TypeScript com desenvolvimento, build, testes e injeção de dependência opcional já preparados.</p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/create-kit-dev"><img src="https://img.shields.io/npm/v/create-kit-dev?style=flat-square&color=CB3837&logo=npm" alt="Versão no npm"></a>
-  <a href="https://www.npmjs.com/package/create-kit-dev"><img src="https://img.shields.io/npm/dt/create-kit-dev?style=flat-square&color=3178C6" alt="Downloads no npm"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/licença-MIT-green?style=flat-square" alt="Licença MIT"></a>
+  <a href="https://www.npmjs.com/package/create-kit-dev"><img src="https://img.shields.io/npm/v/create-kit-dev?style=flat-square&color=CB3837&logo=npm" alt="versão npm"></a>
+  <a href="https://www.npmjs.com/package/create-kit-dev"><img src="https://img.shields.io/npm/dt/create-kit-dev?style=flat-square&color=3178C6" alt="downloads npm"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="Licença MIT"></a>
 </p>
-
-<p align="center"><strong>TypeScript</strong> · <strong>esbuild</strong> · <strong>npm</strong> · <strong>Yarn</strong> · <strong>pnpm</strong></p>
 
 ---
 
 ## O que é o Kit Dev?
 
-**Kit Dev** é uma CLI para iniciar projetos Node.js com TypeScript sem precisar configurar o ambiente do zero.
+O **Kit Dev** é uma CLI que cria um projeto TypeScript pronto para começar a programar.
 
-Ela prepara o projeto, instala as dependências e deixa prontos os comandos de desenvolvimento e produção.
+Em vez de configurar tudo do zero, você já começa com:
 
-Você pode usar o Kit Dev apenas como gerador e sistema de build. A injeção de dependência é totalmente opcional.
+- modo de desenvolvimento com rebuild e reinício automático;
+- build de produção;
+- verificação de tipos;
+- testes em modo watch;
+- geração automática de testes a partir de classes;
+- injeção de dependência opcional;
+- suporte a npm, Yarn e pnpm.
 
-## Início rápido
+A proposta é simples: gastar menos tempo configurando o projeto e mais tempo escrevendo a aplicação.
 
-Com npm:
+## Começando
+
+Escolha o comando do seu gerenciador:
 
 ```bash
 npx create-kit-dev
 ```
 
-Também funciona com:
-
 ```bash
-pnpm create kit-dev
 yarn create kit-dev
 ```
 
-Informe o nome do projeto. Depois:
+```bash
+pnpm create kit-dev
+```
+
+Informe o nome do projeto e depois:
 
 ```bash
 cd minha-api
 npm run dev
 ```
 
-Pronto. A aplicação será recompilada e reiniciada automaticamente quando o código mudar.
+Se criou com Yarn ou pnpm, use o equivalente:
 
-## O que já vem configurado?
+```bash
+yarn dev
+pnpm dev
+```
 
-- TypeScript em modo `strict`;
-- esbuild para desenvolvimento e produção;
-- watch com reinício automático do Node.js;
-- testes nativos com `node:test` em watch, sem framework adicional;
-- geração de testes por análise AST de classes TypeScript;
-- checagem de tipos no build;
-- bundle minificado;
-- sourcemap externo;
-- análise simples do bundle;
-- npm, pnpm e Yarn;
-- DI opcional, sem decorators.
+## Comandos principais
 
-## Comandos
-
-Os scripts são adicionados automaticamente ao `package.json`.
-
-| Comando | Para que serve |
+| Comando | O que faz |
 |---|---|
-| `npm run dev` | Executa a aplicação em desenvolvimento, observa alterações e reinicia o Node.js |
-| `npm run type` | Mantém o TypeScript verificando erros em tempo real |
-| `npm test` | Executa os testes em watch; com um alvo, gera o teste automaticamente |
-| `npm run build` | Verifica os tipos e gera o bundle de produção |
-| `npm start` | Executa o bundle já gerado em `dist` |
-| `npm run di` | Instala a DI opcional no projeto |
+| `dev` | Executa a aplicação e acompanha alterações |
+| `test` | Executa os testes em modo watch |
+| `test <arquivo>` | Gera ou atualiza o teste de uma classe |
+| `build` | Verifica os tipos e gera o bundle de produção |
+| `start` | Executa o bundle gerado |
+| `type` | Acompanha erros de TypeScript |
+| `di` | Instala a injeção de dependência opcional |
 
-> Com pnpm use `pnpm dev`, `pnpm build` etc. Com Yarn use `yarn dev`, `yarn build` etc.
-
-### Desenvolvimento
-
-Na maior parte do tempo você só precisa de:
+Exemplos com Yarn:
 
 ```bash
-npm run dev
+yarn dev
+yarn test
+yarn test create-user
+yarn build
+yarn start
 ```
 
-O esbuild observa o projeto e, após cada rebuild bem-sucedido, reinicia a aplicação.
+## Testes automáticos
 
-Se quiser acompanhar erros TypeScript continuamente em outro terminal:
+Todo projeto gerado já possui um runner de testes.
+
+Execute:
 
 ```bash
-npm run type
+yarn test
 ```
 
-O comando `type` é opcional. O `build` já executa uma checagem de tipos antes de gerar o bundle.
-
-### Testes
-
-O projeto já é criado com um runner de testes nativo. Basta executar:
+Para gerar um teste a partir de uma classe:
 
 ```bash
-npm test
-```
-
-O esbuild transpila os arquivos `.test.ts` e `.spec.ts`, o `node:test` executa os testes e o processo permanece observando alterações. Nenhum Jest, Vitest, ts-node ou tsx é instalado.
-
-Um teste inicial é criado em `test/example.test.ts`.
-
-Para gerar um teste a partir de uma classe existente, use o mesmo comando `test` com um alvo:
-
-```bash
-npm test -- src/application/use-cases/create-user.ts
-```
-
-Também é possível informar apenas um nome de arquivo quando ele for único dentro de `src`:
-
-```bash
-npm test -- create-user
-```
-
-Com pnpm e Yarn, o argumento pode ser passado diretamente:
-
-```bash
-pnpm test create-user
 yarn test create-user
 ```
 
-O gerador usa a AST do TypeScript para localizar a classe, dependências do construtor, métodos públicos e chamadas como `this.repository.save()`. A partir disso ele cria mocks com `t.mock.fn()` e verificações de chamadas. Quando não consegue inferir um valor com segurança, deixa um `TODO` em vez de inventar uma regra de negócio.
-
-### Build de produção
+ou:
 
 ```bash
-npm run build
+yarn test src/application/create-user.ts
 ```
 
-O build executa, nesta ordem:
+O Kit Dev analisa a classe, as dependências do construtor e os métodos públicos para criar uma boa base de teste. Quando não consegue inferir com segurança uma regra de negócio, deixa um `TODO` em vez de inventar uma assertion.
 
-1. checagem TypeScript com `tsc --noEmit`;
-2. bundle com esbuild;
-3. minificação;
-4. geração do sourcemap;
-5. resumo simples do bundle.
+Um teste já gerado pode ser criado novamente quando a classe mudar.
 
-Arquivos gerados:
+## Build de produção
+
+Execute:
+
+```bash
+yarn build
+```
+
+O build verifica o projeto e gera:
 
 ```text
 dist/bundle.cjs
 dist/bundle.cjs.map
 ```
 
-O resumo mostra o tamanho do bundle, quantidade de arquivos de entrada e tempo total do build.
-
-Pacotes listados em `dependencies` e `devDependencies` ficam externos ao bundle.
-
-Para executar o resultado:
+Depois, execute a aplicação com:
 
 ```bash
-npm start
+yarn start
 ```
+
+O bundle é otimizado, mas continua legível.
 
 ## Injeção de dependência opcional
 
-Você **não precisa usar DI** para usar o Kit Dev.
+A DI é opcional. Você pode usar o Kit Dev normalmente sem ela.
 
-Para instalar a DI, execute uma única vez:
+Para habilitar, execute uma única vez:
 
 ```bash
-npm run di
+yarn di
 ```
 
-O comando cria o container e habilita o transformer. Depois disso, o script `di` é removido do `package.json` e a DI passa a funcionar automaticamente em `npm run dev` e `npm run build`.
+Depois da instalação, o projeto passa a ter o container e o arquivo `src/di/providers.ts`. O script `di` é removido porque a configuração já foi instalada.
 
-A DI do Kit Dev não usa decorators, `reflect-metadata` ou bibliotecas externas de injeção de dependência.
-
-### Como a DI funciona
-
-Existem três partes principais:
-
-1. `AppConfig` registra as dependências;
-2. o transformer analisa os tipos TypeScript e descobre dependências do construtor quando possível;
-3. `ApplicationContext` cria e entrega as instâncias em runtime.
-
-O fluxo é:
-
-```text
-AppConfig
-   ↓
-providers registrados
-   ↓
-createApplicationContext()
-   ↓
-container.get(...)
-```
-
-A configuração normalmente fica em `src/di/providers.ts`.
-
-### Exemplo completo com interface
+### Exemplo básico
 
 Contrato:
 
 ```ts
-// src/domain/repositories/user-repository.ts
 export interface UserRepository {
-  save(name: string): Promise<void>;
+  save(name: string): Promise<void>
 }
 ```
 
 Implementação:
 
 ```ts
-// src/infra/repositories/user-repository-memory.ts
-import type { UserRepository } from '../../domain/repositories/user-repository.js';
-
 export class UserRepositoryMemory implements UserRepository {
   async save(name: string): Promise<void> {
-    console.log(`Usuário ${name} salvo`);
+    console.log(name)
   }
 }
 ```
@@ -232,14 +167,13 @@ export class UserRepositoryMemory implements UserRepository {
 Caso de uso:
 
 ```ts
-// src/application/use-cases/create-user.ts
-import type { UserRepository } from '../../domain/repositories/user-repository.js';
-
 export class CreateUser {
-  constructor(private readonly repository: UserRepository) {}
+  constructor(
+    private readonly repository: UserRepository,
+  ) {}
 
-  execute(name: string): Promise<void> {
-    return this.repository.save(name);
+  execute(name: string) {
+    return this.repository.save(name)
   }
 }
 ```
@@ -247,557 +181,59 @@ export class CreateUser {
 Registro:
 
 ```ts
-// src/di/providers.ts
-import {
-  AppConfig,
-  createApplicationContext,
-} from '../../kit-dev/di/container.js';
-import { CreateUser } from '../application/use-cases/create-user.js';
-import type { UserRepository } from '../domain/repositories/user-repository.js';
-import { UserRepositoryMemory } from '../infra/repositories/user-repository-memory.js';
+const providers = new AppConfig()
 
-const providers = new AppConfig();
+providers.useClass<UserRepository>(UserRepositoryMemory)
+providers.useClass(CreateUser)
 
-providers.useClass<UserRepository>(UserRepositoryMemory);
-providers.useClass(CreateUser);
-
-export const container = createApplicationContext(providers);
+export const container = createApplicationContext(providers)
 ```
 
 Uso:
 
 ```ts
-// src/main.ts
-import { CreateUser } from './application/use-cases/create-user.js';
-import { container } from './di/providers.js';
+const createUser = container.get(CreateUser)
 
-const createUser = container.get(CreateUser);
-await createUser.execute('Marcos');
+await createUser.execute('Marcos')
 ```
 
-O transformer vê que `CreateUser` recebe `UserRepository` no construtor e liga automaticamente esse contrato à implementação `UserRepositoryMemory`.
+Para dependências normais de classes, prefira `useClass()`. O Kit Dev consegue inferir dependências do construtor quando os tipos são suportados.
 
-Interfaces não existem em runtime. Por isso você registra a interface com `useClass<Interface>(Implementacao)`, mas normalmente resolve uma **classe concreta** com `container.get()`.
+Use `useFactory()` quando a criação realmente precisar de lógica personalizada.
 
-## Todas as formas de registrar dependências
+### Formas de registro
 
-### `useClass()` — classes
+| Método | Quando usar |
+|---|---|
+| `useClass()` | O container deve criar uma classe |
+| `useValue()` | Você já possui um valor ou instância |
+| `useFactory()` | A criação precisa de lógica personalizada |
+| `useExisting()` | Dois tokens devem apontar para o mesmo provider |
+| `createToken<T>()` | A dependência não possui classe em runtime |
+| `imports()` | Você quer separar providers por módulos |
 
-`useClass()` é a forma mais comum de registro e pode ser usada de várias maneiras.
+O escopo padrão é `singleton`. Use `transient` quando precisar de uma nova instância em cada resolução.
 
-#### 1. Classe concreta
-
-Quando a própria classe pode ser usada como token:
+Métodos úteis do container:
 
 ```ts
-class EmailService {}
-
-providers.useClass(EmailService);
+container.get(Service)
+container.getOptional(Service)
+container.has(Service)
+container.clearInstances()
+await container.close()
 ```
 
-Depois:
+## Estrutura gerada
 
-```ts
-const emailService = container.get(EmailService);
-```
-
-Se a classe tiver dependências no construtor, o Kit Dev tenta inferi-las automaticamente:
-
-```ts
-class SendEmail {
-  constructor(private readonly emailService: EmailService) {}
-}
-
-providers.useClass(EmailService);
-providers.useClass(SendEmail);
-```
-
-Não é necessário informar `[EmailService]` manualmente nesse caso.
-
-#### 2. Interface ou type alias como contrato
-
-Interfaces e type aliases não existem em JavaScript. O transformer cria um token interno automaticamente:
-
-```ts
-import type { UserRepository } from '../domain/user-repository.js';
-import { UserRepositoryMemory } from '../infra/user-repository-memory.js';
-
-providers.useClass<UserRepository>(UserRepositoryMemory);
-```
-
-Agora qualquer classe cujo construtor dependa de `UserRepository` pode ser resolvida automaticamente:
-
-```ts
-class CreateUser {
-  constructor(private readonly repository: UserRepository) {}
-}
-```
-
-Para o token automático, o contrato deve ser uma interface ou type alias **nomeado e não genérico**.
-
-#### 3. Classe abstrata como token
-
-Uma classe abstrata existe em runtime e pode ser usada diretamente como token:
-
-```ts
-abstract class UserRepositoryBase {
-  abstract save(name: string): Promise<void>;
-}
-
-class UserRepositoryDatabase extends UserRepositoryBase {
-  async save(name: string): Promise<void> {
-    // banco de dados
-  }
-}
-
-providers.useClass(UserRepositoryBase, UserRepositoryDatabase);
-```
-
-Uma classe pode depender dela normalmente:
-
-```ts
-class CreateUser {
-  constructor(private readonly repository: UserRepositoryBase) {}
-}
-```
-
-#### 4. Dependências informadas manualmente
-
-O transformer não consegue inferir tudo. Valores primitivos, tokens manuais, tipos genéricos, parâmetros opcionais e alguns tipos externos devem ser informados explicitamente.
-
-A ordem do array deve seguir a ordem do construtor:
-
-```ts
-import { createToken } from '../../kit-dev/di/container.js';
-
-const APP_NAME = createToken<string>('APP_NAME');
-
-class ConfigService {
-  constructor(readonly appName: string) {}
-}
-
-providers.useValue(APP_NAME, 'Minha API');
-providers.useClass(ConfigService, [APP_NAME]);
-```
-
-Também é possível informar dependências manualmente ao registrar uma interface:
-
-```ts
-providers.useClass<UserRepository>(UserRepositoryDatabase, [DATABASE]);
-```
-
-Ou uma classe abstrata:
-
-```ts
-providers.useClass(UserRepositoryBase, UserRepositoryDatabase, [DATABASE]);
-```
-
-### `createToken<T>()` — tokens manuais
-
-Use `createToken<T>()` quando não existir uma classe que possa representar a dependência em runtime.
-
-É útil principalmente para strings, números, configurações, clientes externos e outras dependências manuais:
-
-```ts
-import { createToken } from '../../kit-dev/di/container.js';
-
-export const DATABASE_URL = createToken<string>('DATABASE_URL');
-export const PORT = createToken<number>('PORT');
-```
-
-Registre o valor:
-
-```ts
-providers.useValue(DATABASE_URL, process.env.DATABASE_URL!);
-providers.useValue(PORT, 3000);
-```
-
-E use o mesmo token para resolver:
-
-```ts
-const databaseUrl = container.get(DATABASE_URL);
-```
-
-O token é um `symbol`. Guarde e reutilize a mesma constante; não crie um novo token com a mesma descrição esperando que ele seja o mesmo token.
-
-### `useValue()` — valor já existente
-
-Use quando a instância ou valor já existe e o container não precisa criá-lo:
-
-```ts
-const APP_NAME = createToken<string>('APP_NAME');
-
-providers.useValue(APP_NAME, 'Kit Dev');
-```
-
-Também funciona com objetos e instâncias:
-
-```ts
-const config = {
-  port: 3000,
-  environment: 'development',
-};
-
-const CONFIG = createToken<typeof config>('CONFIG');
-providers.useValue(CONFIG, config);
-```
-
-Uma classe também pode ser usada como token para uma instância pronta:
-
-```ts
-providers.useValue(Logger, new Logger());
-```
-
-`useValue()` sempre entrega o mesmo valor registrado.
-
-### `useFactory()` — criação personalizada
-
-Use quando a criação da dependência precisa de lógica própria.
-
-A factory recebe o `ApplicationContext`, então pode resolver outras dependências:
-
-```ts
-const DATABASE_URL = createToken<string>('DATABASE_URL');
-
-providers.useValue(DATABASE_URL, process.env.DATABASE_URL!);
-
-providers.useFactory(Database, (container) => {
-  const url = container.get(DATABASE_URL);
-  return new Database(url);
-});
-```
-
-Depois:
-
-```ts
-const database = container.get(Database);
-```
-
-`useFactory()` é útil para clientes de banco, SDKs, adaptadores, objetos que precisam de configuração e criações que não cabem em um construtor inferido automaticamente.
-
-### `useExisting()` — alias
-
-Use quando dois tokens devem apontar para a **mesma instância**:
-
-```ts
-const PRIMARY_DATABASE = createToken<Database>('PRIMARY_DATABASE');
-
-providers.useClass(Database);
-providers.useExisting(PRIMARY_DATABASE, Database);
-```
-
-Agora:
-
-```ts
-const database = container.get(Database);
-const primaryDatabase = container.get(PRIMARY_DATABASE);
-
-console.log(database === primaryDatabase); // true
-```
-
-`useExisting()` não cria outra instância. Ele apenas redireciona um token para outro provider.
-
-### `imports()` — separar providers por módulo
-
-Use `imports()` para dividir os registros de DI por contexto ou módulo, em vez de concentrar tudo em um único `providers.ts`.
-
-Por exemplo, o módulo de banco pode cuidar apenas das dependências relacionadas a persistência:
-
-```ts
-// src/di/database-providers.ts
-import {
-  AppConfig,
-  createToken,
-} from '../../kit-dev/di/container.js';
-import { Database } from '../infra/database.js';
-
-export const DATABASE_URL =
-  createToken<string>('DATABASE_URL');
-
-export const databaseProviders = new AppConfig()
-  .useValue(
-    DATABASE_URL,
-    process.env.DATABASE_URL ?? 'sqlite://local.db',
-  )
-  .useClass(Database, [DATABASE_URL]);
-```
-
-O módulo de usuários registra seu próprio contrato e implementação:
-
-```ts
-// src/di/user-providers.ts
-import { AppConfig } from '../../kit-dev/di/container.js';
-import type { UserRepository } from '../domain/repositories/user-repository.js';
-import { UserRepositoryDatabase } from '../infra/repositories/user-repository-database.js';
-import { CreateUser } from '../application/use-cases/create-user.js';
-
-export const userProviders = new AppConfig()
-  .useClass<UserRepository>(UserRepositoryDatabase)
-  .useClass(CreateUser);
-```
-
-Outro módulo pode fazer o mesmo:
-
-```ts
-// src/di/email-providers.ts
-import { AppConfig } from '../../kit-dev/di/container.js';
-import { EmailService } from '../infra/email/email-service.js';
-
-export const emailProviders = new AppConfig()
-  .useClass(EmailService);
-```
-
-Então o composition root fica responsável apenas por juntar as configurações e criar o container:
-
-```ts
-// src/di/providers.ts
-import {
-  AppConfig,
-  createApplicationContext,
-} from '../../kit-dev/di/container.js';
-import { databaseProviders } from './database-providers.js';
-import { emailProviders } from './email-providers.js';
-import { userProviders } from './user-providers.js';
-
-const providers = new AppConfig()
-  .imports(
-    databaseProviders,
-    userProviders,
-    emailProviders,
-  );
-
-export const container =
-  createApplicationContext(providers);
-```
-
-Depois, a aplicação resolve apenas a classe raiz de que precisa:
-
-```ts
-// src/main.ts
-import { CreateUser } from './application/use-cases/create-user.js';
-import { container } from './di/providers.js';
-
-const createUser = container.get(CreateUser);
-
-await createUser.execute('Marcos');
-```
-
-Cada `AppConfig` importado continua sendo independente durante a configuração. O `imports()` copia seus providers para a configuração principal, permitindo organizar a DI por domínio, feature ou camada sem criar vários containers.
-
-Se dois módulos registrarem o mesmo token, o Kit Dev lança `DependencyInjectionError` em vez de sobrescrever silenciosamente o provider.
-
-### `has()` — verificar registro no `AppConfig`
-
-Antes de criar o container:
-
-```ts
-providers.useClass(Database);
-
-console.log(providers.has(Database)); // true
-```
-
-Esse `has()` verifica os registros do `AppConfig`.
-
-## Escopos
-
-### `singleton` — padrão
-
-É o escopo padrão. A instância é criada na primeira resolução e reutilizada pelo container:
-
-```ts
-providers.useClass(Database);
-```
-
-Equivale a:
-
-```ts
-providers.useClass(Database, [], { scope: 'singleton' });
-```
-
-### `transient`
-
-Cria uma nova instância em cada resolução:
-
-```ts
-providers.useClass(RequestContext, [], { scope: 'transient' });
-```
-
-Também pode ser usado com factory:
-
-```ts
-providers.useFactory(
-  RequestId,
-  () => new RequestId(crypto.randomUUID()),
-  { scope: 'transient' },
-);
-```
-
-E com registros que usam contrato:
-
-```ts
-providers.useClass<UserRepository>(
-  UserRepositoryMemory,
-  [],
-  { scope: 'transient' },
-);
-```
-
-Instâncias `transient` não ficam armazenadas no container e, por isso, não são gerenciadas por `close()`.
-
-## Encadeando registros
-
-Os métodos de registro retornam o próprio `AppConfig`, então podem ser encadeados:
-
-```ts
-const providers = new AppConfig()
-  .useValue(APP_NAME, 'Kit Dev')
-  .useClass(Logger)
-  .useClass(UserService);
-```
-
-## Criando o container
-
-Crie o `ApplicationContext` somente depois de registrar e importar todos os providers:
-
-```ts
-export const container = createApplicationContext(providers);
-```
-
-O container recebe uma cópia da configuração naquele momento. Portanto, faça os registros antes de chamar `createApplicationContext()`.
-
-## Métodos do container
-
-### `get()`
-
-Resolve uma dependência. Se o token não existir, lança `DependencyInjectionError`:
-
-```ts
-const service = container.get(UserService);
-```
-
-### `getOptional()`
-
-Retorna a dependência ou `undefined` se não estiver registrada:
-
-```ts
-const logger = container.getOptional(LOGGER);
-```
-
-### `has()`
-
-Verifica se o token existe no contexto:
-
-```ts
-if (container.has(UserService)) {
-  // registrado
-}
-```
-
-### `clearInstances()`
-
-Limpa as instâncias armazenadas em cache sem remover os providers:
-
-```ts
-container.clearInstances();
-```
-
-Na próxima resolução, singletons de classe/factory serão criados novamente.
-
-`clearInstances()` **não chama** `dispose()` ou `close()` nas instâncias antigas. É especialmente útil em testes.
-
-### `close()`
-
-Fecha recursos armazenados pelo container e depois limpa o cache:
-
-```ts
-await container.close();
-```
-
-Se uma instância singleton possuir `dispose()` ou `close()`, o Kit Dev chama esse método uma vez durante o fechamento.
-
-Exemplo:
-
-```ts
-class Database {
-  async close() {
-    // encerra conexão
-  }
-}
-
-providers.useClass(Database);
-
-const database = container.get(Database);
-
-// ao encerrar a aplicação
-await container.close();
-```
-
-## Quando a inferência automática funciona?
-
-O Kit Dev consegue inferir dependências de construtores quando elas são representadas por tipos nomeados do projeto, como classes, classes abstratas, interfaces e type aliases suportados.
-
-Exemplo:
-
-```ts
-class UserService {
-  constructor(
-    private readonly repository: UserRepository,
-    private readonly logger: Logger,
-  ) {}
-}
-
-providers.useClass<UserRepository>(UserRepositoryMemory);
-providers.useClass(Logger);
-providers.useClass(UserService);
-```
-
-Nesse caso não é necessário informar manualmente `[UserRepository, Logger]`.
-
-Quando o transformer não consegue inferir uma dependência, informe os tokens manualmente:
-
-```ts
-providers.useClass(ConfigService, [APP_NAME]);
-```
-
-Isso é necessário principalmente para valores primitivos, tipos genéricos, parâmetros opcionais, parâmetros rest e tipos que não podem ser convertidos em um token automático do projeto.
-
-## Erros da DI
-
-Problemas de configuração usam `DependencyInjectionError`, por exemplo:
-
-- token não registrado;
-- token duplicado;
-- dependência circular;
-- configuração inválida;
-- erro durante a criação de uma dependência.
-
-Erros de análise do transformer aparecem durante `npm run dev` ou `npm run build` e apontam o local do registro que não pôde ser transformado.
-
-## Regras rápidas
-
-- use `import type` para interfaces e type aliases usados apenas como tipos;
-- classes concretas podem usar a própria classe como token;
-- classes abstratas podem ser tokens em runtime;
-- use `createToken<T>()` para valores primitivos e tokens manuais;
-- o escopo padrão é `singleton`;
-- use `transient` quando precisar de uma nova instância a cada resolução;
-- a ordem das dependências manuais deve ser a mesma do construtor;
-- registre e importe tudo antes de `createApplicationContext()`;
-- prefira resolver uma classe concreta que inicia o fluxo em vez de tentar resolver uma interface diretamente.
-
-## Estrutura do projeto
-
-Logo após criar um projeto:
+Um projeto novo começa com uma estrutura pequena:
 
 ```text
 minha-api/
 ├── kit-dev/
 │   ├── build/
-│   │   ├── dev.cjs
-│   │   └── esbuild.config.cjs
+│   ├── di/
 │   └── test/
-│       ├── test.cjs
-│       └── generator.cjs
 ├── src/
 │   └── main.ts
 ├── test/
@@ -806,14 +242,12 @@ minha-api/
 └── tsconfig.json
 ```
 
-Ao instalar a DI, também são adicionados os arquivos de `kit-dev/di` e `src/di/providers.ts`.
-
-A pasta `kit-dev` faz parte da configuração gerada pelo CLI e pode ser versionada junto com o projeto.
+A pasta `kit-dev` contém as ferramentas geradas pela CLI e pode ser versionada junto com o projeto.
 
 ## Requisitos
 
 - Node.js 22 ou superior;
-- npm, pnpm ou Yarn.
+- npm, Yarn ou pnpm.
 
 Não é necessário instalar o Kit Dev globalmente.
 
@@ -825,5 +259,3 @@ MIT
 
 <p align="center">Feito por <a href="https://github.com/marcosfrancomarinho">Marcos Franco Marinho</a></p>
 <p align="center"><strong>Menos configuração. Mais código.</strong></p>
-
-

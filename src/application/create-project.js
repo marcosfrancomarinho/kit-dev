@@ -43,7 +43,23 @@ class CreateProject {
 }
 
 function createCreateProject({ projectScaffolder, packageManager, pathResolver }) {
-  return new CreateProject(projectScaffolder, packageManager, pathResolver);
+  const createProject = new CreateProject(
+    projectScaffolder,
+    packageManager,
+    pathResolver,
+  );
+
+  return {
+    execute(input) {
+      const manager =
+        input.manager ??
+        (typeof packageManager.detect === 'function'
+          ? packageManager.detect()
+          : undefined);
+
+      return createProject.execute({ ...input, manager });
+    },
+  };
 }
 
 module.exports = {

@@ -1,6 +1,6 @@
 const { readdir, readFile, writeFile } = require('node:fs/promises');
+const { createRequire } = require('node:module');
 const { join, relative } = require('node:path');
-const ts = require('typescript');
 
 const projectRoot = join(__dirname, '..', '..');
 const roots = [
@@ -9,6 +9,25 @@ const roots = [
 ];
 const supported = /\.(?:js|jsx|mjs|cjs|ts|tsx|mts|cts)$/i;
 const indentUnit = '  ';
+
+function loadTypeScript() {
+  const projectRequire = createRequire(join(projectRoot, 'package.json'));
+
+  try {
+    return projectRequire('@typescript/typescript6');
+  } catch {}
+
+  try {
+    return require('@typescript/typescript6');
+  } catch {
+    throw new Error(
+      'The TypeScript AST compatibility package is required to format code. ' +
+        'Run your package manager install command and try again.',
+    );
+  }
+}
+
+const ts = loadTypeScript();
 
 async function collectFiles(directory) {
   let entries;

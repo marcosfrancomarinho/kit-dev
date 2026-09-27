@@ -84,7 +84,7 @@ export class ProjectTemplateCatalog {
       '  bundle: true,',
       "  outfile: resolve(projectRoot, 'dist', 'bundle.cjs'),",
       '  minifySyntax: true,',
-      '  minifyWhitespace: true,',
+      '  minifyWhitespace: false,',
       '  minifyIdentifiers: false,',
       '  keepNames: true,',
       '  sourcemap: true,',

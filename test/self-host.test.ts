@@ -11,6 +11,8 @@ import type { ProjectScaffolder } from '../src/application/ports/project-scaffol
 import { NodeVersionPolicy } from '../src/application/policies/node-version-policy.js';
 import { ProjectName } from '../src/domain/project/project-name.js';
 import { NodePackageManagerDetector } from '../src/infrastructure/package-manager/node-package-manager-detector.js';
+import { TerminalAdapter } from '../src/presentation/terminal/terminal-adapter.js';
+import { TerminalPalette } from '../src/presentation/terminal/terminal-palette.js';
 
 class ProjectScaffolderSpy implements ProjectScaffolder {
   readonly calls: unknown[] = [];
@@ -96,4 +98,23 @@ describe('self-hosted architecture', () => {
       /requires Node\.js 22 or newer/,
     );
   });
+  it('shows fmt in the final command list', () => {
+    const terminal = new TerminalAdapter(new TerminalPalette());
+    const messages: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      messages.push(String(message ?? ''));
+    };
+
+    try {
+      terminal.showFinalInstructions('api', 'npm run');
+    } finally {
+      console.log = originalLog;
+    }
+
+    assert.match(messages.join('\n'), /npm run fmt/);
+    assert.match(messages.join('\n'), /Indent src\/ and test\/ code/);
+  });
+
 });

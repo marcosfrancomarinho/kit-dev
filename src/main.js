@@ -34,29 +34,30 @@ function createApplication() {
   const createProject = createCreateProject({
     projectScaffolder,
     packageManager,
-    pathResolver: {
-      resolve: path.join,
-    },
+    pathResolver: { resolve: path.join },
   });
 
-  return { createProject, output };
+  return {
+    createProject,
+    output,
+    packageManager,
+  };
 }
 
 async function run() {
-  const { createProject, output } = createApplication();
+  const { createProject, output, packageManager } = createApplication();
 
   try {
     assertSupportedNodeVersion();
 
-    const detectedManager = createProject
-      ? require('./infrastructure/package-manager/package-manager').detectPackageManager()
-      : 'npm';
-    output.info(`Using package manager: ${detectedManager}`);
+    const manager = packageManager.detect();
+    output.info(`Using package manager: ${manager}`);
 
     const projectName = createProjectName(await output.ask('Enter project name: '));
     const result = await createProject.execute({
       projectName,
       cwd: process.cwd(),
+      manager,
     });
 
     output.showFinalInstructions(projectName, result.runCommand);

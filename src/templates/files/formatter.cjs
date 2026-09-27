@@ -688,12 +688,8 @@ function listFormattingInfo(node) {
   return null;
 }
 
-function shouldSkipListItem(item, text) {
-  return (
-    ts.isOmittedExpression(item) ||
-    text.includes('\n') ||
-    text.includes('\r')
-  );
+function shouldSkipListItem(item) {
+  return ts.isOmittedExpression(item);
 }
 
 function formatDelimitedListsOnce(
@@ -731,8 +727,9 @@ function formatDelimitedListsOnce(
           )
         ) {
           const compact = itemTexts.join(', ');
-          const isMultiline =
-            rawInterior.includes('\n') || rawInterior.includes('\r');
+          const hasMultilineItem = itemTexts.some(
+            (text) => text.includes('\n') || text.includes('\r'),
+          );
           const projectedLength = lineLengthWithReplacement(
             source,
             interiorStart,
@@ -745,9 +742,9 @@ function formatDelimitedListsOnce(
 
           let value = null;
 
-          if (shouldExpand && !isMultiline) {
+          if (shouldExpand) {
             value = '\n' + itemTexts.join(',\n') + '\n';
-          } else if (!shouldExpand && isMultiline) {
+          } else if (!hasMultilineItem) {
             value = compact;
           }
 

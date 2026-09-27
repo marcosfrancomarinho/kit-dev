@@ -178,46 +178,80 @@ function scanStructure(line, state) {
 
 
 
-function toSingleQuotedString(value) {
-  return (
-    "'" +
-    value
-      .replace(/\\/g, '\\\\')
-      .replace(/'/g, "\\'")
-      .replace(/\r/g, '\\r')
-      .replace(/\n/g, '\\n')
-      .replace(/\u2028/g, '\\u2028')
-      .replace(/\u2029/g, '\\u2029') +
-    "'"
-  );
+function getScriptKind(fileName) {
+  if (/\.tsx$/i.test(fileName)) return ts.ScriptKind.TSX;
+  if (/\.jsx$/i.test(fileName)) return ts.ScriptKind.JSX;
+  if (/\.(?:js|mjs|cjs)$/i.test(fileName)) return ts.ScriptKind.JS;
+  return ts.ScriptKind.TS;
+}
+
+function convertDoubleQuotedLiteral(raw) {
+  const inner = raw.slice(1, -1);
+  let result = "'";
+
+  for (let index = 0; index < inner.length; index += 1) {
+    const char = inner[index];
+
+    if (char === '\\') {
+      const next = inner[index + 1];
+
+      if (next === '"') {
+        result += '"';
+        index += 1;
+        continue;
+      }
+
+      if (next === "'") {
+        result += "\\'";
+        index += 1;
+        continue;
+      }
+
+      result += char;
+
+      if (next !== undefined) {
+        result += next;
+        index += 1;
+      }
+
+      continue;
+    }
+
+    if (char === "'") {
+      result += "\\'";
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result + "'";
 }
 
 function useSingleQuotes(source, fileName = 'source.ts') {
-  const scriptKind = /\.(?:js|jsx|mjs|cjs)$/i.test(fileName)
-    ? ts.ScriptKind.JS
-    : /\.tsx$/i.test(fileName)
-      ? ts.ScriptKind.TSX
-      : /\.jsx$/i.test(fileName)
-        ? ts.ScriptKind.JSX
-        : ts.ScriptKind.TS;
   const sourceFile = ts.createSourceFile(
     fileName,
     source,
     ts.ScriptTarget.Latest,
     true,
-    scriptKind,
+    getScriptKind(fileName),
   );
   const replacements = [];
 
   function visit(node) {
-    if (ts.isStringLiteral(node)) {
-      const raw = source.slice(node.getStart(sourceFile), node.getEnd());
+    if (
+      ts.isStringLiteral(node) &&
+      !ts.isJsxAttribute(node.parent)
+    ) {
+      const start = node.getStart(sourceFile);
+      const end = node.getEnd();
+      const raw = source.slice(start, end);
 
       if (raw.startsWith('"') && raw.endsWith('"')) {
         replacements.push({
-          start: node.getStart(sourceFile),
-          end: node.getEnd(),
-          value: toSingleQuotedString(node.text),
+          start,
+          end,
+          value: convertDoubleQuotedLiteral(raw),
         });
       }
     }
@@ -262,15 +296,12 @@ function shouldEndWithSemicolon(node) {
 }
 
 function addSemicolons(source, fileName = 'source.ts') {
-  const scriptKind = /\.(?:js|jsx|mjs|cjs)$/i.test(fileName)
-    ? ts.ScriptKind.JS
-    : ts.ScriptKind.TS;
   const sourceFile = ts.createSourceFile(
     fileName,
     source,
     ts.ScriptTarget.Latest,
     true,
-    scriptKind,
+    getScriptKind(fileName),
   );
   const positions = new Set();
 
@@ -363,8 +394,8 @@ async function main() {
 
   console.log(
     changed === 0
-      ? '✨ src/ is already indented.'
-      : '\n✨ Indented ' + changed + ' file' + (changed === 1 ? '' : 's') + ' in src/ and test/.',
+      ? '✨ src/ and test/ are already formatted.'
+      : '\n✨ Formatted ' + changed + ' file' + (changed === 1 ? '' : 's') + ' in src/ and test/.',
   );
 }
 

@@ -507,6 +507,12 @@ var NodeProjectScaffolder = class {
         this.templates.gitignore(),
         "\u{1F419} .gitignore created"
       ),
+      this.copyTemplate(
+        paths,
+        "README.md",
+        (0, import_node_path3.join)(input.projectPath, "README.md"),
+        "\u{1F4D8} README.md created"
+      ),
       this.copyTemplate(paths, "di.cjs", (0, import_node_path3.join)(paths.di(), "install.cjs"), "\u{1F9E9} Optional DI command prepared"),
       this.copyTemplate(paths, "dependency-injection.ts", (0, import_node_path3.join)(paths.di(), "container.ts"), "\u{1F9E9} DI template prepared"),
       this.copyTemplate(paths, "dependency-injection.d.ts", (0, import_node_path3.join)(paths.di(), "container.d.ts"), "\u{1F9E9} DI types prepared"),

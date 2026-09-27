@@ -99,7 +99,7 @@ npm run fmt -- src/application/create-user.ts
 ```
 
 
-O comando `fmt` é leve e não adiciona uma biblioteca externa de formatação. Ele atua somente nos arquivos JavaScript e TypeScript de `src/` e `test/`, corrigindo a identação, expandindo blocos compactos como `function teste(){console.log()}`, adicionando ponto e vírgula aos statements reconhecidos e convertendo strings com aspas duplas para aspas simples. Objetos literais não são expandidos. O comando também remove bindings de import confirmados como não usados e apaga completamente imports com bindings quando nenhum deles é utilizado. Imports escritos originalmente apenas por efeito colateral, como `import './setup';`, são preservados. `import type` sem uso é removido sem criar import de runtime. Imports com comentários internos não são reescritos. Template strings com crase, regex, comentários e atributos JSX com aspas permanecem intactos.
+O comando `fmt` é leve e não adiciona uma biblioteca externa de formatação. Ele atua somente nos arquivos JavaScript e TypeScript de `src/` e `test/`, corrigindo a indentação, expandindo blocos compactos como `function teste(){console.log()}`, adicionando ponto e vírgula aos statements reconhecidos, convertendo strings com aspas duplas para aspas simples, separando statements independentes que estão na mesma linha, compactando chamadas curtas quebradas em várias linhas e expandindo arrays, objetos, listas de argumentos, parâmetros de funções e construtores, destructuring e imports/exports nomeados médios ou grandes quando isso melhora a leitura. O formatador preserva comentários, template strings, regex, atributos JSX com aspas, listas multilinha com vírgula final e os ponto e vírgula internos de `for`. Ele também remove bindings de import confirmados como não usados e apaga completamente imports com bindings quando nenhum deles é utilizado.
 
 ## Testes automáticos
 
@@ -308,6 +308,8 @@ providers.useClass<UserRepository>(
 Use tokens quando a dependência não possui uma classe que possa representá-la em runtime.
 
 ```ts
+import { createToken } from '../../kit-dev/di/container.js'
+
 const DATABASE_URL = createToken<string>('DATABASE_URL')
 const PORT = createToken<number>('PORT')
 

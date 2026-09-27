@@ -559,6 +559,551 @@ function expandCompactBlocks(source, fileName = 'source.ts') {
   return result;
 }
 
+
+function splitSameLineStatements(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const newline = source.includes('\r\n') ? '\r\n' : '\n';
+  const replacements = [];
+
+  function visit(node) {
+    const statements = node.statements;
+
+    if (statements && typeof statements.length === 'number') {
+      for (let index = 1; index < statements.length; index += 1) {
+        const previous = statements[index - 1];
+        const current = statements[index];
+        const gapStart = previous.getEnd();
+        const currentStart = current.getStart(sourceFile);
+        const gap = source.slice(gapStart, currentStart);
+
+        if (
+          !gap.includes('\n') &&
+          !gap.includes('\r') &&
+          gap.trim() === ''
+        ) {
+          replacements.push({
+            start: gapStart,
+            end: currentStart,
+            value: newline,
+          });
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const change of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+  }
+
+  return result;
+}
+
+function containsComment(text) {
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    ts.LanguageVariant.Standard,
+    text,
+  );
+
+  while (scanner.scan() !== ts.SyntaxKind.EndOfFileToken) {
+    const token = scanner.getToken();
+
+    if (
+      token === ts.SyntaxKind.SingleLineCommentTrivia ||
+      token === ts.SyntaxKind.MultiLineCommentTrivia
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function lineLengthWithReplacement(source, start, end, replacement) {
+  const lineStart = Math.max(
+    source.lastIndexOf('\n', start - 1),
+    source.lastIndexOf('\r', start - 1),
+  ) + 1;
+  const newlineIndex = source.indexOf('\n', end);
+  const carriageIndex = source.indexOf('\r', end);
+  const candidates = [newlineIndex, carriageIndex].filter((index) => index >= 0);
+  const lineEnd =
+    candidates.length > 0 ? Math.min(...candidates) : source.length;
+
+  return (
+    source.slice(lineStart, start).length +
+    replacement.length +
+    source.slice(end, lineEnd).length
+  );
+}
+
+function listFormattingInfo(node) {
+  if (ts.isArrayLiteralExpression(node)) {
+    return {
+      items: node.elements,
+      threshold: 4,
+      kind: 'array',
+      open: '[',
+      close: ']',
+      padded: false,
+    };
+  }
+
+  if (ts.isObjectLiteralExpression(node)) {
+    return {
+      items: node.properties,
+      threshold: 3,
+      kind: 'object',
+      open: '{',
+      close: '}',
+      padded: true,
+    };
+  }
+
+  if (ts.isArrayBindingPattern(node)) {
+    return {
+      items: node.elements,
+      threshold: 4,
+      kind: 'array-binding',
+      open: '[',
+      close: ']',
+      padded: false,
+    };
+  }
+
+  if (ts.isObjectBindingPattern(node)) {
+    return {
+      items: node.elements,
+      threshold: 4,
+      kind: 'object-binding',
+      open: '{',
+      close: '}',
+      padded: true,
+    };
+  }
+
+  if (ts.isNamedImports(node) || ts.isNamedExports(node)) {
+    return {
+      items: node.elements,
+      threshold: 5,
+      kind: 'named',
+      open: '{',
+      close: '}',
+      padded: true,
+    };
+  }
+
+  if (
+    (ts.isCallExpression(node) || ts.isNewExpression(node)) &&
+    node.arguments
+  ) {
+    return {
+      items: node.arguments,
+      threshold: 4,
+      kind: 'arguments',
+      open: '(',
+      close: ')',
+      padded: false,
+    };
+  }
+
+  if (
+    node.parameters &&
+    typeof node.parameters.length === 'number' &&
+    !ts.isSourceFile(node)
+  ) {
+    return {
+      items: node.parameters,
+      threshold: 4,
+      kind: 'parameters',
+      open: '(',
+      close: ')',
+      padded: false,
+    };
+  }
+
+  return null;
+}
+
+function shouldSkipListItem(item) {
+  return ts.isOmittedExpression(item);
+}
+
+function findListBounds(source, sourceFile, node, info) {
+  const nodeStart = node.getStart(sourceFile);
+  const nodeEnd = node.getEnd();
+  const firstPosition =
+    info.items.length > 0
+      ? info.items[0].getStart(sourceFile)
+      : info.items.pos;
+  const lastPosition =
+    info.items.length > 0
+      ? info.items[info.items.length - 1].getEnd()
+      : info.items.end;
+  const openIndex = source.lastIndexOf(info.open, firstPosition);
+  const closeIndex = source.indexOf(info.close, lastPosition);
+
+  if (
+    openIndex < nodeStart ||
+    closeIndex < 0 ||
+    closeIndex >= nodeEnd ||
+    openIndex >= closeIndex
+  ) {
+    return null;
+  }
+
+  return {
+    start: openIndex + 1,
+    end: closeIndex,
+  };
+}
+
+function formatDelimitedListsOnce(
+  source,
+  fileName = 'source.ts',
+  maxLineLength = 100,
+) {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const candidates = [];
+
+  function visit(node, depth = 0) {
+    const info = listFormattingInfo(node);
+
+    if (info && !info.items.hasTrailingComma) {
+      const bounds = findListBounds(source, sourceFile, node, info);
+
+      if (bounds) {
+        const rawInterior = source.slice(bounds.start, bounds.end);
+        const nodeText = source.slice(node.getStart(sourceFile), node.getEnd());
+
+        if (info.items.length === 0) {
+          if (
+            info.kind === 'arguments' &&
+            rawInterior.trim() === '' &&
+            (rawInterior.includes('\n') || rawInterior.includes('\r'))
+          ) {
+            candidates.push({
+              start: bounds.start,
+              end: bounds.end,
+              value: '',
+              depth,
+            });
+          }
+        } else if (!containsComment(nodeText)) {
+          const itemTexts = info.items.map((item) =>
+            source.slice(item.getStart(sourceFile), item.getEnd()),
+          );
+
+          if (
+            itemTexts.length > 0 &&
+            !itemTexts.some((text, index) =>
+              shouldSkipListItem(info.items[index], text),
+            )
+          ) {
+            const joined = itemTexts.join(', ');
+            const compact = info.padded ? ' ' + joined + ' ' : joined;
+            const hasMultilineItem = itemTexts.some(
+              (text) => text.includes('\n') || text.includes('\r'),
+            );
+            const projectedLength = lineLengthWithReplacement(
+              source,
+              bounds.start,
+              bounds.end,
+              compact,
+            );
+            const shouldExpand =
+              info.items.length >= info.threshold ||
+              projectedLength > maxLineLength;
+            const preserveMultilineItems =
+              hasMultilineItem && info.kind !== 'array';
+
+            let value = null;
+
+            if (!preserveMultilineItems && shouldExpand) {
+              value = '\n' + itemTexts.join(',\n') + '\n';
+            } else if (!hasMultilineItem) {
+              value = compact;
+            }
+
+            if (value !== null && value !== rawInterior) {
+              candidates.push({
+                start: bounds.start,
+                end: bounds.end,
+                value,
+                depth,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    ts.forEachChild(node, (child) => visit(child, depth + 1));
+  }
+
+  visit(sourceFile);
+
+  if (candidates.length === 0) return source;
+
+  const maxDepth = Math.max(...candidates.map((candidate) => candidate.depth));
+  const deepest = candidates
+    .filter((candidate) => candidate.depth === maxDepth)
+    .sort((a, b) => b.start - a.start);
+
+  let result = source;
+
+  for (const change of deepest) {
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+  }
+
+  return result;
+}
+
+function formatDelimitedLists(
+  source,
+  fileName = 'source.ts',
+  maxLineLength = 100,
+) {
+  let result = source;
+
+  for (let pass = 0; pass < 20; pass += 1) {
+    const next = formatDelimitedListsOnce(
+      result,
+      fileName,
+      maxLineLength,
+    );
+
+    if (next === result) break;
+    result = next;
+  }
+
+  return result;
+}
+
+function compactShortCalls(source, fileName = 'source.ts', maxLineLength = 100) {
+  return formatDelimitedLists(source, fileName, maxLineLength);
+}
+
+function formatSource(source, fileName = 'source.ts') {
+  const withoutUnusedImports = removeUnusedImports(source, fileName);
+  const quoted = useSingleQuotes(withoutUnusedImports, fileName);
+  const withSemicolons = addSemicolons(quoted, fileName);
+  const expanded = expandCompactBlocks(withSemicolons, fileName);
+  const split = splitSameLineStatements(expanded, fileName);
+  const listed = formatDelimitedLists(split, fileName);
+
+  return indentSource(listed);
+}
+
+function matchingOpener(char) {
+  if (char === ')') return '(';
+  if (char === ']') return '[';
+  if (char === '}') return '{';
+  return null;
+}
+
+function effectiveIndentDepth(stack) {
+  return stack.reduce(
+    (depth, entry) => depth + (entry.indent ? 1 : 0),
+    0,
+  );
+}
+
+function scanIndentationLine(line, state, stack, lineNumber) {
+  let escaped = false;
+  let regexClass = false;
+  let previousCode = '';
+  let leading = true;
+  let leadingDedent = 0;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (state.blockComment) {
+      if (char === '*' && next === '/') {
+        state.blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+
+    if (state.quote) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === state.quote) {
+        state.quote = null;
+      }
+      continue;
+    }
+
+    if (state.template) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '`') {
+        state.template = false;
+      }
+      continue;
+    }
+
+    if (state.regex) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '[') {
+        regexClass = true;
+        continue;
+      }
+
+      if (char === ']' && regexClass) {
+        regexClass = false;
+        continue;
+      }
+
+      if (char === '/' && !regexClass) {
+        state.regex = false;
+      }
+      continue;
+    }
+
+    if (char === '/' && next === '/') break;
+
+    if (char === '/' && next === '*') {
+      state.blockComment = true;
+      leading = false;
+      index += 1;
+      continue;
+    }
+
+    if (
+      char === '/' &&
+      next !== '/' &&
+      next !== '*' &&
+      (!previousCode || /[({[,:;=!?&|]/.test(previousCode))
+    ) {
+      state.regex = true;
+      regexClass = false;
+      previousCode = '/';
+      leading = false;
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      state.quote = char;
+      previousCode = char;
+      leading = false;
+      continue;
+    }
+
+    if (char === '`') {
+      state.template = true;
+      previousCode = char;
+      leading = false;
+      continue;
+    }
+
+    if (/\s/.test(char)) continue;
+
+    if (char === '(') {
+      stack.push({ char, indent: true, line: lineNumber });
+      previousCode = char;
+      leading = false;
+      continue;
+    }
+
+    if (char === '{' || char === '[') {
+      for (let stackIndex = stack.length - 1; stackIndex >= 0; stackIndex -= 1) {
+        const entry = stack[stackIndex];
+
+        if (entry.line !== lineNumber) break;
+
+        if (entry.char === '(' && entry.indent) {
+          entry.indent = false;
+          break;
+        }
+      }
+
+      stack.push({ char, indent: true, line: lineNumber });
+      previousCode = char;
+      leading = false;
+      continue;
+    }
+
+    const opener = matchingOpener(char);
+
+    if (opener) {
+      let matched = null;
+
+      for (let stackIndex = stack.length - 1; stackIndex >= 0; stackIndex -= 1) {
+        if (stack[stackIndex].char === opener) {
+          matched = stack.splice(stackIndex, 1)[0];
+          break;
+        }
+      }
+
+      if (leading && matched?.indent) {
+        leadingDedent += 1;
+      }
+
+      previousCode = char;
+      continue;
+    }
+
+    previousCode = char;
+    leading = false;
+  }
+
+  return leadingDedent;
+}
+
 function indentSource(source) {
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   const hadFinalNewline = source.endsWith('\n');
@@ -569,24 +1114,28 @@ function indentSource(source) {
     template: false,
     regex: false,
   };
+  const stack = [];
 
-  let depth = 0;
-
-  const formatted = lines.map((line) => {
+  const formatted = lines.map((line, lineNumber) => {
     if (line.trim() === '') return '';
 
     const wasInsideTemplate = state.template;
-    const trimmed = line.trim();
-    const structure = scanStructure(wasInsideTemplate ? line : trimmed, state);
+    const text = wasInsideTemplate ? line : line.trim();
+    const depthBefore = effectiveIndentDepth(stack);
+    const leadingDedent = scanIndentationLine(
+      text,
+      state,
+      stack,
+      lineNumber,
+    );
 
     if (wasInsideTemplate) {
       return line;
     }
 
-    const lineDepth = Math.max(0, depth - structure.leadingClosers);
-    depth = Math.max(0, depth + structure.opens - structure.closes);
+    const lineDepth = Math.max(0, depthBefore - leadingDedent);
 
-    return indentUnit.repeat(lineDepth) + trimmed;
+    return indentUnit.repeat(lineDepth) + text;
   });
 
   let result = formatted.join(newline);
@@ -630,11 +1179,7 @@ function resolveTarget(target) {
 
 async function formatFile(file) {
   const source = await readFile(file, 'utf8');
-  const withoutUnusedImports = removeUnusedImports(source, file);
-  const quoted = useSingleQuotes(withoutUnusedImports, file);
-  const withSemicolons = addSemicolons(quoted, file);
-  const expanded = expandCompactBlocks(withSemicolons, file);
-  const formatted = indentSource(expanded);
+  const formatted = formatSource(source, file);
 
   if (formatted === source) {
     return false;
@@ -693,9 +1238,13 @@ if (require.main === module) {
 
 module.exports = {
   addSemicolons,
+  compactShortCalls,
   expandCompactBlocks,
+  formatDelimitedLists,
+  formatSource,
   indentSource,
   removeUnusedImports,
   resolveTarget,
+  splitSameLineStatements,
   useSingleQuotes,
 };

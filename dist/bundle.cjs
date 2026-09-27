@@ -284,41 +284,8 @@ var NodeVersionPolicy = class {
   }
 };
 
-// src/infrastructure/package-manager/package-manager.ts
-var PackageManagerRegistry = class {
-  static {
-    __name(this, "PackageManagerRegistry");
-  }
-  managers = Object.freeze({
-    npm: {
-      command: "npm",
-      installArgs: ["install", "--save-dev"],
-      runCommand: "npm run"
-    },
-    yarn: {
-      command: "yarn",
-      installArgs: ["add", "-D"],
-      runCommand: "yarn"
-    },
-    pnpm: {
-      command: "pnpm",
-      installArgs: ["--allow-build=esbuild", "add", "-D"],
-      runCommand: "pnpm"
-    }
-  });
-  get(manager) {
-    return this.managers[manager];
-  }
-}, NodePackageManagerDetector = class {
-  static {
-    __name(this, "NodePackageManagerDetector");
-  }
-  environment = process.env;
-  detect(environment = this.environment) {
-    let execPath = environment.npm_execpath ?? "", userAgent = environment.npm_config_user_agent ?? "";
-    return userAgent.startsWith("pnpm") ? "pnpm" : userAgent.startsWith("yarn") ? "yarn" : (execPath.includes("npm-cli.js") || execPath.includes("npx"), "npm");
-  }
-}, NodePackageInstaller = class {
+// src/infrastructure/package-manager/node-package-installer.ts
+var NodePackageInstaller = class {
   constructor(commandRunner, terminal, registry) {
     this.commandRunner = commandRunner;
     this.terminal = terminal;
@@ -351,6 +318,45 @@ var PackageManagerRegistry = class {
         errorMessage: `${input.manager} installation failed.`
       }
     );
+  }
+};
+
+// src/infrastructure/package-manager/node-package-manager-detector.ts
+var NodePackageManagerDetector = class {
+  static {
+    __name(this, "NodePackageManagerDetector");
+  }
+  environment = process.env;
+  detect(environment = this.environment) {
+    let execPath = environment.npm_execpath ?? "", userAgent = environment.npm_config_user_agent ?? "";
+    return userAgent.startsWith("pnpm") ? "pnpm" : userAgent.startsWith("yarn") ? "yarn" : (execPath.includes("npm-cli.js") || execPath.includes("npx"), "npm");
+  }
+};
+
+// src/infrastructure/package-manager/package-manager-registry.ts
+var PackageManagerRegistry = class {
+  static {
+    __name(this, "PackageManagerRegistry");
+  }
+  managers = Object.freeze({
+    npm: {
+      command: "npm",
+      installArgs: ["install", "--save-dev"],
+      runCommand: "npm run"
+    },
+    yarn: {
+      command: "yarn",
+      installArgs: ["add", "-D"],
+      runCommand: "yarn"
+    },
+    pnpm: {
+      command: "pnpm",
+      installArgs: ["--allow-build=esbuild", "add", "-D"],
+      runCommand: "pnpm"
+    }
+  });
+  get(manager) {
+    return this.managers[manager];
   }
 };
 
@@ -394,76 +400,11 @@ var NodeCommandRunner = class {
 };
 
 // src/infrastructure/project/node-project-scaffolder.ts
-var import_node_fs = require("node:fs"), import_promises = require("node:fs/promises"), import_node_path2 = require("node:path");
-var NodeProjectScaffolder = class {
-  constructor(terminal, templates) {
-    this.terminal = terminal;
-    this.templates = templates;
-  }
-  terminal;
-  templates;
-  static {
-    __name(this, "NodeProjectScaffolder");
-  }
-  async create(input) {
-    let paths = new ProjectPaths(input.projectPath);
-    for (let directory of paths.directories())
-      await this.createDirectory(directory);
-    await Promise.all([
-      this.writeFile(
-        (0, import_node_path2.join)(paths.src(), "main.ts"),
-        this.templates.mainFile(),
-        "\u{1F4DD} src/main.ts created"
-      ),
-      this.writeFile(
-        (0, import_node_path2.join)(paths.test(), "example.test.ts"),
-        this.templates.exampleTest(),
-        "\u{1F9EA} test/example.test.ts created"
-      ),
-      this.writeFile(
-        (0, import_node_path2.join)(input.projectPath, "package.json"),
-        this.templates.packageJson(input.projectName),
-        "\u{1F4E6} package.json created"
-      ),
-      this.writeFile(
-        (0, import_node_path2.join)(input.projectPath, "tsconfig.json"),
-        this.templates.tsconfig(),
-        "\u2699\uFE0F tsconfig.json created"
-      ),
-      this.writeFile(
-        (0, import_node_path2.join)(paths.build(), "esbuild.config.cjs"),
-        this.templates.esbuildConfig(),
-        "\u{1F6E0} kit-dev/build/esbuild.config.cjs created"
-      ),
-      this.writeFile(
-        (0, import_node_path2.join)(input.projectPath, ".gitignore"),
-        this.templates.gitignore(),
-        "\u{1F419} .gitignore created"
-      ),
-      this.copyTemplate(paths, "di.cjs", (0, import_node_path2.join)(paths.di(), "install.cjs"), "\u{1F9E9} Optional DI command prepared"),
-      this.copyTemplate(paths, "dependency-injection.ts", (0, import_node_path2.join)(paths.di(), "container.ts"), "\u{1F9E9} DI template prepared"),
-      this.copyTemplate(paths, "dependency-injection.d.ts", (0, import_node_path2.join)(paths.di(), "container.d.ts"), "\u{1F9E9} DI types prepared"),
-      this.copyTemplate(paths, "di-transformer.cjs", (0, import_node_path2.join)(paths.di(), "transformer.cjs"), "\u{1F9E9} DI transformer prepared"),
-      this.copyTemplate(paths, "dev.cjs", (0, import_node_path2.join)(paths.build(), "dev.cjs"), "\u26A1 esbuild development runner prepared"),
-      this.copyTemplate(paths, "providers.ts", (0, import_node_path2.join)(paths.di(), "providers.ts"), "\u{1F9E9} DI providers template prepared"),
-      this.copyTemplate(paths, "runner.cjs", (0, import_node_path2.join)(paths.kitDevTest(), "test.cjs"), "\u{1F9EA} Native test runner prepared"),
-      this.copyTemplate(paths, "test-generator.cjs", (0, import_node_path2.join)(paths.kitDevTest(), "generator.cjs"), "\u{1F9EA} Automatic test generator prepared")
-    ]);
-  }
-  async createDirectory(directory) {
-    try {
-      await (0, import_promises.mkdir)(directory), this.terminal.success(`\u{1F4C1} Folder created: ${directory}`);
-    } catch (error) {
-      throw error instanceof Error && "code" in error && error.code === "EEXIST" ? new Error(`\u26A0\uFE0F  Folder already exists: ${directory}`) : error;
-    }
-  }
-  async writeFile(path2, content, message) {
-    await (0, import_promises.writeFile)(path2, content, "utf-8"), this.terminal.success(message);
-  }
-  async copyTemplate(paths, sourceName, destination, message) {
-    await (0, import_promises.copyFile)((0, import_node_path2.join)(paths.templates(), sourceName), destination), this.terminal.success(message);
-  }
-}, ProjectPaths = class {
+var import_promises = require("node:fs/promises"), import_node_path3 = require("node:path");
+
+// src/infrastructure/project/project-paths.ts
+var import_node_fs = require("node:fs"), import_node_path2 = require("node:path");
+var ProjectPaths = class {
   constructor(projectPath) {
     this.projectPath = projectPath;
   }
@@ -520,24 +461,80 @@ var NodeProjectScaffolder = class {
   }
 };
 
+// src/infrastructure/project/node-project-scaffolder.ts
+var NodeProjectScaffolder = class {
+  constructor(terminal, templates) {
+    this.terminal = terminal;
+    this.templates = templates;
+  }
+  terminal;
+  templates;
+  static {
+    __name(this, "NodeProjectScaffolder");
+  }
+  async create(input) {
+    let paths = new ProjectPaths(input.projectPath);
+    for (let directory of paths.directories())
+      await this.createDirectory(directory);
+    await Promise.all([
+      this.writeFile(
+        (0, import_node_path3.join)(paths.src(), "main.ts"),
+        this.templates.mainFile(),
+        "\u{1F4DD} src/main.ts created"
+      ),
+      this.writeFile(
+        (0, import_node_path3.join)(paths.test(), "example.test.ts"),
+        this.templates.exampleTest(),
+        "\u{1F9EA} test/example.test.ts created"
+      ),
+      this.writeFile(
+        (0, import_node_path3.join)(input.projectPath, "package.json"),
+        this.templates.packageJson(input.projectName),
+        "\u{1F4E6} package.json created"
+      ),
+      this.writeFile(
+        (0, import_node_path3.join)(input.projectPath, "tsconfig.json"),
+        this.templates.tsconfig(),
+        "\u2699\uFE0F tsconfig.json created"
+      ),
+      this.writeFile(
+        (0, import_node_path3.join)(paths.build(), "esbuild.config.cjs"),
+        this.templates.esbuildConfig(),
+        "\u{1F6E0} kit-dev/build/esbuild.config.cjs created"
+      ),
+      this.writeFile(
+        (0, import_node_path3.join)(input.projectPath, ".gitignore"),
+        this.templates.gitignore(),
+        "\u{1F419} .gitignore created"
+      ),
+      this.copyTemplate(paths, "di.cjs", (0, import_node_path3.join)(paths.di(), "install.cjs"), "\u{1F9E9} Optional DI command prepared"),
+      this.copyTemplate(paths, "dependency-injection.ts", (0, import_node_path3.join)(paths.di(), "container.ts"), "\u{1F9E9} DI template prepared"),
+      this.copyTemplate(paths, "dependency-injection.d.ts", (0, import_node_path3.join)(paths.di(), "container.d.ts"), "\u{1F9E9} DI types prepared"),
+      this.copyTemplate(paths, "di-transformer.cjs", (0, import_node_path3.join)(paths.di(), "transformer.cjs"), "\u{1F9E9} DI transformer prepared"),
+      this.copyTemplate(paths, "dev.cjs", (0, import_node_path3.join)(paths.build(), "dev.cjs"), "\u26A1 esbuild development runner prepared"),
+      this.copyTemplate(paths, "providers.ts", (0, import_node_path3.join)(paths.di(), "providers.ts"), "\u{1F9E9} DI providers template prepared"),
+      this.copyTemplate(paths, "runner.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test.cjs"), "\u{1F9EA} Native test runner prepared"),
+      this.copyTemplate(paths, "test-generator.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "generator.cjs"), "\u{1F9EA} Automatic test generator prepared")
+    ]);
+  }
+  async createDirectory(directory) {
+    try {
+      await (0, import_promises.mkdir)(directory), this.terminal.success(`\u{1F4C1} Folder created: ${directory}`);
+    } catch (error) {
+      throw error instanceof Error && "code" in error && error.code === "EEXIST" ? new Error(`\u26A0\uFE0F  Folder already exists: ${directory}`) : error;
+    }
+  }
+  async writeFile(path2, content, message) {
+    await (0, import_promises.writeFile)(path2, content, "utf-8"), this.terminal.success(message);
+  }
+  async copyTemplate(paths, sourceName, destination, message) {
+    await (0, import_promises.copyFile)((0, import_node_path3.join)(paths.templates(), sourceName), destination), this.terminal.success(message);
+  }
+};
+
 // src/presentation/terminal/terminal-adapter.ts
 var import_node_readline = require("node:readline");
-var TerminalPalette = class {
-  static {
-    __name(this, "TerminalPalette");
-  }
-  reset = "\x1B[0m";
-  bold = "\x1B[1m";
-  cyan = "\x1B[36m";
-  green = "\x1B[32m";
-  yellow = "\x1B[33m";
-  red = "\x1B[31m";
-  magenta = "\x1B[35m";
-  gray = "\x1B[90m";
-  paint(color, message) {
-    return color + message + this.reset;
-  }
-}, TerminalAdapter = class {
+var TerminalAdapter = class {
   constructor(palette) {
     this.palette = palette;
   }
@@ -597,6 +594,24 @@ var TerminalPalette = class {
       this.palette.yellow,
       `${runCommand} ${command}`
     ) + spacing + this.palette.paint(this.palette.gray, `# ${description}`);
+  }
+};
+
+// src/presentation/terminal/terminal-palette.ts
+var TerminalPalette = class {
+  static {
+    __name(this, "TerminalPalette");
+  }
+  reset = "\x1B[0m";
+  bold = "\x1B[1m";
+  cyan = "\x1B[36m";
+  green = "\x1B[32m";
+  yellow = "\x1B[33m";
+  red = "\x1B[31m";
+  magenta = "\x1B[35m";
+  gray = "\x1B[90m";
+  paint(color, message) {
+    return color + message + this.reset;
   }
 };
 
@@ -787,7 +802,7 @@ var ProjectTemplateCatalog = class {
 };
 
 // src/di/providers.ts
-var providers = new AppConfig().useClass(/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/command-runner#CommandRunner"), NodeCommandRunner, []).useClass(/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/terminal#Terminal"), TerminalAdapter, [/* @__PURE__ */ Symbol.for("kit-dev:src/presentation/terminal/terminal-adapter#TerminalPalette")]).useClass(/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/package-manager-detector#PackageManagerDetector"), NodePackageManagerDetector, []).useClass(/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/path-resolver#PathResolver"), NodePathResolver, []).useClass(/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/project-scaffolder#ProjectScaffolder"), NodeProjectScaffolder, [/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/terminal#Terminal"), /* @__PURE__ */ Symbol.for("kit-dev:src/templates/project-files#ProjectTemplateCatalog")]).useClass(/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/package-installer#PackageInstaller"), NodePackageInstaller, [/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/command-runner#CommandRunner"), /* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/terminal#Terminal"), /* @__PURE__ */ Symbol.for("kit-dev:src/infrastructure/package-manager/package-manager#PackageManagerRegistry")]).useClass(TerminalPalette, []).useExisting(/* @__PURE__ */ Symbol.for("kit-dev:src/presentation/terminal/terminal-adapter#TerminalPalette"), TerminalPalette).useClass(ProjectTemplateCatalog, []).useExisting(/* @__PURE__ */ Symbol.for("kit-dev:src/templates/project-files#ProjectTemplateCatalog"), ProjectTemplateCatalog).useClass(PackageManagerRegistry, []).useExisting(/* @__PURE__ */ Symbol.for("kit-dev:src/infrastructure/package-manager/package-manager#PackageManagerRegistry"), PackageManagerRegistry).useClass(NodeVersionPolicy, []).useExisting(/* @__PURE__ */ Symbol.for("kit-dev:src/application/policies/node-version-policy#NodeVersionPolicy"), NodeVersionPolicy).useClass(CreateProject, [/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/project-scaffolder#ProjectScaffolder"), /* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/package-installer#PackageInstaller"), /* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/path-resolver#PathResolver")]).useExisting(/* @__PURE__ */ Symbol.for("kit-dev:src/application/create-project#CreateProject"), CreateProject).useClass(CliApplication, [/* @__PURE__ */ Symbol.for("kit-dev:src/application/create-project#CreateProject"), /* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/terminal#Terminal"), /* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/package-manager-detector#PackageManagerDetector"), /* @__PURE__ */ Symbol.for("kit-dev:src/application/policies/node-version-policy#NodeVersionPolicy")]).useExisting(/* @__PURE__ */ Symbol.for("kit-dev:src/presentation/cli/cli-application#CliApplication"), CliApplication), container = createApplicationContext(providers);
+var providers = new AppConfig().useClass(/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/command-runner#CommandRunner"), NodeCommandRunner, []).useClass(/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/terminal#Terminal"), TerminalAdapter, [/* @__PURE__ */ Symbol.for("kit-dev:src/presentation/terminal/terminal-palette#TerminalPalette")]).useClass(/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/package-manager-detector#PackageManagerDetector"), NodePackageManagerDetector, []).useClass(/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/path-resolver#PathResolver"), NodePathResolver, []).useClass(/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/project-scaffolder#ProjectScaffolder"), NodeProjectScaffolder, [/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/terminal#Terminal"), /* @__PURE__ */ Symbol.for("kit-dev:src/templates/project-files#ProjectTemplateCatalog")]).useClass(/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/package-installer#PackageInstaller"), NodePackageInstaller, [/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/command-runner#CommandRunner"), /* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/terminal#Terminal"), /* @__PURE__ */ Symbol.for("kit-dev:src/infrastructure/package-manager/package-manager-registry#PackageManagerRegistry")]).useClass(TerminalPalette, []).useExisting(/* @__PURE__ */ Symbol.for("kit-dev:src/presentation/terminal/terminal-palette#TerminalPalette"), TerminalPalette).useClass(ProjectTemplateCatalog, []).useExisting(/* @__PURE__ */ Symbol.for("kit-dev:src/templates/project-files#ProjectTemplateCatalog"), ProjectTemplateCatalog).useClass(PackageManagerRegistry, []).useExisting(/* @__PURE__ */ Symbol.for("kit-dev:src/infrastructure/package-manager/package-manager-registry#PackageManagerRegistry"), PackageManagerRegistry).useClass(NodeVersionPolicy, []).useExisting(/* @__PURE__ */ Symbol.for("kit-dev:src/application/policies/node-version-policy#NodeVersionPolicy"), NodeVersionPolicy).useClass(CreateProject, [/* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/project-scaffolder#ProjectScaffolder"), /* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/package-installer#PackageInstaller"), /* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/path-resolver#PathResolver")]).useExisting(/* @__PURE__ */ Symbol.for("kit-dev:src/application/create-project#CreateProject"), CreateProject).useClass(CliApplication, [/* @__PURE__ */ Symbol.for("kit-dev:src/application/create-project#CreateProject"), /* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/terminal#Terminal"), /* @__PURE__ */ Symbol.for("kit-dev:src/application/ports/package-manager-detector#PackageManagerDetector"), /* @__PURE__ */ Symbol.for("kit-dev:src/application/policies/node-version-policy#NodeVersionPolicy")]).useExisting(/* @__PURE__ */ Symbol.for("kit-dev:src/presentation/cli/cli-application#CliApplication"), CliApplication), container = createApplicationContext(providers);
 
 // src/main.ts
 container.get(CliApplication).run();

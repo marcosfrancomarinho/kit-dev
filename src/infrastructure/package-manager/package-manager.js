@@ -1,32 +1,37 @@
 const { PackageInstaller } = require('../../application/ports/package-installer');
+const {
+  PackageManagerDetector,
+} = require('../../application/ports/package-manager-detector');
 
-const DEPENDENCIES = [
-  'typescript@7.0.2',
-  '@typescript/typescript6@6.0.2',
-  'esbuild@0.28.2',
-  '@types/node@22',
-];
+class PackageManagerRegistry {
+  constructor() {
+    this.managers = Object.freeze({
+      npm: {
+        command: 'npm',
+        installArgs: ['install', '--save-dev'],
+        runCommand: 'npm run',
+      },
+      yarn: {
+        command: 'yarn',
+        installArgs: ['add', '-D'],
+        runCommand: 'yarn',
+      },
+      pnpm: {
+        command: 'pnpm',
+        installArgs: ['--allow-build=esbuild', 'add', '-D'],
+        runCommand: 'pnpm',
+      },
+    });
+  }
 
-const MANAGERS = Object.freeze({
-  npm: {
-    command: 'npm',
-    installArgs: ['install', '--save-dev'],
-    runCommand: 'npm run',
-  },
-  yarn: {
-    command: 'yarn',
-    installArgs: ['add', '-D'],
-    runCommand: 'yarn',
-  },
-  pnpm: {
-    command: 'pnpm',
-    installArgs: ['--allow-build=esbuild', 'add', '-D'],
-    runCommand: 'pnpm',
-  },
-});
+  get(manager) {
+    return this.managers[manager] || this.managers.npm;
+  }
+}
 
-class PackageManagerDetector {
+class NodePackageManagerDetector extends PackageManagerDetector {
   constructor(environment = process.env) {
+    super();
     this.environment = environment;
   }
 
@@ -43,51 +48,41 @@ class PackageManagerDetector {
 }
 
 class NodePackageInstaller extends PackageInstaller {
-  constructor(commandRunner, output) {
+  constructor(commandRunner, terminal, registry = new PackageManagerRegistry()) {
     super();
     this.commandRunner = commandRunner;
-    this.output = output;
+    this.terminal = terminal;
+    this.registry = registry;
+    this.dependencies = Object.freeze([
+      'typescript@7.0.2',
+      '@typescript/typescript6@6.0.2',
+      'esbuild@0.28.2',
+      '@types/node@22',
+    ]);
   }
 
   getRunCommand(manager) {
-    return this.getManager(manager).runCommand;
+    return this.registry.get(manager).runCommand;
   }
 
   async install({ manager, projectPath }) {
-    const selectedManager = this.getManager(manager);
+    const selectedManager = this.registry.get(manager);
 
-    this.output.info(`⬇️ Installing dependencies with ${manager}...`);
+    this.terminal.info(`⬇️ Installing dependencies with ${manager}...`);
 
     await this.commandRunner.run(
       selectedManager.command,
-      [...selectedManager.installArgs, ...DEPENDENCIES],
+      [...selectedManager.installArgs, ...this.dependencies],
       {
         cwd: projectPath,
         errorMessage: `${manager} installation failed.`,
       },
     );
   }
-
-  getManager(manager) {
-    return MANAGERS[manager] || MANAGERS.npm;
-  }
-}
-
-function detectPackageManager(environment = process.env) {
-  return new PackageManagerDetector(environment).detect();
-}
-
-function createPackageManager({ commandRunner, output }) {
-  const installer = new NodePackageInstaller(commandRunner, output);
-
-  installer.detect = () => detectPackageManager();
-
-  return installer;
 }
 
 module.exports = {
   NodePackageInstaller,
-  PackageManagerDetector,
-  createPackageManager,
-  detectPackageManager,
+  NodePackageManagerDetector,
+  PackageManagerRegistry,
 };

@@ -3,10 +3,13 @@ const { describe, it } = require('node:test');
 
 const {
   addSemicolons,
+  compactShortCalls,
   expandCompactBlocks,
+  formatSource,
   indentSource,
   removeUnusedImports,
   resolveTarget,
+  splitSameLineStatements,
   useSingleQuotes,
 } = require('../src/templates/files/formatter.cjs');
 
@@ -115,6 +118,234 @@ describe('source formatter', () => {
     );
   });
 
+
+
+  it('splits independent statements that share the same line', () => {
+    const source = [
+      "const first = 'first'; const last = 'last';",
+      'let one = 1; let two = 2; let three = 3;',
+      '',
+    ].join('\n');
+
+    assert.equal(
+      splitSameLineStatements(source, 'example.ts'),
+      [
+        "const first = 'first'; ",
+        "const last = 'last';",
+        'let one = 1; ',
+        'let two = 2; ',
+        'let three = 3;',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('splits same-line statements inside nested blocks', () => {
+    const source = [
+      'function run() {',
+      "  const first = 'first'; const last = 'last';",
+      '  if (first) { console.log(first); console.log(last); }',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = splitSameLineStatements(source, 'example.ts');
+
+    assert.match(result, /const first = 'first'; \nconst last = 'last';/);
+    assert.match(result, /console\.log\(first\); \nconsole\.log\(last\);/);
+  });
+
+  it('does not split semicolons that belong to for statements', () => {
+    const source = [
+      'for (let index = 0; index < 3; index += 1) {',
+      '  console.log(index);',
+      '}',
+      '',
+    ].join('\n');
+
+    assert.equal(splitSameLineStatements(source, 'example.ts'), source);
+  });
+
+  it('does not split semicolons inside strings, templates or regular expressions', () => {
+    const source = [
+      "const text = 'a; b; c';",
+      'const template = `a; b; c`;',
+      'const regex = /a;b;c/;',
+      '',
+    ].join('\n');
+
+    assert.equal(splitSameLineStatements(source, 'example.ts'), source);
+  });
+
+  it('does not move comments placed between same-line statements', () => {
+    const source = "const first = 1; /* keep */ const last = 2;\n";
+
+    assert.equal(splitSameLineStatements(source, 'example.ts'), source);
+  });
+
+  it('compacts short multiline function and constructor calls', () => {
+    const source = [
+      'const first = createName(',
+      "  'first',",
+      "  'last'",
+      ');',
+      'const second = new Name(',
+      '  first,',
+      '  last',
+      ');',
+      '',
+    ].join('\n');
+
+    assert.equal(
+      compactShortCalls(source, 'example.ts'),
+      [
+        "const first = createName('first', 'last');",
+        'const second = new Name(first, last);',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('compacts empty multiline calls', () => {
+    const source = ['run(', ');', ''].join('\n');
+
+    assert.equal(
+      compactShortCalls(source, 'example.ts'),
+      ['run();', ''].join('\n'),
+    );
+  });
+
+  it('keeps long calls multiline', () => {
+    const source = [
+      'const result = createSomething(',
+      "  'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz',",
+      "  'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz'",
+      ');',
+      '',
+    ].join('\n');
+
+    assert.equal(compactShortCalls(source, 'example.ts'), source);
+  });
+
+  it('keeps calls with comments multiline', () => {
+    const source = [
+      'const result = createName(',
+      "  'first', // keep this explanation",
+      "  'last'",
+      ');',
+      '',
+    ].join('\n');
+
+    assert.equal(compactShortCalls(source, 'example.ts'), source);
+  });
+
+  it('keeps calls with trailing commas multiline', () => {
+    const source = [
+      'const result = createName(',
+      "  'first',",
+      "  'last',",
+      ');',
+      '',
+    ].join('\n');
+
+    assert.equal(compactShortCalls(source, 'example.ts'), source);
+  });
+
+  it('keeps calls when an argument is itself multiline', () => {
+    const source = [
+      'const result = run(',
+      '  {',
+      "    name: 'Marcos',",
+      '  }',
+      ');',
+      '',
+    ].join('\n');
+
+    assert.equal(compactShortCalls(source, 'example.ts'), source);
+  });
+
+  it('does not mistake comment markers inside strings for comments', () => {
+    const source = [
+      'const url = build(',
+      "  'https://example.com/a//b',",
+      "  '/*literal*/'",
+      ');',
+      '',
+    ].join('\n');
+
+    assert.equal(
+      compactShortCalls(source, 'example.ts'),
+      [
+        "const url = build('https://example.com/a//b', '/*literal*/');",
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('formats the reported constructor case end to end', () => {
+    const source = [
+      "describe('Name', () => {",
+      "it('constructor', () => {",
+      "const first = 'first'; const last = 'last';",
+      '',
+      'const sut = new Name(first,',
+      'last);',
+      '',
+      'assert.ok(sut);',
+      '});',
+      '});',
+      '',
+    ].join('\n');
+
+    assert.equal(
+      formatSource(source, 'example.test.ts'),
+      [
+        "describe('Name', () => {",
+        "  it('constructor', () => {",
+        "    const first = 'first';",
+        "    const last = 'last';",
+        '',
+        '    const sut = new Name(first, last);',
+        '',
+        '    assert.ok(sut);',
+        '  });',
+        '});',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('is idempotent after formatting', () => {
+    const source = [
+      'function run(){const first = "first"; const last = "last";',
+      'return createName(',
+      'first,',
+      'last',
+      ')',
+      '}',
+      '',
+    ].join('\n');
+
+    const once = formatSource(source, 'example.ts');
+    const twice = formatSource(once, 'example.ts');
+
+    assert.equal(twice, once);
+  });
+
+  it('preserves JSX attributes while formatting surrounding statements', () => {
+    const source = [
+      'function View(){',
+      'const first = "first"; const last = "last";',
+      'return <div title="hello">{first + last}</div>',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.tsx');
+
+    assert.match(result, /title="hello"/);
+    assert.match(result, /const first = 'first';\n  const last = 'last';/);
+  });
 
   it('removes unused import bindings and fully unused imports', () => {
     const source = [

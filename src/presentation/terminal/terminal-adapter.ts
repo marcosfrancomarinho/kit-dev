@@ -50,6 +50,8 @@ export class TerminalAdapter implements Terminal {
         '\n  ' +
         this.formatCommand(runCommand, 'test', 'Run tests in watch mode') +
         '\n  ' +
+        this.formatCommand(runCommand, 'fmt', 'Indent src/ and test/ code') +
+        '\n  ' +
         this.formatCommand(runCommand, 'build', 'Build the project') +
         '\n  ' +
         this.formatCommand(runCommand, 'start', 'Run bundled output') +

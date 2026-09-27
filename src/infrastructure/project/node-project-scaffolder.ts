@@ -1,9 +1,9 @@
-import { existsSync } from 'node:fs';
 import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ProjectScaffolder } from '../../application/ports/project-scaffolder.js';
 import type { Terminal } from '../../application/ports/terminal.js';
 import { ProjectTemplateCatalog } from '../../templates/project-files.js';
+import { ProjectPaths } from './project-paths.js';
 
 export class NodeProjectScaffolder implements ProjectScaffolder {
   constructor(
@@ -97,68 +97,5 @@ export class NodeProjectScaffolder implements ProjectScaffolder {
   ): Promise<void> {
     await copyFile(join(paths.templates(), sourceName), destination);
     this.terminal.success(message);
-  }
-}
-
-export class ProjectPaths {
-  constructor(private readonly projectPath: string) {}
-
-  src(): string {
-    return join(this.projectPath, 'src');
-  }
-
-  kitDev(): string {
-    return join(this.projectPath, 'kit-dev');
-  }
-
-  build(): string {
-    return join(this.kitDev(), 'build');
-  }
-
-  di(): string {
-    return join(this.kitDev(), 'di');
-  }
-
-  kitDevTest(): string {
-    return join(this.kitDev(), 'test');
-  }
-
-  test(): string {
-    return join(this.projectPath, 'test');
-  }
-
-  templates(): string {
-    const productionPath = join(
-      __dirname,
-      '..',
-      'src',
-      'templates',
-      'files',
-    );
-    const developmentPath = join(
-      __dirname,
-      '..',
-      '..',
-      '..',
-      'src',
-      'templates',
-      'files',
-    );
-
-    return existsSync(productionPath)
-      ? productionPath
-      : developmentPath;
-  }
-
-  directories(): string[] {
-    return [
-      this.projectPath,
-      this.src(),
-      this.kitDev(),
-      this.build(),
-      this.di(),
-      this.kitDevTest(),
-      this.test(),
-    ];
   }
 }

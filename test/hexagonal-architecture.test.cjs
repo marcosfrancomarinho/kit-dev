@@ -1,62 +1,78 @@
 const assert = require('node:assert/strict');
 const { describe, it } = require('node:test');
 
+const { CreateProject } = require('../src/application/create-project');
 const {
-  createCreateProject,
-} = require('../src/application/create-project');
+  PackageInstaller,
+} = require('../src/application/ports/package-installer');
 const {
-  createProjectName,
-} = require('../src/domain/project/project-name');
+  PathResolver,
+} = require('../src/application/ports/path-resolver');
 const {
-  assertSupportedNodeVersion,
-} = require('../src/main');
+  ProjectScaffolder,
+} = require('../src/application/ports/project-scaffolder');
+const {
+  NodeVersionPolicy,
+} = require('../src/application/policies/node-version-policy');
+const { ProjectName } = require('../src/domain/project/project-name');
 
-describe('project name domain rule', () => {
+class FakeProjectScaffolder extends ProjectScaffolder {
+  constructor(calls) {
+    super();
+    this.calls = calls;
+  }
+
+  async create(input) {
+    this.calls.push(['scaffold', input]);
+  }
+}
+
+class FakePackageInstaller extends PackageInstaller {
+  constructor(calls) {
+    super();
+    this.calls = calls;
+  }
+
+  async install(input) {
+    this.calls.push(['install', input]);
+  }
+
+  getRunCommand(manager) {
+    return manager === 'pnpm' ? 'pnpm' : 'npm run';
+  }
+}
+
+class FakePathResolver extends PathResolver {
+  resolve(...parts) {
+    return parts.join('/');
+  }
+}
+
+describe('ProjectName', () => {
   it('normalizes and returns a valid project name', () => {
-    assert.equal(createProjectName('  my-api  '), 'my-api');
+    assert.equal(ProjectName.create('  my-api  ').toString(), 'my-api');
   });
 
   it('rejects empty, reserved and invalid names', () => {
-    assert.throws(() => createProjectName(''));
-    assert.throws(() => createProjectName('CON'));
-    assert.throws(() => createProjectName('my/api'));
+    assert.throws(() => ProjectName.create(''));
+    assert.throws(() => ProjectName.create('CON'));
+    assert.throws(() => ProjectName.create('my/api'));
   });
 });
 
-describe('CreateProject use case', () => {
+describe('CreateProject', () => {
   it('orchestrates scaffolding and dependency installation through ports', async () => {
     const calls = [];
-    const projectScaffolder = {
-      async create(input) {
-        calls.push(['scaffold', input]);
-      },
-    };
-    const packageManager = {
-      detect() {
-        return 'pnpm';
-      },
-      async install(input) {
-        calls.push(['install', input]);
-      },
-      getRunCommand(manager) {
-        return manager === 'pnpm' ? 'pnpm' : 'npm run';
-      },
-    };
-    const pathResolver = {
-      resolve(...parts) {
-        return parts.join('/');
-      },
-    };
-
-    const createProject = createCreateProject({
-      projectScaffolder,
-      packageManager,
-      pathResolver,
-    });
+    const createProject = new CreateProject(
+      new FakeProjectScaffolder(calls),
+      new FakePackageInstaller(calls),
+      new FakePathResolver(),
+    );
 
     const result = await createProject.execute({
       projectName: 'api',
       cwd: '/workspace',
+      manager: 'pnpm',
     });
 
     assert.deepEqual(calls, [
@@ -75,54 +91,26 @@ describe('CreateProject use case', () => {
         },
       ],
     ]);
+
     assert.deepEqual(result, {
       manager: 'pnpm',
       projectPath: '/workspace/api',
       runCommand: 'pnpm',
     });
   });
-
-  it('accepts an already detected package manager', async () => {
-    let detectCalls = 0;
-    const createProject = createCreateProject({
-      projectScaffolder: {
-        async create() {},
-      },
-      packageManager: {
-        detect() {
-          detectCalls += 1;
-          return 'npm';
-        },
-        async install() {},
-        getRunCommand() {
-          return 'yarn';
-        },
-      },
-      pathResolver: {
-        resolve: (...parts) => parts.join('/'),
-      },
-    });
-
-    const result = await createProject.execute({
-      projectName: 'api',
-      cwd: '/workspace',
-      manager: 'yarn',
-    });
-
-    assert.equal(detectCalls, 0);
-    assert.equal(result.manager, 'yarn');
-  });
 });
 
-describe('Node version policy', () => {
+describe('NodeVersionPolicy', () => {
   it('accepts Node.js 22 or newer', () => {
-    assert.doesNotThrow(() => assertSupportedNodeVersion('22.0.0'));
-    assert.doesNotThrow(() => assertSupportedNodeVersion('24.1.0'));
+    const policy = new NodeVersionPolicy();
+
+    assert.doesNotThrow(() => policy.assertSupported('22.0.0'));
+    assert.doesNotThrow(() => policy.assertSupported('24.1.0'));
   });
 
   it('rejects unsupported Node.js versions', () => {
     assert.throws(
-      () => assertSupportedNodeVersion('20.18.0'),
+      () => new NodeVersionPolicy().assertSupported('20.18.0'),
       /requires Node\.js 22 or newer/,
     );
   });

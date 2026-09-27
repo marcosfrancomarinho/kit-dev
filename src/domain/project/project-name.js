@@ -28,11 +28,4 @@ class ProjectName {
   }
 }
 
-function createProjectName(value) {
-  return ProjectName.create(value).toString();
-}
-
-module.exports = {
-  ProjectName,
-  createProjectName,
-};
+module.exports = { ProjectName };

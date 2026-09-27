@@ -17,12 +17,13 @@ const { build, transform } = require('esbuild');
 const {
   kitDevDiPlugin,
 } = require('../src/templates/files/di-transformer.cjs');
-const { generateProject } = require('../src/generators/project-generator');
 const {
-  createPackageJson,
-  createTsconfig,
-  esbuildConfig,
-} = require('../src/templates/project-files');
+  NodeProjectScaffolder,
+} = require('../src/infrastructure/project/node-project-scaffolder');
+const { TerminalAdapter } = require('../src/presentation/terminal/terminal-adapter');
+const { ProjectTemplateCatalog } = require('../src/templates/project-files');
+
+const projectTemplates = new ProjectTemplateCatalog();
 
 const templateFilesPath = join(
   __dirname,
@@ -38,7 +39,7 @@ const containerTypesTemplate = join(
 );
 
 test('configura o desenvolvimento somente com esbuild', () => {
-  const packageJson = JSON.parse(createPackageJson('my-api'));
+  const packageJson = JSON.parse(projectTemplates.packageJson('my-api'));
 
   assert.equal(packageJson.scripts.dev, 'node kit-dev/build/dev.cjs');
   assert.equal(
@@ -59,7 +60,10 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   const projectPath = join(parentPath, 'my-api');
   context.after(() => rm(parentPath, { recursive: true, force: true }));
 
-  await generateProject(projectPath, 'my-api');
+  await new NodeProjectScaffolder(
+    new TerminalAdapter(),
+    projectTemplates,
+  ).create({ projectPath, projectName: 'my-api' });
 
   assert.deepEqual((await readdir(join(projectPath, 'kit-dev'))).sort(), [
     'build',
@@ -133,12 +137,12 @@ test('executa o modo dev com esbuild antes da DI', async (context) => {
     mkdir(diPath, { recursive: true }),
   ]);
   await Promise.all([
-    writeProjectFile(projectPath, 'package.json', createPackageJson('my-api')),
-    writeProjectFile(projectPath, 'tsconfig.json', createTsconfig()),
+    writeProjectFile(projectPath, 'package.json', projectTemplates.packageJson('my-api')),
+    writeProjectFile(projectPath, 'tsconfig.json', projectTemplates.tsconfig()),
     writeProjectFile(
       projectPath,
       'kit-dev/build/esbuild.config.cjs',
-      esbuildConfig,
+      projectTemplates.esbuildConfig(),
     ),
     writeProjectFile(
       projectPath,
@@ -194,7 +198,7 @@ test('gera build com logs e sourcemap externo', async (context) => {
     mkdir(diPath, { recursive: true }),
   ]);
   await Promise.all([
-    writeProjectFile(projectPath, 'package.json', createPackageJson('my-api')),
+    writeProjectFile(projectPath, 'package.json', projectTemplates.packageJson('my-api')),
     writeProjectFile(
       projectPath,
       'tsconfig.json',
@@ -212,7 +216,7 @@ test('gera build com logs e sourcemap externo', async (context) => {
     writeProjectFile(
       projectPath,
       'kit-dev/build/esbuild.config.cjs',
-      esbuildConfig,
+      projectTemplates.esbuildConfig(),
     ),
     writeProjectFile(
       projectPath,
@@ -295,7 +299,7 @@ test('instala o container interno fora de src', async (context) => {
     writeProjectFile(
       projectPath,
       'kit-dev/build/esbuild.config.cjs',
-      esbuildConfig,
+      projectTemplates.esbuildConfig(),
     ),
     copyFile(join(templateFilesPath, 'di.cjs'), join(diPath, 'install.cjs')),
     copyFile(

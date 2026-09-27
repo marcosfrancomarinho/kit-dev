@@ -1,6 +1,7 @@
 const { spawn } = require('child_process');
+const { CommandRunner } = require('../../application/ports/command-runner');
 
-class NodeCommandRunner {
+class NodeCommandRunner extends CommandRunner {
   run(command, args, options = {}) {
     return new Promise((resolve, reject) => {
       const child = spawn(command, args, {
@@ -26,11 +27,4 @@ class NodeCommandRunner {
   }
 }
 
-function createCommandRunner() {
-  return new NodeCommandRunner();
-}
-
-module.exports = {
-  NodeCommandRunner,
-  createCommandRunner,
-};
+module.exports = { NodeCommandRunner };

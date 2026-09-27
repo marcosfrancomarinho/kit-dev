@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-const { run } = require('./src/cli');
+const { ApplicationBootstrap } = require('./src/bootstrap/application-bootstrap');
 
-run();
+new ApplicationBootstrap().run();

@@ -6,6 +6,7 @@ const {
   expandCompactBlocks,
   indentSource,
   removeUnusedImports,
+  resolveTarget,
   useSingleQuotes,
 } = require('../src/templates/files/formatter.cjs');
 
@@ -176,6 +177,23 @@ describe('source formatter', () => {
 
     assert.match(result, /\/\* keep \*\//);
     assert.match(result, /unused/);
+  });
+
+
+  it('accepts a single file only inside src or test', () => {
+    const sourceFile = resolveTarget('src/main.ts');
+    const testFile = resolveTarget('test/example.test.ts');
+
+    assert.match(sourceFile, /src[\\/]main\.ts$/);
+    assert.match(testFile, /test[\\/]example\.test\.ts$/);
+    assert.throws(
+      () => resolveTarget('package.json'),
+      /fmt only accepts files inside src\/ or test\//,
+    );
+    assert.throws(
+      () => resolveTarget('src/file.txt'),
+      /fmt only supports JavaScript and TypeScript source files/,
+    );
   });
 
   it('adds semicolons to statements without changing blocks', () => {

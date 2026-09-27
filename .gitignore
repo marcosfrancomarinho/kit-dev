@@ -1,2 +1,10 @@
 node_modules/
 *.tgz
+.env
+*.log
+.vscode/
+.idea/
+.DS_Store
+*.tsbuildinfo
+kit-dev/build/.cache/
+kit-dev/test/.cache/

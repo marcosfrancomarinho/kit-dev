@@ -399,9 +399,7 @@ function removeUnusedImports(source, fileName = 'source.ts') {
     let replacement;
 
     if (parts.length === 0) {
-      replacement = hasRuntimeBinding
-        ? 'import ' + moduleText + ';'
-        : '';
+      replacement = '';
     } else {
       const typePrefix = clause.isTypeOnly ? 'type ' : '';
       replacement =

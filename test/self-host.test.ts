@@ -10,7 +10,7 @@ import type { PathResolver } from '../src/application/ports/path-resolver.js';
 import type { ProjectScaffolder } from '../src/application/ports/project-scaffolder.js';
 import { NodeVersionPolicy } from '../src/application/policies/node-version-policy.js';
 import { ProjectName } from '../src/domain/project/project-name.js';
-import { NodePackageManagerDetector } from '../src/infrastructure/package-manager/package-manager.js';
+import { NodePackageManagerDetector } from '../src/infrastructure/package-manager/node-package-manager-detector.js';
 
 class ProjectScaffolderSpy implements ProjectScaffolder {
   readonly calls: unknown[] = [];

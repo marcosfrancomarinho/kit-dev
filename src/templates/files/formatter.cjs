@@ -559,6 +559,174 @@ function expandCompactBlocks(source, fileName = 'source.ts') {
   return result;
 }
 
+
+function splitSameLineStatements(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const newline = source.includes('\r\n') ? '\r\n' : '\n';
+  const insertions = new Set();
+
+  function visit(node) {
+    const statements = node.statements;
+
+    if (statements && typeof statements.length === 'number') {
+      for (let index = 1; index < statements.length; index += 1) {
+        const previous = statements[index - 1];
+        const current = statements[index];
+        const gapStart = previous.getEnd();
+        const currentStart = current.getStart(sourceFile);
+        const gap = source.slice(gapStart, currentStart);
+
+        if (
+          !gap.includes('\n') &&
+          !gap.includes('\r') &&
+          gap.trim() === ''
+        ) {
+          insertions.add(currentStart);
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const position of [...insertions].sort((a, b) => b - a)) {
+    result = result.slice(0, position) + newline + result.slice(position);
+  }
+
+  return result;
+}
+
+function containsComment(text) {
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    ts.LanguageVariant.Standard,
+    text,
+  );
+
+  while (scanner.scan() !== ts.SyntaxKind.EndOfFileToken) {
+    const token = scanner.getToken();
+
+    if (
+      token === ts.SyntaxKind.SingleLineCommentTrivia ||
+      token === ts.SyntaxKind.MultiLineCommentTrivia
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function compactShortCalls(source, fileName = 'source.ts', maxLineLength = 100) {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  function visit(node) {
+    if (
+      (ts.isCallExpression(node) || ts.isNewExpression(node)) &&
+      node.arguments
+    ) {
+      const start = node.getStart(sourceFile);
+      const end = node.getEnd();
+      const raw = source.slice(start, end);
+
+      if (raw.includes('\n') || raw.includes('\r')) {
+        const prefix = source.slice(start, node.arguments.pos);
+        const suffix = source.slice(node.arguments.end, end);
+        const argumentTexts = node.arguments.map((argument) =>
+          source.slice(argument.getStart(sourceFile), argument.getEnd()),
+        );
+
+        const canCompact =
+          !prefix.includes('\n') &&
+          !prefix.includes('\r') &&
+          !suffix.includes('\n') &&
+          !suffix.includes('\r') &&
+          !node.arguments.hasTrailingComma &&
+          !containsComment(raw) &&
+          argumentTexts.every(
+            (argument) =>
+              !argument.includes('\n') && !argument.includes('\r'),
+          );
+
+        if (canCompact) {
+          const candidate =
+            prefix + argumentTexts.join(', ') + suffix;
+          const lineStart = Math.max(
+            source.lastIndexOf('\n', start - 1),
+            source.lastIndexOf('\r', start - 1),
+          ) + 1;
+          const projectedLineLength =
+            start - lineStart + candidate.length;
+
+          if (projectedLineLength <= maxLineLength) {
+            replacements.push({
+              start,
+              end,
+              value: candidate,
+            });
+          }
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
+    const overlapsLaterReplacement = replacements.some(
+      (other) =>
+        other !== replacement &&
+        other.start >= replacement.start &&
+        other.end <= replacement.end &&
+        other.start !== replacement.start,
+    );
+
+    if (overlapsLaterReplacement) {
+      continue;
+    }
+
+    result =
+      result.slice(0, replacement.start) +
+      replacement.value +
+      result.slice(replacement.end);
+  }
+
+  return result;
+}
+
+function formatSource(source, fileName = 'source.ts') {
+  const withoutUnusedImports = removeUnusedImports(source, fileName);
+  const quoted = useSingleQuotes(withoutUnusedImports, fileName);
+  const withSemicolons = addSemicolons(quoted, fileName);
+  const expanded = expandCompactBlocks(withSemicolons, fileName);
+  const split = splitSameLineStatements(expanded, fileName);
+  const compacted = compactShortCalls(split, fileName);
+
+  return indentSource(compacted);
+}
+
 function indentSource(source) {
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   const hadFinalNewline = source.endsWith('\n');
@@ -630,11 +798,7 @@ function resolveTarget(target) {
 
 async function formatFile(file) {
   const source = await readFile(file, 'utf8');
-  const withoutUnusedImports = removeUnusedImports(source, file);
-  const quoted = useSingleQuotes(withoutUnusedImports, file);
-  const withSemicolons = addSemicolons(quoted, file);
-  const expanded = expandCompactBlocks(withSemicolons, file);
-  const formatted = indentSource(expanded);
+  const formatted = formatSource(source, file);
 
   if (formatted === source) {
     return false;
@@ -693,9 +857,12 @@ if (require.main === module) {
 
 module.exports = {
   addSemicolons,
+  compactShortCalls,
   expandCompactBlocks,
+  formatSource,
   indentSource,
   removeUnusedImports,
   resolveTarget,
+  splitSameLineStatements,
   useSingleQuotes,
 };

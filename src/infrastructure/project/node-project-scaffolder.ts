@@ -58,12 +58,6 @@ export class NodeProjectScaffolder implements ProjectScaffolder {
         join(input.projectPath, 'README.md'),
         '📘 README.md created',
       ),
-      this.copyTemplate(
-        paths,
-        'README.pt-BR.md',
-        join(input.projectPath, 'README.pt-BR.md'),
-        '📘 README.pt-BR.md created',
-      ),
       this.copyTemplate(paths, 'di.cjs', join(paths.di(), 'install.cjs'), '🧩 Optional DI command prepared'),
       this.copyTemplate(paths, 'dependency-injection.ts', join(paths.di(), 'container.ts'), '🧩 DI template prepared'),
       this.copyTemplate(paths, 'dependency-injection.d.ts', join(paths.di(), 'container.d.ts'), '🧩 DI types prepared'),

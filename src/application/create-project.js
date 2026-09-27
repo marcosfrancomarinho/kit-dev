@@ -1,20 +1,20 @@
-function assertPort(name, dependency, methods) {
-  const isValid =
-    dependency &&
-    methods.every((method) => typeof dependency[method] === 'function');
-
-  if (!isValid) {
-    throw new TypeError(
-      `${name} must implement: ${methods.join(', ')}.`,
-    );
-  }
-}
+const { ProjectScaffolder } = require('./ports/project-scaffolder');
+const { PackageInstaller } = require('./ports/package-installer');
+const { PathResolver } = require('./ports/path-resolver');
 
 class CreateProject {
   constructor(projectScaffolder, packageInstaller, pathResolver) {
-    assertPort('projectScaffolder', projectScaffolder, ['create']);
-    assertPort('packageInstaller', packageInstaller, ['install', 'getRunCommand']);
-    assertPort('pathResolver', pathResolver, ['resolve']);
+    if (!(projectScaffolder instanceof ProjectScaffolder)) {
+      throw new TypeError('projectScaffolder must implement ProjectScaffolder.');
+    }
+
+    if (!(packageInstaller instanceof PackageInstaller)) {
+      throw new TypeError('packageInstaller must implement PackageInstaller.');
+    }
+
+    if (!(pathResolver instanceof PathResolver)) {
+      throw new TypeError('pathResolver must implement PathResolver.');
+    }
 
     this.projectScaffolder = projectScaffolder;
     this.packageInstaller = packageInstaller;
@@ -42,27 +42,4 @@ class CreateProject {
   }
 }
 
-function createCreateProject({ projectScaffolder, packageManager, pathResolver }) {
-  const createProject = new CreateProject(
-    projectScaffolder,
-    packageManager,
-    pathResolver,
-  );
-
-  return {
-    execute(input) {
-      const manager =
-        input.manager ??
-        (typeof packageManager.detect === 'function'
-          ? packageManager.detect()
-          : undefined);
-
-      return createProject.execute({ ...input, manager });
-    },
-  };
-}
-
-module.exports = {
-  CreateProject,
-  createCreateProject,
-};
+module.exports = { CreateProject };

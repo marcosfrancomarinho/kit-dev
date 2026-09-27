@@ -2,8 +2,12 @@ const INVALID_NAME_PATTERN = /[<>:"/\\|?*\x00-\x1F]/;
 const RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 const MAX_PROJECT_NAME_LENGTH = 255;
 
-class ProjectName {
-  constructor(value) {
+export class ProjectName {
+  private constructor(private readonly value: string) {
+    Object.freeze(this);
+  }
+
+  static create(value: unknown): ProjectName {
     const normalized = String(value ?? '').trim();
 
     if (
@@ -15,17 +19,10 @@ class ProjectName {
       throw new Error('❌ Invalid project name.');
     }
 
-    this.value = normalized;
-    Object.freeze(this);
+    return new ProjectName(normalized);
   }
 
-  static create(value) {
-    return new ProjectName(value);
-  }
-
-  toString() {
+  toString(): string {
     return this.value;
   }
 }
-
-module.exports = { ProjectName };

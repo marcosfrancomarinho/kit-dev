@@ -1,58 +1,56 @@
-const { createInterface } = require('readline');
-const { Terminal } = require('../../application/ports/terminal');
+import { createInterface } from 'node:readline';
+import type { Terminal } from '../../application/ports/terminal.js';
 
-class TerminalPalette {
-  constructor() {
-    this.reset = '\x1b[0m';
-    this.bold = '\x1b[1m';
-    this.cyan = '\x1b[36m';
-    this.green = '\x1b[32m';
-    this.yellow = '\x1b[33m';
-    this.red = '\x1b[31m';
-    this.magenta = '\x1b[35m';
-    this.gray = '\x1b[90m';
-  }
+export class TerminalPalette {
+  readonly reset = '\x1b[0m';
+  readonly bold = '\x1b[1m';
+  readonly cyan = '\x1b[36m';
+  readonly green = '\x1b[32m';
+  readonly yellow = '\x1b[33m';
+  readonly red = '\x1b[31m';
+  readonly magenta = '\x1b[35m';
+  readonly gray = '\x1b[90m';
 
-  paint(color, message) {
+  paint(color: string, message: string): string {
     return color + message + this.reset;
   }
 }
 
-class TerminalAdapter extends Terminal {
-  constructor(palette = new TerminalPalette()) {
-    super();
-    this.palette = palette;
-  }
+export class TerminalAdapter implements Terminal {
+  constructor(private readonly palette: TerminalPalette) {}
 
-  ask(query) {
+  ask(query: string): Promise<string> {
     const readline = createInterface({
       input: process.stdin,
       output: process.stdout,
     });
 
     return new Promise((resolve) => {
-      readline.question(this.palette.paint(this.palette.cyan, query), (answer) => {
-        readline.close();
-        resolve(answer);
-      });
+      readline.question(
+        this.palette.paint(this.palette.cyan, query),
+        (answer) => {
+          readline.close();
+          resolve(answer);
+        },
+      );
     });
   }
 
-  info(message) {
+  info(message: string): void {
     console.log(this.palette.paint(this.palette.magenta, message));
   }
 
-  success(message) {
+  success(message: string): void {
     console.log(this.palette.paint(this.palette.green, message));
   }
 
-  error(message) {
+  error(message: string): void {
     console.error(
       this.palette.paint(this.palette.red, '❌ Error:') + ' ' + message,
     );
   }
 
-  showFinalInstructions(projectName, runCommand) {
+  showFinalInstructions(projectName: string, runCommand: string): void {
     console.log(
       '\n' +
         this.palette.paint(
@@ -77,18 +75,20 @@ class TerminalAdapter extends Terminal {
     );
   }
 
-  formatCommand(runCommand, command, description) {
+  private formatCommand(
+    runCommand: string,
+    command: string,
+    description: string,
+  ): string {
     const spacing = ' '.repeat(Math.max(1, 10 - command.length));
 
     return (
-      this.palette.paint(this.palette.yellow, `${runCommand} ${command}`) +
+      this.palette.paint(
+        this.palette.yellow,
+        `${runCommand} ${command}`,
+      ) +
       spacing +
       this.palette.paint(this.palette.gray, `# ${description}`)
     );
   }
 }
-
-module.exports = {
-  TerminalAdapter,
-  TerminalPalette,
-};

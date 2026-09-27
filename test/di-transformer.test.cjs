@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
 const { spawn, spawnSync } = require('node:child_process');
 const { once } = require('node:events');
 const {
@@ -17,13 +18,6 @@ const { build, transform } = require('esbuild');
 const {
   kitDevDiPlugin,
 } = require('../src/templates/files/di-transformer.cjs');
-const {
-  NodeProjectScaffolder,
-} = require('../src/infrastructure/project/node-project-scaffolder');
-const { TerminalAdapter } = require('../src/presentation/terminal/terminal-adapter');
-const { ProjectTemplateCatalog } = require('../src/templates/project-files');
-
-const projectTemplates = new ProjectTemplateCatalog();
 
 const templateFilesPath = join(
   __dirname,
@@ -37,6 +31,132 @@ const containerTypesTemplate = join(
   templateFilesPath,
   'dependency-injection.d.ts',
 );
+
+class ProjectFixtureTemplates {
+  packageJson(projectName) {
+    return JSON.stringify(
+      {
+        name: projectName,
+        version: '1.0.0',
+        type: 'module',
+        main: 'src/main.ts',
+        scripts: {
+          start: 'node --enable-source-maps dist/bundle.cjs',
+          dev: 'node kit-dev/build/dev.cjs',
+          build: 'node kit-dev/build/esbuild.config.cjs',
+          type: 'tsc --watch --noEmit',
+          test: 'node kit-dev/test/test.cjs',
+          di: 'node kit-dev/di/install.cjs',
+        },
+        dependencies: {},
+        devDependencies: {},
+        engines: { node: '>=22' },
+        license: 'MIT',
+      },
+      null,
+      2,
+    );
+  }
+
+  tsconfig() {
+    return JSON.stringify(
+      {
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
+          rootDir: './src',
+          outDir: './dist',
+          strict: true,
+          esModuleInterop: true,
+          skipLibCheck: true,
+          forceConsistentCasingInFileNames: true,
+          types: ['node'],
+        },
+        include: ['src'],
+      },
+      null,
+      2,
+    );
+  }
+
+  esbuildConfig() {
+    return readFileSync(
+      join(__dirname, '..', 'kit-dev', 'build', 'esbuild.config.cjs'),
+      'utf-8',
+    );
+  }
+}
+
+class ProjectFixtureGenerator {
+  constructor(templates) {
+    this.templates = templates;
+  }
+
+  async create(projectPath, projectName) {
+    const buildPath = join(projectPath, 'kit-dev', 'build');
+    const diPath = join(projectPath, 'kit-dev', 'di');
+    const testRuntimePath = join(projectPath, 'kit-dev', 'test');
+
+    await Promise.all([
+      mkdir(join(projectPath, 'src'), { recursive: true }),
+      mkdir(join(projectPath, 'test'), { recursive: true }),
+      mkdir(buildPath, { recursive: true }),
+      mkdir(diPath, { recursive: true }),
+      mkdir(testRuntimePath, { recursive: true }),
+    ]);
+
+    await Promise.all([
+      writeProjectFile(projectPath, 'src/main.ts', "console.log('Hello World!');"),
+      writeProjectFile(
+        projectPath,
+        'test/example.test.ts',
+        [
+          "import assert from 'node:assert/strict'",
+          "import { describe, it } from 'node:test'",
+          '',
+          "describe('addition', () => {",
+          "  it('should sum two numbers', () => {",
+          '    const result = 1 + 1',
+          '    assert.equal(result, 2)',
+          '  })',
+          '})',
+          '',
+        ].join('\n'),
+      ),
+      writeProjectFile(projectPath, 'package.json', this.templates.packageJson(projectName)),
+      writeProjectFile(projectPath, 'tsconfig.json', this.templates.tsconfig()),
+      writeProjectFile(
+        projectPath,
+        'kit-dev/build/esbuild.config.cjs',
+        this.templates.esbuildConfig(),
+      ),
+      writeProjectFile(projectPath, '.gitignore', 'node_modules/\ndist/\n'),
+      copyFile(join(templateFilesPath, 'dev.cjs'), join(buildPath, 'dev.cjs')),
+      copyFile(join(templateFilesPath, 'di.cjs'), join(diPath, 'install.cjs')),
+      copyFile(
+        join(templateFilesPath, 'dependency-injection.ts'),
+        join(diPath, 'container.ts'),
+      ),
+      copyFile(
+        join(templateFilesPath, 'dependency-injection.d.ts'),
+        join(diPath, 'container.d.ts'),
+      ),
+      copyFile(
+        join(templateFilesPath, 'di-transformer.cjs'),
+        join(diPath, 'transformer.cjs'),
+      ),
+      copyFile(join(templateFilesPath, 'providers.ts'), join(diPath, 'providers.ts')),
+      copyFile(join(templateFilesPath, 'runner.cjs'), join(testRuntimePath, 'test.cjs')),
+      copyFile(
+        join(templateFilesPath, 'test-generator.cjs'),
+        join(testRuntimePath, 'generator.cjs'),
+      ),
+    ]);
+  }
+}
+
+const projectTemplates = new ProjectFixtureTemplates();
 
 test('configura o desenvolvimento somente com esbuild', () => {
   const packageJson = JSON.parse(projectTemplates.packageJson('my-api'));
@@ -60,10 +180,10 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   const projectPath = join(parentPath, 'my-api');
   context.after(() => rm(parentPath, { recursive: true, force: true }));
 
-  await new NodeProjectScaffolder(
-    new TerminalAdapter(),
-    projectTemplates,
-  ).create({ projectPath, projectName: 'my-api' });
+  await new ProjectFixtureGenerator(projectTemplates).create(
+    projectPath,
+    'my-api',
+  );
 
   assert.deepEqual((await readdir(join(projectPath, 'kit-dev'))).sort(), [
     'build',

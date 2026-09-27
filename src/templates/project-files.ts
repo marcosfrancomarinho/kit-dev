@@ -1,5 +1,5 @@
-class ProjectTemplateCatalog {
-  packageJson(projectName) {
+export class ProjectTemplateCatalog {
+  packageJson(projectName: string): string {
     return JSON.stringify(
       {
         name: projectName,
@@ -26,7 +26,7 @@ class ProjectTemplateCatalog {
     );
   }
 
-  tsconfig() {
+  tsconfig(): string {
     return JSON.stringify(
       {
         compilerOptions: {
@@ -48,11 +48,11 @@ class ProjectTemplateCatalog {
     );
   }
 
-  mainFile() {
+  mainFile(): string {
     return "console.log('Hello World!');";
   }
 
-  exampleTest() {
+  exampleTest(): string {
     return [
       "import assert from 'node:assert/strict'",
       "import { describe, it } from 'node:test'",
@@ -68,7 +68,7 @@ class ProjectTemplateCatalog {
     ].join('\n');
   }
 
-  esbuildConfig() {
+  esbuildConfig(): string {
     return [
       "const { execSync } = require('child_process');",
       "const { resolve } = require('path');",
@@ -165,7 +165,7 @@ class ProjectTemplateCatalog {
     ].join('\n');
   }
 
-  gitignore() {
+  gitignore(): string {
     return [
       'node_modules/',
       'dist/',
@@ -181,5 +181,3 @@ class ProjectTemplateCatalog {
     ].join('\n');
   }
 }
-
-module.exports = { ProjectTemplateCatalog };

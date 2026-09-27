@@ -2,8 +2,10 @@
   "name": "create-kit-dev",
   "version": "1.1.32",
   "description": "Fast Node.js + TypeScript project generator with esbuild, native testing, automatic test generation, optional dependency injection, and a zero-config developer workflow.",
+  "type": "module",
+  "main": "src/main.ts",
   "bin": {
-    "create-kit-dev": "index.js"
+    "create-kit-dev": "dist/bundle.cjs"
   },
   "repository": {
     "type": "git",
@@ -56,18 +58,22 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "node index.js",
-    "test": "node --test",
-    "prepare": "node normalize-eol.js"
+    "start": "node --enable-source-maps dist/bundle.cjs",
+    "dev": "node kit-dev/build/dev.cjs",
+    "build": "node kit-dev/build/esbuild.config.cjs",
+    "type": "tsc --watch --noEmit",
+    "test": "node kit-dev/test/test.cjs --once",
+    "prepack": "yarn build"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "@typescript/typescript6": "6.0.2",
     "esbuild": "^0.28.2",
     "typescript": "7.0.2"
   },
   "files": [
-    "index.js",
-    "normalize-eol.js",
-    "src"
+    "dist/bundle.cjs",
+    "dist/bundle.cjs.map",
+    "src/templates/files"
   ]
 }

@@ -1,16 +1,21 @@
-const { copyFile, mkdir, writeFile } = require('fs/promises');
-const { join } = require('path');
-const { ProjectScaffolder } = require('../../application/ports/project-scaffolder');
+import { existsSync } from 'node:fs';
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import type { ProjectScaffolder } from '../../application/ports/project-scaffolder.js';
+import type { Terminal } from '../../application/ports/terminal.js';
+import { ProjectTemplateCatalog } from '../../templates/project-files.js';
 
-class NodeProjectScaffolder extends ProjectScaffolder {
-  constructor(terminal, templates) {
-    super();
-    this.terminal = terminal;
-    this.templates = templates;
-  }
+export class NodeProjectScaffolder implements ProjectScaffolder {
+  constructor(
+    private readonly terminal: Terminal,
+    private readonly templates: ProjectTemplateCatalog,
+  ) {}
 
-  async create({ projectPath, projectName }) {
-    const paths = new ProjectPaths(projectPath);
+  async create(input: {
+    projectPath: string;
+    projectName: string;
+  }): Promise<void> {
+    const paths = new ProjectPaths(input.projectPath);
 
     for (const directory of paths.directories()) {
       await this.createDirectory(directory);
@@ -28,12 +33,12 @@ class NodeProjectScaffolder extends ProjectScaffolder {
         '🧪 test/example.test.ts created',
       ),
       this.writeFile(
-        join(projectPath, 'package.json'),
-        this.templates.packageJson(projectName),
+        join(input.projectPath, 'package.json'),
+        this.templates.packageJson(input.projectName),
         '📦 package.json created',
       ),
       this.writeFile(
-        join(projectPath, 'tsconfig.json'),
+        join(input.projectPath, 'tsconfig.json'),
         this.templates.tsconfig(),
         '⚙️ tsconfig.json created',
       ),
@@ -43,7 +48,7 @@ class NodeProjectScaffolder extends ProjectScaffolder {
         '🛠 kit-dev/build/esbuild.config.cjs created',
       ),
       this.writeFile(
-        join(projectPath, '.gitignore'),
+        join(input.projectPath, '.gitignore'),
         this.templates.gitignore(),
         '🐙 .gitignore created',
       ),
@@ -58,12 +63,16 @@ class NodeProjectScaffolder extends ProjectScaffolder {
     ]);
   }
 
-  async createDirectory(directory) {
+  private async createDirectory(directory: string): Promise<void> {
     try {
       await mkdir(directory);
       this.terminal.success(`📁 Folder created: ${directory}`);
     } catch (error) {
-      if (error.code === 'EEXIST') {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'EEXIST'
+      ) {
         throw new Error(`⚠️  Folder already exists: ${directory}`);
       }
 
@@ -71,51 +80,77 @@ class NodeProjectScaffolder extends ProjectScaffolder {
     }
   }
 
-  async writeFile(path, content, message) {
+  private async writeFile(
+    path: string,
+    content: string,
+    message: string,
+  ): Promise<void> {
     await writeFile(path, content, 'utf-8');
     this.terminal.success(message);
   }
 
-  async copyTemplate(paths, sourceName, destination, message) {
+  private async copyTemplate(
+    paths: ProjectPaths,
+    sourceName: string,
+    destination: string,
+    message: string,
+  ): Promise<void> {
     await copyFile(join(paths.templates(), sourceName), destination);
     this.terminal.success(message);
   }
 }
 
-class ProjectPaths {
-  constructor(projectPath) {
-    this.projectPath = projectPath;
-  }
+export class ProjectPaths {
+  constructor(private readonly projectPath: string) {}
 
-  src() {
+  src(): string {
     return join(this.projectPath, 'src');
   }
 
-  kitDev() {
+  kitDev(): string {
     return join(this.projectPath, 'kit-dev');
   }
 
-  build() {
+  build(): string {
     return join(this.kitDev(), 'build');
   }
 
-  di() {
+  di(): string {
     return join(this.kitDev(), 'di');
   }
 
-  kitDevTest() {
+  kitDevTest(): string {
     return join(this.kitDev(), 'test');
   }
 
-  test() {
+  test(): string {
     return join(this.projectPath, 'test');
   }
 
-  templates() {
-    return join(__dirname, '..', '..', 'templates', 'files');
+  templates(): string {
+    const productionPath = join(
+      __dirname,
+      '..',
+      'src',
+      'templates',
+      'files',
+    );
+    const developmentPath = join(
+      __dirname,
+      '..',
+      '..',
+      '..',
+      'src',
+      'templates',
+      'files',
+    );
+
+    return existsSync(productionPath)
+      ? productionPath
+      : developmentPath;
   }
 
-  directories() {
+  directories(): string[] {
     return [
       this.projectPath,
       this.src(),
@@ -127,8 +162,3 @@ class ProjectPaths {
     ];
   }
 }
-
-module.exports = {
-  NodeProjectScaffolder,
-  ProjectPaths,
-};

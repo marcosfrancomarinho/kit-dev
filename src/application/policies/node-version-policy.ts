@@ -1,9 +1,7 @@
-class NodeVersionPolicy {
-  constructor(minimumMajor = 22) {
-    this.minimumMajor = minimumMajor;
-  }
+export class NodeVersionPolicy {
+  private readonly minimumMajor = 22;
 
-  assertSupported(version = process.versions.node) {
+  assertSupported(version = process.versions.node): void {
     const major = Number.parseInt(version, 10);
 
     if (major < this.minimumMajor) {
@@ -13,5 +11,3 @@ class NodeVersionPolicy {
     }
   }
 }
-
-module.exports = { NodeVersionPolicy };

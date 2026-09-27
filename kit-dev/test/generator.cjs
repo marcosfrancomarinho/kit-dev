@@ -2628,7 +2628,7 @@ function renderCreationSetup(
           call.awaited || call.returnsPromise ? 'async ' : '';
 
         lines.push(
-          `    ${safePropertyName(call.method)}: t.mock.fn(${asyncKeyword}(..._args: unknown[]) => ${call.returnFixture}),`,
+          `    ${safePropertyName(call.method)}: t.mock.fn(${asyncKeyword}(..._args: unknown[]) => { return ${call.returnFixture} }),`,
         );
       }
 
@@ -2672,7 +2672,7 @@ function renderCreationSetup(
         `  const ${mockVariableName(
           parameter.name,
           call.method,
-        )} = t.mock.fn(${asyncKeyword}(..._args: unknown[]) => ${call.returnFixture})`,
+        )} = t.mock.fn(${asyncKeyword}(..._args: unknown[]) => { return ${call.returnFixture} })`,
       );
     }
 

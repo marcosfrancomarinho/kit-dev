@@ -1,6 +1,6 @@
 const { readdir, readFile, writeFile } = require('node:fs/promises');
 const { createRequire } = require('node:module');
-const { join, relative } = require('node:path');
+const { isAbsolute, join, relative, resolve, sep } = require('node:path');
 
 const projectRoot = join(__dirname, '..', '..');
 const roots = [
@@ -610,7 +610,67 @@ function indentSource(source) {
   return result;
 }
 
+function isInsideAllowedRoots(path) {
+  const normalized = resolve(path);
+
+  return roots.some((root) => {
+    const normalizedRoot = resolve(root);
+    return (
+      normalized === normalizedRoot ||
+      normalized.startsWith(normalizedRoot + sep)
+    );
+  });
+}
+
+function resolveTarget(target) {
+  const candidate = isAbsolute(target)
+    ? resolve(target)
+    : resolve(projectRoot, target);
+
+  if (!isInsideAllowedRoots(candidate)) {
+    throw new Error('fmt only accepts files inside src/ or test/.');
+  }
+
+  if (!supported.test(candidate)) {
+    throw new Error(
+      'fmt only supports JavaScript and TypeScript source files.',
+    );
+  }
+
+  return candidate;
+}
+
+async function formatFile(file) {
+  const source = await readFile(file, 'utf8');
+  const withoutUnusedImports = removeUnusedImports(source, file);
+  const quoted = useSingleQuotes(withoutUnusedImports, file);
+  const withSemicolons = addSemicolons(quoted, file);
+  const expanded = expandCompactBlocks(withSemicolons, file);
+  const formatted = indentSource(expanded);
+
+  if (formatted === source) {
+    return false;
+  }
+
+  await writeFile(file, formatted, 'utf8');
+  console.log('✨ ' + relative(projectRoot, file));
+  return true;
+}
+
 async function main() {
+  const target = process.argv[2];
+
+  if (target) {
+    const file = resolveTarget(target);
+    const changed = await formatFile(file);
+
+    if (!changed) {
+      console.log('✨ ' + relative(projectRoot, file) + ' is already formatted.');
+    }
+
+    return;
+  }
+
   const files = (
     await Promise.all(roots.map((root) => collectFiles(root)))
   ).flat().sort();
@@ -623,18 +683,9 @@ async function main() {
   let changed = 0;
 
   for (const file of files) {
-    const source = await readFile(file, 'utf8');
-    const withoutUnusedImports = removeUnusedImports(source, file);
-    const quoted = useSingleQuotes(withoutUnusedImports, file);
-    const withSemicolons = addSemicolons(quoted, file);
-    const expanded = expandCompactBlocks(withSemicolons, file);
-    const formatted = indentSource(expanded);
-
-    if (formatted === source) continue;
-
-    await writeFile(file, formatted, 'utf8');
-    changed += 1;
-    console.log('✨ ' + relative(projectRoot, file));
+    if (await formatFile(file)) {
+      changed += 1;
+    }
   }
 
   console.log(
@@ -657,5 +708,6 @@ module.exports = {
   expandCompactBlocks,
   indentSource,
   removeUnusedImports,
+  resolveTarget,
   useSingleQuotes,
 };

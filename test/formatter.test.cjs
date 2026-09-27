@@ -3,6 +3,7 @@ const { describe, it } = require('node:test');
 
 const {
   addSemicolons,
+  expandCompactBlocks,
   indentSource,
   useSingleQuotes,
 } = require('../src/templates/files/formatter.cjs');
@@ -71,6 +72,45 @@ describe('source formatter', () => {
 
     assert.match(result, /    keep this spacing/);
     assert.match(result, /  return value/);
+  });
+
+
+  it('expands compact function blocks without expanding object literals', () => {
+    const source = [
+      'function teste(){console.log()}',
+      'const user = { name: \'Marcos\' };',
+      '',
+    ].join('\n');
+
+    const expanded = expandCompactBlocks(source, 'example.ts');
+    const result = indentSource(expanded);
+
+    assert.equal(
+      result,
+      [
+        'function teste(){',
+        '  console.log()',
+        '}',
+        'const user = { name: \'Marcos\' };',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('expands nested compact blocks', () => {
+    const source = 'function teste(){if(true){console.log()}}';
+    const result = indentSource(expandCompactBlocks(source, 'example.ts'));
+
+    assert.equal(
+      result,
+      [
+        'function teste(){',
+        '  if(true){',
+        '    console.log()',
+        '  }',
+        '}',
+      ].join('\n'),
+    );
   });
 
   it('adds semicolons to statements without changing blocks', () => {

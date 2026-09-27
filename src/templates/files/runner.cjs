@@ -14,6 +14,7 @@ let structureWatcher;
 let knownTestFiles = '';
 let recreateTimer;
 let closing = false;
+let runOnce = false;
 
 async function collectFiles(directory, matcher) {
   let entries;
@@ -101,7 +102,7 @@ async function runTests() {
       testProcess = undefined;
     }
 
-    if (process.env.CI) {
+    if (runOnce) {
       close(code ?? 1).catch(fail);
       return;
     }
@@ -216,7 +217,9 @@ function fail(error) {
 }
 
 async function main() {
-  const [target] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  runOnce = args.includes('--once');
+  const target = args.find((argument) => argument !== '--once');
 
   if (target) {
     const { generateTest } = require('./generator.cjs');

@@ -68,6 +68,7 @@ pnpm dev
 | `dev` | Runs the application and watches for changes |
 | `test` | Runs tests in watch mode |
 | `test <file>` | Generates or updates a test for a class |
+| `fmt` | Fixes indentation only for JavaScript/TypeScript files in `src/` and `test/` |
 | `build` | Checks types and creates the production bundle |
 | `start` | Runs the generated bundle |
 | `type` | Watches TypeScript errors |
@@ -79,9 +80,20 @@ Examples with npm:
 npm run dev
 npm test
 npm test -- create-user
+npm run fmt
 npm run build
 npm start
 ```
+
+## Code formatting
+
+Run:
+
+```bash
+npm run fmt
+```
+
+The `fmt` command is lightweight and does not use an external formatting library. It only fixes indentation for JavaScript and TypeScript files found in `src/` and `test/`, without changing style rules such as quotes, semicolons or line wrapping.
 
 ## Automatic tests
 

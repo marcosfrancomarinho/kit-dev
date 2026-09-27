@@ -5,6 +5,7 @@ const {
   addSemicolons,
   expandCompactBlocks,
   indentSource,
+  removeUnusedImports,
   useSingleQuotes,
 } = require('../src/templates/files/formatter.cjs');
 
@@ -111,6 +112,44 @@ describe('source formatter', () => {
         '}',
       ].join('\n'),
     );
+  });
+
+
+  it('removes only unused import bindings and preserves module loading', () => {
+    const source = [
+      "import DefaultValue, { used, unused, type UsedType } from 'pkg';",
+      "import * as helpers from 'helpers';",
+      "import { unusedOnly } from 'side-effect-module';",
+      "import 'always-run';",
+      '',
+      'const value: UsedType = used();',
+      'helpers.run(value);',
+      '',
+    ].join('\n');
+
+    const result = removeUnusedImports(source, 'example.ts');
+
+    assert.match(
+      result,
+      /import \{ used, type UsedType \} from 'pkg';/,
+    );
+    assert.doesNotMatch(result, /DefaultValue/);
+    assert.doesNotMatch(result, /unused,/);
+    assert.match(result, /import \* as helpers from 'helpers';/);
+    assert.match(result, /import 'side-effect-module';/);
+    assert.match(result, /import 'always-run';/);
+  });
+
+  it('keeps an import binding when it is referenced in a type position', () => {
+    const source = [
+      "import { User } from 'domain';",
+      'const user: User | null = null;',
+      '',
+    ].join('\n');
+
+    const result = removeUnusedImports(source, 'example.ts');
+
+    assert.match(result, /import \{ User \} from 'domain';/);
   });
 
   it('adds semicolons to statements without changing blocks', () => {

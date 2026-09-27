@@ -11,19 +11,15 @@ import type { PackageManagerDetector } from '../application/ports/package-manage
 import type { PathResolver } from '../application/ports/path-resolver.js';
 import type { ProjectScaffolder } from '../application/ports/project-scaffolder.js';
 import type { Terminal } from '../application/ports/terminal.js';
-import {
-  NodePackageInstaller,
-  NodePackageManagerDetector,
-  PackageManagerRegistry,
-} from '../infrastructure/package-manager/package-manager.js';
+import { NodePackageInstaller } from '../infrastructure/package-manager/node-package-installer.js';
+import { NodePackageManagerDetector } from '../infrastructure/package-manager/node-package-manager-detector.js';
+import { PackageManagerRegistry } from '../infrastructure/package-manager/package-manager-registry.js';
 import { NodePathResolver } from '../infrastructure/path/node-path-resolver.js';
 import { NodeCommandRunner } from '../infrastructure/process/command-runner.js';
 import { NodeProjectScaffolder } from '../infrastructure/project/node-project-scaffolder.js';
 import { CliApplication } from '../presentation/cli/cli-application.js';
-import {
-  TerminalAdapter,
-  TerminalPalette,
-} from '../presentation/terminal/terminal-adapter.js';
+import { TerminalAdapter } from '../presentation/terminal/terminal-adapter.js';
+import { TerminalPalette } from '../presentation/terminal/terminal-palette.js';
 import { ProjectTemplateCatalog } from '../templates/project-files.js';
 
 const providers = new AppConfig()

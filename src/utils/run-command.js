@@ -1,23 +1,9 @@
-const { spawn } = require('child_process');
+const {
+  createCommandRunner,
+} = require('../infrastructure/process/command-runner');
 
-function runCommand(command, args, options = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      stdio: 'inherit',
-      shell: process.platform === 'win32',
-    });
-
-    child.once('error', reject);
-    child.once('close', (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      reject(new Error(options.errorMessage + ' Exit code: ' + code + '.'));
-    });
-  });
+function runCommand(command, args, options) {
+  return createCommandRunner().run(command, args, options);
 }
 
 module.exports = { runCommand };

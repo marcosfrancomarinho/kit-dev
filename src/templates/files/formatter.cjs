@@ -43,6 +43,8 @@ function scanStructure(line, state) {
   let leadingClosers = 0;
   let seenCode = false;
   let escaped = false;
+  let regexClass = false;
+  let previousCode = '';
 
   for (let index = 0; index < line.length; index += 1) {
     const char = line[index];
@@ -90,11 +92,51 @@ function scanStructure(line, state) {
       continue;
     }
 
+    if (state.regex) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '[') {
+        regexClass = true;
+        continue;
+      }
+
+      if (char === ']' && regexClass) {
+        regexClass = false;
+        continue;
+      }
+
+      if (char === '/' && !regexClass) {
+        state.regex = false;
+      }
+      continue;
+    }
+
     if (char === '/' && next === '/') break;
 
     if (char === '/' && next === '*') {
       state.blockComment = true;
       index += 1;
+      continue;
+    }
+
+    if (
+      char === '/' &&
+      next !== '/' &&
+      next !== '*' &&
+      (!previousCode || /[({[,:;=!?&|]/.test(previousCode))
+    ) {
+      state.regex = true;
+      regexClass = false;
+      seenCode = true;
+      previousCode = '/';
       continue;
     }
 
@@ -111,6 +153,8 @@ function scanStructure(line, state) {
     }
 
     if (/\s/.test(char)) continue;
+
+    previousCode = char;
 
     if (char === '}' || char === ']' || char === ')') {
       closes += 1;
@@ -139,6 +183,7 @@ function indentSource(source) {
     blockComment: false,
     quote: null,
     template: false,
+    regex: false,
   };
 
   let depth = 0;

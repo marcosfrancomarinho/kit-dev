@@ -114,7 +114,7 @@ describe('self-hosted architecture', () => {
     }
 
     assert.match(messages.join('\n'), /npm run fmt/);
-    assert.match(messages.join('\n'), /Indent src\/ and test\/ code/);
+    assert.match(messages.join('\n'), /Format src\/ and test\/ code/);
   });
 
 });

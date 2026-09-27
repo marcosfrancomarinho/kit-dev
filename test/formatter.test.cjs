@@ -116,7 +116,7 @@ describe('source formatter', () => {
   });
 
 
-  it('removes only unused import bindings and preserves module loading', () => {
+  it('removes unused import bindings and fully unused imports', () => {
     const source = [
       "import DefaultValue, { used, unused, type UsedType } from 'pkg';",
       "import * as helpers from 'helpers';",
@@ -137,7 +137,7 @@ describe('source formatter', () => {
     assert.doesNotMatch(result, /DefaultValue/);
     assert.doesNotMatch(result, /unused,/);
     assert.match(result, /import \* as helpers from 'helpers';/);
-    assert.match(result, /import 'side-effect-module';/);
+    assert.doesNotMatch(result, /side-effect-module/);
     assert.match(result, /import 'always-run';/);
   });
 
@@ -153,6 +153,36 @@ describe('source formatter', () => {
     assert.match(result, /import \{ User \} from 'domain';/);
   });
 
+
+
+  it('keeps only the used named import', () => {
+    const source = [
+      "import { Request, Response } from 'express';",
+      '',
+      'function handle(res: Response) {',
+      '  return res;',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = removeUnusedImports(source, 'example.ts');
+
+    assert.match(result, /import \{ Response \} from 'express';/);
+    assert.doesNotMatch(result, /Request/);
+  });
+
+  it('removes an unused default import completely', () => {
+    const source = [
+      "import express from 'express';",
+      "console.log('Hello World!');",
+      '',
+    ].join('\n');
+
+    const result = removeUnusedImports(source, 'example.ts');
+
+    assert.doesNotMatch(result, /express/);
+    assert.match(result, /console\.log/);
+  });
 
   it('removes unused type-only imports without creating runtime imports', () => {
     const source = [

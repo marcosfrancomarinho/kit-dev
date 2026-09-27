@@ -355,8 +355,6 @@ function removeUnusedImports(source, fileName = 'source.ts') {
       statement.moduleSpecifier.getEnd(),
     );
     const parts = [];
-    let hasRuntimeBinding = Boolean(clause.name) && !clause.isTypeOnly;
-
     if (clause.name && references.has(clause.name.text)) {
       parts.push(clause.name.text);
     }
@@ -364,18 +362,10 @@ function removeUnusedImports(source, fileName = 'source.ts') {
     if (clause.namedBindings) {
       if (ts.isNamespaceImport(clause.namedBindings)) {
         const local = clause.namedBindings.name.text;
-        hasRuntimeBinding = hasRuntimeBinding || !clause.isTypeOnly;
-
         if (references.has(local)) {
           parts.push('* as ' + local);
         }
       } else {
-        hasRuntimeBinding =
-          hasRuntimeBinding ||
-          clause.namedBindings.elements.some(
-            (element) => !clause.isTypeOnly && !element.isTypeOnly,
-          );
-
         const used = clause.namedBindings.elements.filter((element) =>
           references.has(element.name.text),
         );
@@ -399,9 +389,7 @@ function removeUnusedImports(source, fileName = 'source.ts') {
     let replacement;
 
     if (parts.length === 0) {
-      replacement = hasRuntimeBinding
-        ? 'import ' + moduleText + ';'
-        : '';
+      replacement = '';
     } else {
       const typePrefix = clause.isTypeOnly ? 'type ' : '';
       replacement =

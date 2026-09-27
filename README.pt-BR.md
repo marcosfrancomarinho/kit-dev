@@ -207,6 +207,35 @@ Interface como contrato:
 providers.useClass<UserRepository>(UserRepositoryDatabase)
 ```
 
+Quando esse formato não puder ser usado ou você quiser controlar o token manualmente, crie um token tipado e registre a implementação com ele:
+
+```ts
+const USER_REPOSITORY =
+  createToken<UserRepository>('USER_REPOSITORY')
+
+providers.useClass(
+  USER_REPOSITORY,
+  UserRepositoryDatabase,
+)
+```
+
+Nesse caso, classes que não puderem ter a dependência inferida automaticamente também podem receber o token manualmente no array de dependências:
+
+```ts
+class CreateUser {
+  constructor(
+    private readonly repository: UserRepository,
+  ) {}
+}
+
+providers.useClass(
+  CreateUser,
+  [USER_REPOSITORY],
+)
+```
+
+Esse padrão é útil como alternativa a `useClass<Interface>(Implementacao)` e também quando você quer um token explícito para um repository, gateway, service ou outro contrato.
+
 Classe abstrata como token:
 
 ```ts

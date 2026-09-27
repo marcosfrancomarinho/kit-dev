@@ -55,6 +55,12 @@ async function findCompiledTests() {
   ).sort();
 }
 
+async function findLegacyTests() {
+  return (
+    await collectFiles(testRoot, (name) => /\.(test|spec)\.cjs$/i.test(name))
+  ).sort();
+}
+
 function stopTestProcess() {
   if (
     testProcess &&
@@ -68,7 +74,11 @@ function stopTestProcess() {
 }
 
 async function runTests() {
-  const files = await findCompiledTests();
+  const [compiledFiles, legacyFiles] = await Promise.all([
+    findCompiledTests(),
+    findLegacyTests(),
+  ]);
+  const files = [...compiledFiles, ...legacyFiles];
 
   if (files.length === 0 || closing) return;
 

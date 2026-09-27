@@ -197,8 +197,9 @@ O Kit Dev consegue inferir a dependência do construtor e ligar o contrato à im
 Classe concreta:
 
 ```ts
-providers.useClass(Logger)
-providers.useClass(UserService)
+providers
+  .useClass(Logger)
+  .useClass(UserService)
 ```
 
 Interface como contrato:
@@ -263,8 +264,9 @@ class ConfigService {
   constructor(readonly appName: string) {}
 }
 
-providers.useValue(APP_NAME, 'Minha API')
-providers.useClass(ConfigService, [APP_NAME])
+providers
+  .useValue(APP_NAME, 'Minha API')
+  .useClass(ConfigService, [APP_NAME])
 ```
 
 Também funciona ao registrar uma interface ou classe abstrata:
@@ -284,8 +286,9 @@ Use tokens quando a dependência não possui uma classe que possa representá-la
 const DATABASE_URL = createToken<string>('DATABASE_URL')
 const PORT = createToken<number>('PORT')
 
-providers.useValue(DATABASE_URL, process.env.DATABASE_URL!)
-providers.useValue(PORT, 3000)
+providers
+  .useValue(DATABASE_URL, process.env.DATABASE_URL!)
+  .useValue(PORT, 3000)
 ```
 
 Sempre reutilize a mesma constante do token.
@@ -297,8 +300,9 @@ Use quando o valor ou a instância já existe.
 ```ts
 const APP_NAME = createToken<string>('APP_NAME')
 
-providers.useValue(APP_NAME, 'Kit Dev')
-providers.useValue(Logger, new Logger())
+providers
+  .useValue(APP_NAME, 'Kit Dev')
+  .useValue(Logger, new Logger())
 ```
 
 ### `useFactory()`
@@ -308,16 +312,16 @@ Use quando a criação precisa de lógica personalizada.
 ```ts
 const DATABASE_URL = createToken<string>('DATABASE_URL')
 
-providers.useValue(
-  DATABASE_URL,
-  process.env.DATABASE_URL!,
-)
+providers
+  .useValue(
+    DATABASE_URL,
+    process.env.DATABASE_URL!,
+  )
+  .useFactory(Database, (container) => {
+    const url = container.get(DATABASE_URL)
 
-providers.useFactory(Database, (container) => {
-  const url = container.get(DATABASE_URL)
-
-  return new Database(url)
-})
+    return new Database(url)
+  })
 ```
 
 Use `useClass()` quando a criação for simples. Use `useFactory()` quando você realmente precisar controlar como a instância será criada.
@@ -330,8 +334,9 @@ Use para fazer dois tokens apontarem para a mesma instância.
 const PRIMARY_DATABASE =
   createToken<Database>('PRIMARY_DATABASE')
 
-providers.useClass(Database)
-providers.useExisting(PRIMARY_DATABASE, Database)
+providers
+  .useClass(Database)
+  .useExisting(PRIMARY_DATABASE, Database)
 ```
 
 ### `imports()`
@@ -395,17 +400,17 @@ providers.useClass(
 Também funciona com factory e registros por contrato:
 
 ```ts
-providers.useFactory(
-  RequestId,
-  () => new RequestId(),
-  { scope: 'transient' },
-)
-
-providers.useClass<UserRepository>(
-  UserRepositoryMemory,
-  [],
-  { scope: 'transient' },
-)
+providers
+  .useFactory(
+    RequestId,
+    () => new RequestId(),
+    { scope: 'transient' },
+  )
+  .useClass<UserRepository>(
+    UserRepositoryMemory,
+    [],
+    { scope: 'transient' },
+  )
 ```
 
 ### Métodos do container

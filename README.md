@@ -136,37 +136,29 @@ The bundle is optimized but remains readable.
 
 Dependency injection is optional. You can use Kit Dev without it.
 
-To enable it, run once:
+Enable it once:
 
 ```bash
 yarn di
 ```
 
-After installation, the project receives a container and a `src/di/providers.ts` file. The `di` script is then removed because the setup is already installed.
+After installation, the project gets the container and `src/di/providers.ts`. The `di` script is then removed because the setup is already installed.
 
-### Basic example
+### Basic flow
 
-Contract:
+A common case is a class depending on a repository interface.
 
 ```ts
 export interface UserRepository {
   save(name: string): Promise<void>
 }
-```
 
-Implementation:
-
-```ts
 export class UserRepositoryMemory implements UserRepository {
   async save(name: string): Promise<void> {
     console.log(name)
   }
 }
-```
 
-Use case:
-
-```ts
 export class CreateUser {
   constructor(
     private readonly repository: UserRepository,
@@ -182,9 +174,8 @@ Registration:
 
 ```ts
 const providers = new AppConfig()
-
-providers.useClass<UserRepository>(UserRepositoryMemory)
-providers.useClass(CreateUser)
+  .useClass<UserRepository>(UserRepositoryMemory)
+  .useClass(CreateUser)
 
 export const container = createApplicationContext(providers)
 ```
@@ -197,11 +188,214 @@ const createUser = container.get(CreateUser)
 await createUser.execute('Marcos')
 ```
 
-For normal class dependencies, prefer `useClass()`. Kit Dev can infer constructor dependencies when the types are supported.
+Kit Dev can infer the constructor dependency and connect the contract to the registered implementation.
 
-Use `useFactory()` when creating the dependency requires custom logic.
+### `useClass()`
 
-### Registration options
+Use it for classes the container should create.
+
+Concrete class:
+
+```ts
+providers.useClass(Logger)
+providers.useClass(UserService)
+```
+
+Interface contract:
+
+```ts
+providers.useClass<UserRepository>(UserRepositoryDatabase)
+```
+
+Abstract class as token:
+
+```ts
+export abstract class UserRepository {
+  abstract save(name: string): Promise<void>
+}
+
+export class UserRepositoryDatabase extends UserRepository {
+  async save(name: string): Promise<void> {
+    // ...
+  }
+}
+
+providers.useClass(UserRepository, UserRepositoryDatabase)
+```
+
+### Manual dependencies with `[]`
+
+When Kit Dev cannot infer a dependency, provide tokens manually in constructor order.
+
+```ts
+const APP_NAME = createToken<string>('APP_NAME')
+
+class ConfigService {
+  constructor(readonly appName: string) {}
+}
+
+providers.useValue(APP_NAME, 'My API')
+providers.useClass(ConfigService, [APP_NAME])
+```
+
+This also works for interface and abstract-class registrations:
+
+```ts
+providers.useClass<UserRepository>(
+  UserRepositoryDatabase,
+  [DATABASE],
+)
+```
+
+### `createToken<T>()`
+
+Use tokens when a dependency has no runtime class.
+
+```ts
+const DATABASE_URL = createToken<string>('DATABASE_URL')
+const PORT = createToken<number>('PORT')
+
+providers.useValue(DATABASE_URL, process.env.DATABASE_URL!)
+providers.useValue(PORT, 3000)
+```
+
+Always reuse the same token constant.
+
+### `useValue()`
+
+Use it when a value or instance already exists.
+
+```ts
+const APP_NAME = createToken<string>('APP_NAME')
+
+providers.useValue(APP_NAME, 'Kit Dev')
+providers.useValue(Logger, new Logger())
+```
+
+### `useFactory()`
+
+Use it when creation needs custom logic.
+
+```ts
+const DATABASE_URL = createToken<string>('DATABASE_URL')
+
+providers.useValue(
+  DATABASE_URL,
+  process.env.DATABASE_URL!,
+)
+
+providers.useFactory(Database, (container) => {
+  const url = container.get(DATABASE_URL)
+
+  return new Database(url)
+})
+```
+
+Prefer `useClass()` for normal creation. Use `useFactory()` when you need full control over construction.
+
+### `useExisting()`
+
+Use it when two tokens should resolve to the same instance.
+
+```ts
+const PRIMARY_DATABASE =
+  createToken<Database>('PRIMARY_DATABASE')
+
+providers.useClass(Database)
+providers.useExisting(PRIMARY_DATABASE, Database)
+```
+
+### `imports()`
+
+Registrations can be split into modules.
+
+```ts
+// database-providers.ts
+export const databaseProviders = new AppConfig()
+  .useValue(DATABASE_URL, process.env.DATABASE_URL!)
+  .useClass(Database, [DATABASE_URL])
+```
+
+```ts
+// user-providers.ts
+export const userProviders = new AppConfig()
+  .useClass<UserRepository>(UserRepositoryDatabase)
+  .useClass(CreateUser)
+```
+
+Combine them in the main configuration:
+
+```ts
+const providers = new AppConfig()
+  .imports(
+    databaseProviders,
+    userProviders,
+  )
+
+export const container =
+  createApplicationContext(providers)
+```
+
+### Scopes
+
+The default scope is `singleton`.
+
+```ts
+providers.useClass(Database)
+```
+
+The instance is created on first resolution and then reused:
+
+```ts
+const first = container.get(Database)
+const second = container.get(Database)
+
+console.log(first === second) // true
+```
+
+Use `transient` when you need a new instance on every resolution:
+
+```ts
+providers.useClass(
+  RequestContext,
+  [],
+  { scope: 'transient' },
+)
+```
+
+It also works with factories and contract registrations:
+
+```ts
+providers.useFactory(
+  RequestId,
+  () => new RequestId(),
+  { scope: 'transient' },
+)
+
+providers.useClass<UserRepository>(
+  UserRepositoryMemory,
+  [],
+  { scope: 'transient' },
+)
+```
+
+### Container methods
+
+```ts
+container.get(Service)
+container.getOptional(Service)
+container.has(Service)
+container.clearInstances()
+await container.close()
+```
+
+- `get()` resolves a dependency;
+- `getOptional()` returns `undefined` when it is not registered;
+- `has()` checks whether a token exists;
+- `clearInstances()` clears cached instances without removing providers;
+- `close()` disposes resources that expose `dispose()` or `close()`.
+
+### Registration summary
 
 | Method | Use when |
 |---|---|
@@ -212,17 +406,6 @@ Use `useFactory()` when creating the dependency requires custom logic.
 | `createToken<T>()` | The dependency has no runtime class |
 | `imports()` | You want to split providers into modules |
 
-The default scope is `singleton`. Use `transient` when you need a new instance on every resolution.
-
-Useful container methods:
-
-```ts
-container.get(Service)
-container.getOptional(Service)
-container.has(Service)
-container.clearInstances()
-await container.close()
-```
 
 ## Generated structure
 

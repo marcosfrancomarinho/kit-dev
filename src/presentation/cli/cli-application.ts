@@ -1,8 +1,8 @@
 import { ProjectName } from '../../domain/project/project-name.js';
-import type { CreateProject } from '../../application/create-project.js';
+import { CreateProject } from '../../application/create-project.js';
 import type { PackageManagerDetector } from '../../application/ports/package-manager-detector.js';
 import type { Terminal } from '../../application/ports/terminal.js';
-import type { NodeVersionPolicy } from '../../application/policies/node-version-policy.js';
+import { NodeVersionPolicy } from '../../application/policies/node-version-policy.js';
 
 export class CliApplication {
   constructor(

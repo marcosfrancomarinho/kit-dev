@@ -207,6 +207,35 @@ Interface contract:
 providers.useClass<UserRepository>(UserRepositoryDatabase)
 ```
 
+If this form cannot be used, or if you want explicit control over the token, create a typed token and register the implementation with it:
+
+```ts
+const USER_REPOSITORY =
+  createToken<UserRepository>('USER_REPOSITORY')
+
+providers.useClass(
+  USER_REPOSITORY,
+  UserRepositoryDatabase,
+)
+```
+
+When automatic constructor inference is not available, the same token can be passed manually in the dependency array:
+
+```ts
+class CreateUser {
+  constructor(
+    private readonly repository: UserRepository,
+  ) {}
+}
+
+providers.useClass(
+  CreateUser,
+  [USER_REPOSITORY],
+)
+```
+
+This is a useful alternative to `useClass<Interface>(Implementation)` and also works well when you want an explicit token for a repository, gateway, service or another contract.
+
 Abstract class as token:
 
 ```ts

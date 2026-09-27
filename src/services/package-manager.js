@@ -1,65 +1,27 @@
-const { colors } = require('../utils/terminal');
-const { runCommand } = require('../utils/run-command');
+const {
+  createPackageManager,
+  detectPackageManager,
+} = require('../infrastructure/package-manager/package-manager');
+const {
+  createCommandRunner,
+} = require('../infrastructure/process/command-runner');
+const {
+  createTerminalAdapter,
+} = require('../presentation/terminal/terminal-adapter');
 
-const dependencies = [
-  'typescript@7.0.2',
-  '@typescript/typescript6@6.0.2',
-  'esbuild@0.28.2',
-  '@types/node@22',
-];
-
-const managers = {
-  npm: {
-    command: 'npm',
-    installArgs: ['install', '--save-dev'],
-    runCommand: 'npm run',
-  },
-  yarn: {
-    command: 'yarn',
-    installArgs: ['add', '-D'],
-    runCommand: 'yarn',
-  },
-  pnpm: {
-    command: 'pnpm',
-    installArgs: ['--allow-build=esbuild', 'add', '-D'],
-    runCommand: 'pnpm',
-  },
-};
-
-function detectPackageManager() {
-  const execPath = process.env.npm_execpath || '';
-  const userAgent = process.env.npm_config_user_agent || '';
-
-  if (userAgent.startsWith('pnpm')) return 'pnpm';
-  if (userAgent.startsWith('yarn')) return 'yarn';
-  if (execPath.includes('npm-cli.js') || execPath.includes('npx')) return 'npm';
-
-  return 'npm';
+function createLegacyPackageManager() {
+  return createPackageManager({
+    commandRunner: createCommandRunner(),
+    output: createTerminalAdapter(),
+  });
 }
 
 function getRunCommand(manager) {
-  return (managers[manager] || managers.npm).runCommand;
+  return createLegacyPackageManager().getRunCommand(manager);
 }
 
 async function installDependencies(manager, projectPath) {
-  const selectedManager = managers[manager] || managers.npm;
-
-  console.log(
-    colors.magenta +
-      '⬇️ Installing dependencies with ' +
-      manager +
-      '...' +
-      colors.reset,
-  );
-
-  await runCommand(
-    selectedManager.command,
-    [...selectedManager.installArgs, ...dependencies],
-    {
-      cwd: projectPath,
-      errorMessage: manager + ' installation failed.',
-    },
-  );
+  await createLegacyPackageManager().install({ manager, projectPath });
 }
 
 module.exports = {

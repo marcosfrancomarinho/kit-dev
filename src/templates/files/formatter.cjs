@@ -569,7 +569,7 @@ function splitSameLineStatements(source, fileName = 'source.ts') {
     getScriptKind(fileName),
   );
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
-  const insertions = new Set();
+  const replacements = [];
 
   function visit(node) {
     const statements = node.statements;
@@ -587,7 +587,11 @@ function splitSameLineStatements(source, fileName = 'source.ts') {
           !gap.includes('\r') &&
           gap.trim() === ''
         ) {
-          insertions.add(currentStart);
+          replacements.push({
+            start: gapStart,
+            end: currentStart,
+            value: newline,
+          });
         }
       }
     }
@@ -599,8 +603,11 @@ function splitSameLineStatements(source, fileName = 'source.ts') {
 
   let result = source;
 
-  for (const position of [...insertions].sort((a, b) => b - a)) {
-    result = result.slice(0, position) + newline + result.slice(position);
+  for (const change of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
   }
 
   return result;
@@ -628,7 +635,72 @@ function containsComment(text) {
   return false;
 }
 
-function compactShortCalls(source, fileName = 'source.ts', maxLineLength = 100) {
+function lineLengthWithReplacement(source, start, end, replacement) {
+  const lineStart = Math.max(
+    source.lastIndexOf('\n', start - 1),
+    source.lastIndexOf('\r', start - 1),
+  ) + 1;
+  const newlineIndex = source.indexOf('\n', end);
+  const carriageIndex = source.indexOf('\r', end);
+  const candidates = [newlineIndex, carriageIndex].filter((index) => index >= 0);
+  const lineEnd =
+    candidates.length > 0 ? Math.min(...candidates) : source.length;
+
+  return (
+    source.slice(lineStart, start).length +
+    replacement.length +
+    source.slice(end, lineEnd).length
+  );
+}
+
+function listFormattingInfo(node) {
+  if (ts.isArrayLiteralExpression(node)) {
+    return { items: node.elements, threshold: 4, kind: 'array' };
+  }
+
+  if (ts.isObjectLiteralExpression(node)) {
+    return { items: node.properties, threshold: 3, kind: 'object' };
+  }
+
+  if (ts.isArrayBindingPattern(node) || ts.isObjectBindingPattern(node)) {
+    return { items: node.elements, threshold: 4, kind: 'binding' };
+  }
+
+  if (ts.isNamedImports(node) || ts.isNamedExports(node)) {
+    return { items: node.elements, threshold: 5, kind: 'named' };
+  }
+
+  if (
+    (ts.isCallExpression(node) || ts.isNewExpression(node)) &&
+    node.arguments
+  ) {
+    return { items: node.arguments, threshold: 4, kind: 'arguments' };
+  }
+
+  if (
+    node.parameters &&
+    typeof node.parameters.length === 'number' &&
+    !ts.isSourceFile(node)
+  ) {
+    return { items: node.parameters, threshold: 4, kind: 'parameters' };
+  }
+
+  return null;
+}
+
+function shouldSkipListItem(item, text) {
+  return (
+    ts.isOmittedExpression(item) ||
+    text.includes('\n') ||
+    text.includes('\r')
+  );
+}
+
+function formatDelimitedListsOnce(
+  source,
+  fileName = 'source.ts',
+  maxLineLength = 100,
+) {
   const sourceFile = ts.createSourceFile(
     fileName,
     source,
@@ -636,84 +708,108 @@ function compactShortCalls(source, fileName = 'source.ts', maxLineLength = 100) 
     true,
     getScriptKind(fileName),
   );
-  const replacements = [];
+  const candidates = [];
 
-  function visit(node) {
-    if (
-      (ts.isCallExpression(node) || ts.isNewExpression(node)) &&
-      node.arguments
-    ) {
-      const start = node.getStart(sourceFile);
-      const end = node.getEnd();
-      const raw = source.slice(start, end);
+  function visit(node, depth = 0) {
+    const info = listFormattingInfo(node);
 
-      if (raw.includes('\n') || raw.includes('\r')) {
-        const prefix = source.slice(start, node.arguments.pos);
-        const suffix = source.slice(node.arguments.end, end);
-        const argumentTexts = node.arguments.map((argument) =>
-          source.slice(argument.getStart(sourceFile), argument.getEnd()),
+    if (info && info.items.length > 0) {
+      const interiorStart = info.items.pos;
+      const interiorEnd = info.items.end;
+      const rawInterior = source.slice(interiorStart, interiorEnd);
+      const nodeText = source.slice(node.getStart(sourceFile), node.getEnd());
+
+      if (!containsComment(nodeText)) {
+        const itemTexts = info.items.map((item) =>
+          source.slice(item.getStart(sourceFile), item.getEnd()),
         );
 
-        const canCompact =
-          !prefix.includes('\n') &&
-          !prefix.includes('\r') &&
-          !suffix.includes('\n') &&
-          !suffix.includes('\r') &&
-          !node.arguments.hasTrailingComma &&
-          !containsComment(raw) &&
-          argumentTexts.every(
-            (argument) =>
-              !argument.includes('\n') && !argument.includes('\r'),
+        if (
+          itemTexts.length > 0 &&
+          !itemTexts.some((text, index) =>
+            shouldSkipListItem(info.items[index], text),
+          )
+        ) {
+          const compact = itemTexts.join(', ');
+          const isMultiline =
+            rawInterior.includes('\n') || rawInterior.includes('\r');
+          const projectedLength = lineLengthWithReplacement(
+            source,
+            interiorStart,
+            interiorEnd,
+            compact,
           );
+          const shouldExpand =
+            info.items.length >= info.threshold ||
+            projectedLength > maxLineLength;
 
-        if (canCompact) {
-          const candidate =
-            prefix + argumentTexts.join(', ') + suffix;
-          const lineStart = Math.max(
-            source.lastIndexOf('\n', start - 1),
-            source.lastIndexOf('\r', start - 1),
-          ) + 1;
-          const projectedLineLength =
-            start - lineStart + candidate.length;
+          let value = null;
 
-          if (projectedLineLength <= maxLineLength) {
-            replacements.push({
-              start,
-              end,
-              value: candidate,
+          if (shouldExpand && !isMultiline) {
+            value = '\n' + itemTexts.join(',\n') + '\n';
+          } else if (!shouldExpand && isMultiline) {
+            value = compact;
+          }
+
+          if (value !== null && value !== rawInterior) {
+            candidates.push({
+              start: interiorStart,
+              end: interiorEnd,
+              value,
+              depth,
             });
           }
         }
       }
     }
 
-    ts.forEachChild(node, visit);
+    ts.forEachChild(node, (child) => visit(child, depth + 1));
   }
 
   visit(sourceFile);
 
+  if (candidates.length === 0) return source;
+
+  const maxDepth = Math.max(...candidates.map((candidate) => candidate.depth));
+  const deepest = candidates
+    .filter((candidate) => candidate.depth === maxDepth)
+    .sort((a, b) => b.start - a.start);
+
   let result = source;
 
-  for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
-    const overlapsLaterReplacement = replacements.some(
-      (other) =>
-        other !== replacement &&
-        other.start >= replacement.start &&
-        other.end <= replacement.end &&
-        other.start !== replacement.start,
-    );
-
-    if (overlapsLaterReplacement) {
-      continue;
-    }
-
+  for (const change of deepest) {
     result =
-      result.slice(0, replacement.start) +
-      replacement.value +
-      result.slice(replacement.end);
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
   }
 
   return result;
+}
+
+function formatDelimitedLists(
+  source,
+  fileName = 'source.ts',
+  maxLineLength = 100,
+) {
+  let result = source;
+
+  for (let pass = 0; pass < 20; pass += 1) {
+    const next = formatDelimitedListsOnce(
+      result,
+      fileName,
+      maxLineLength,
+    );
+
+    if (next === result) break;
+    result = next;
+  }
+
+  return result;
+}
+
+function compactShortCalls(source, fileName = 'source.ts', maxLineLength = 100) {
+  return formatDelimitedLists(source, fileName, maxLineLength);
 }
 
 function formatSource(source, fileName = 'source.ts') {
@@ -722,9 +818,9 @@ function formatSource(source, fileName = 'source.ts') {
   const withSemicolons = addSemicolons(quoted, fileName);
   const expanded = expandCompactBlocks(withSemicolons, fileName);
   const split = splitSameLineStatements(expanded, fileName);
-  const compacted = compactShortCalls(split, fileName);
+  const listed = formatDelimitedLists(split, fileName);
 
-  return indentSource(compacted);
+  return indentSource(listed);
 }
 
 function indentSource(source) {
@@ -859,6 +955,7 @@ module.exports = {
   addSemicolons,
   compactShortCalls,
   expandCompactBlocks,
+  formatDelimitedLists,
   formatSource,
   indentSource,
   removeUnusedImports,

@@ -1,120 +1,16 @@
-const { copyFile, mkdir, writeFile } = require('fs/promises');
-const { join } = require('path');
-const { colors } = require('../utils/terminal');
 const {
-  createPackageJson,
-  createTsconfig,
-  esbuildConfig,
-  exampleTest,
-  gitignore,
-  mainFile,
-} = require('../templates/project-files');
-
-async function createDirectory(directory) {
-  try {
-    await mkdir(directory);
-    console.log(colors.green + '📁 Folder created:' + colors.reset + ' ' + directory);
-  } catch (error) {
-    if (error.code === 'EEXIST') {
-      throw new Error(
-        colors.yellow + '⚠️  Folder already exists:' + colors.reset + ' ' + directory,
-      );
-    }
-    throw error;
-  }
-}
-
-async function createFile(path, content, message) {
-  await writeFile(path, content, 'utf-8');
-  console.log(colors.green + message + colors.reset);
-}
-
-async function copyTemplateFile(source, destination, message) {
-  await copyFile(source, destination);
-  console.log(colors.green + message + colors.reset);
-}
+  createNodeProjectScaffolder,
+} = require('../infrastructure/project/node-project-scaffolder');
+const {
+  createTerminalAdapter,
+} = require('../presentation/terminal/terminal-adapter');
 
 async function generateProject(projectPath, projectName) {
-  const srcPath = join(projectPath, 'src');
-  const kitDevPath = join(projectPath, 'kit-dev');
-  const buildPath = join(kitDevPath, 'build');
-  const diPath = join(kitDevPath, 'di');
-  const kitDevTestPath = join(kitDevPath, 'test');
-  const testPath = join(projectPath, 'test');
-  const templateFilesPath = join(__dirname, '..', 'templates', 'files');
+  const projectScaffolder = createNodeProjectScaffolder({
+    output: createTerminalAdapter(),
+  });
 
-  await createDirectory(projectPath);
-  await createDirectory(srcPath);
-  await createDirectory(kitDevPath);
-  await createDirectory(buildPath);
-  await createDirectory(diPath);
-  await createDirectory(kitDevTestPath);
-  await createDirectory(testPath);
-
-  await Promise.all([
-    createFile(join(srcPath, 'main.ts'), mainFile, '📝 src/main.ts created'),
-    createFile(
-      join(testPath, 'example.test.ts'),
-      exampleTest,
-      '🧪 test/example.test.ts created',
-    ),
-    createFile(
-      join(projectPath, 'package.json'),
-      createPackageJson(projectName),
-      '📦 package.json created',
-    ),
-    createFile(
-      join(projectPath, 'tsconfig.json'),
-      createTsconfig(),
-      '⚙️ tsconfig.json created',
-    ),
-    createFile(
-      join(buildPath, 'esbuild.config.cjs'),
-      esbuildConfig,
-      '🛠 kit-dev/build/esbuild.config.cjs created',
-    ),
-    createFile(join(projectPath, '.gitignore'), gitignore, '🐙 .gitignore created'),
-    copyTemplateFile(
-      join(templateFilesPath, 'di.cjs'),
-      join(diPath, 'install.cjs'),
-      '🧩 Optional DI command prepared',
-    ),
-    copyTemplateFile(
-      join(templateFilesPath, 'dependency-injection.ts'),
-      join(diPath, 'container.ts'),
-      '🧩 DI template prepared',
-    ),
-    copyTemplateFile(
-      join(templateFilesPath, 'dependency-injection.d.ts'),
-      join(diPath, 'container.d.ts'),
-      '🧩 DI types prepared',
-    ),
-    copyTemplateFile(
-      join(templateFilesPath, 'di-transformer.cjs'),
-      join(diPath, 'transformer.cjs'),
-      '🧩 DI transformer prepared',
-    ),
-    copyTemplateFile(
-      join(templateFilesPath, 'dev.cjs'),
-      join(buildPath, 'dev.cjs'),
-      '⚡ esbuild development runner prepared',
-    ),
-    copyTemplateFile(
-      join(templateFilesPath, 'providers.ts'),
-      join(diPath, 'providers.ts'),
-      '🧩 DI providers template prepared',
-    ),
-    copyTemplateFile(
-      join(templateFilesPath, 'runner.cjs'),
-      join(kitDevTestPath, 'test.cjs'),
-      '🧪 Native test runner prepared',
-    ),
-    copyTemplateFile(
-      join(templateFilesPath, 'test-generator.cjs'),
-      join(kitDevTestPath, 'generator.cjs'),
-      '🧪 Automatic test generator prepared',
-    ),
-  ]);
+  await projectScaffolder.create({ projectPath, projectName });
 }
 
 module.exports = { generateProject };

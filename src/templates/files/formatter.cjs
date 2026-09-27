@@ -1,5 +1,6 @@
 const { readdir, readFile, writeFile } = require('node:fs/promises');
 const { join, relative } = require('node:path');
+const ts = require('typescript');
 
 const projectRoot = join(__dirname, '..', '..');
 const roots = [
@@ -175,6 +176,66 @@ function scanStructure(line, state) {
   return { opens, closes, leadingClosers };
 }
 
+
+function shouldEndWithSemicolon(node) {
+  return (
+    ts.isVariableStatement(node) ||
+    ts.isExpressionStatement(node) ||
+    ts.isReturnStatement(node) ||
+    ts.isThrowStatement(node) ||
+    ts.isBreakStatement(node) ||
+    ts.isContinueStatement(node) ||
+    ts.isDebuggerStatement(node) ||
+    ts.isImportDeclaration(node) ||
+    ts.isImportEqualsDeclaration(node) ||
+    ts.isExportDeclaration(node) ||
+    ts.isTypeAliasDeclaration(node) ||
+    ts.isPropertyDeclaration(node) ||
+    ts.isPropertySignature(node) ||
+    ts.isMethodSignature(node) ||
+    ts.isCallSignatureDeclaration(node) ||
+    ts.isConstructSignatureDeclaration(node) ||
+    ts.isIndexSignatureDeclaration(node)
+  );
+}
+
+function addSemicolons(source, fileName = 'source.ts') {
+  const scriptKind = /\.(?:js|jsx|mjs|cjs)$/i.test(fileName)
+    ? ts.ScriptKind.JS
+    : ts.ScriptKind.TS;
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKind,
+  );
+  const positions = new Set();
+
+  function visit(node) {
+    if (shouldEndWithSemicolon(node)) {
+      const end = node.getEnd();
+      const beforeEnd = source.slice(0, end).trimEnd();
+
+      if (!beforeEnd.endsWith(';')) {
+        positions.add(end);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const position of [...positions].sort((a, b) => b - a)) {
+    result = result.slice(0, position) + ';' + result.slice(position);
+  }
+
+  return result;
+}
+
 function indentSource(source) {
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   const hadFinalNewline = source.endsWith('\n');
@@ -228,7 +289,7 @@ async function main() {
 
   for (const file of files) {
     const source = await readFile(file, 'utf8');
-    const formatted = indentSource(source);
+    const formatted = indentSource(addSemicolons(source, file));
 
     if (formatted === source) continue;
 
@@ -253,5 +314,6 @@ if (require.main === module) {
 }
 
 module.exports = {
+  addSemicolons,
   indentSource,
 };

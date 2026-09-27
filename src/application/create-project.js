@@ -8,8 +8,7 @@ function createCreateProject({
   }
 
   return {
-    async execute({ projectName, cwd }) {
-      const manager = packageManager.detect();
+    async execute({ projectName, cwd, manager = packageManager.detect() }) {
       const projectPath = pathResolver.resolve(cwd, projectName);
 
       await projectScaffolder.create({

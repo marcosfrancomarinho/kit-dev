@@ -427,6 +427,9 @@ var ProjectPaths = class {
   kitDevTest() {
     return (0, import_node_path2.join)(this.kitDev(), "test");
   }
+  format() {
+    return (0, import_node_path2.join)(this.kitDev(), "format");
+  }
   test() {
     return (0, import_node_path2.join)(this.projectPath, "test");
   }
@@ -456,6 +459,7 @@ var ProjectPaths = class {
       this.build(),
       this.di(),
       this.kitDevTest(),
+      this.format(),
       this.test()
     ];
   }
@@ -520,7 +524,8 @@ var NodeProjectScaffolder = class {
       this.copyTemplate(paths, "dev.cjs", (0, import_node_path3.join)(paths.build(), "dev.cjs"), "\u26A1 esbuild development runner prepared"),
       this.copyTemplate(paths, "providers.ts", (0, import_node_path3.join)(paths.di(), "providers.ts"), "\u{1F9E9} DI providers template prepared"),
       this.copyTemplate(paths, "runner.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test.cjs"), "\u{1F9EA} Native test runner prepared"),
-      this.copyTemplate(paths, "test-generator.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "generator.cjs"), "\u{1F9EA} Automatic test generator prepared")
+      this.copyTemplate(paths, "test-generator.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "generator.cjs"), "\u{1F9EA} Automatic test generator prepared"),
+      this.copyTemplate(paths, "formatter.cjs", (0, import_node_path3.join)(paths.format(), "fmt.cjs"), "\u2728 Source formatter prepared")
     ]);
   }
   async createDirectory(directory) {
@@ -639,6 +644,7 @@ var ProjectTemplateCatalog = class {
           build: "node kit-dev/build/esbuild.config.cjs",
           type: "tsc --watch --noEmit",
           test: "node kit-dev/test/test.cjs",
+          fmt: "node kit-dev/format/fmt.cjs",
           di: "node kit-dev/di/install.cjs"
         },
         dependencies: {},

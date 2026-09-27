@@ -12,6 +12,7 @@ export class ProjectTemplateCatalog {
           build: 'node kit-dev/build/esbuild.config.cjs',
           type: 'tsc --watch --noEmit',
           test: 'node kit-dev/test/test.cjs',
+          fmt: 'node kit-dev/format/fmt.cjs',
           di: 'node kit-dev/di/install.cjs',
         },
         dependencies: {},

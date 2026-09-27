@@ -68,6 +68,7 @@ pnpm dev
 | `dev` | Executa a aplicação e acompanha alterações |
 | `test` | Executa os testes em modo watch |
 | `test <arquivo>` | Gera ou atualiza o teste de uma classe |
+| `fmt` | Corrige apenas a identação dos arquivos JavaScript/TypeScript em `src/` e `test/` |
 | `build` | Verifica os tipos e gera o bundle de produção |
 | `start` | Executa o bundle gerado |
 | `type` | Acompanha erros de TypeScript |
@@ -79,9 +80,20 @@ Exemplos com npm:
 npm run dev
 npm test
 npm test -- create-user
+npm run fmt
 npm run build
 npm start
 ```
+
+## Formatação de código
+
+Use:
+
+```bash
+npm run fmt
+```
+
+O comando `fmt` é leve e não usa biblioteca externa de formatação. Ele corrige apenas a identação dos arquivos JavaScript e TypeScript encontrados em `src/` e `test/`, sem alterar regras de estilo como aspas, ponto e vírgula ou quebra de linhas.
 
 ## Testes automáticos
 

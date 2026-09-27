@@ -1,20 +1,20 @@
-const { ProjectScaffolder } = require('./ports/project-scaffolder');
-const { PackageInstaller } = require('./ports/package-installer');
-const { PathResolver } = require('./ports/path-resolver');
+function assertPort(name, dependency, methods) {
+  const isValid =
+    dependency &&
+    methods.every((method) => typeof dependency[method] === 'function');
+
+  if (!isValid) {
+    throw new TypeError(
+      `${name} must implement: ${methods.join(', ')}.`,
+    );
+  }
+}
 
 class CreateProject {
   constructor(projectScaffolder, packageInstaller, pathResolver) {
-    if (!(projectScaffolder instanceof ProjectScaffolder)) {
-      throw new TypeError('projectScaffolder must implement ProjectScaffolder.');
-    }
-
-    if (!(packageInstaller instanceof PackageInstaller)) {
-      throw new TypeError('packageInstaller must implement PackageInstaller.');
-    }
-
-    if (!(pathResolver instanceof PathResolver)) {
-      throw new TypeError('pathResolver must implement PathResolver.');
-    }
+    assertPort('projectScaffolder', projectScaffolder, ['create']);
+    assertPort('packageInstaller', packageInstaller, ['install', 'getRunCommand']);
+    assertPort('pathResolver', pathResolver, ['resolve']);
 
     this.projectScaffolder = projectScaffolder;
     this.packageInstaller = packageInstaller;

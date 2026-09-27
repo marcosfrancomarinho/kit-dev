@@ -153,11 +153,11 @@ export class CreateUser {
     );
     assert.match(
       generated,
-      /const repositoryFindByNameMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => null\)/,
+      /const repositoryFindByNameMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => \{ return null \}\)/,
     );
     assert.match(
       generated,
-      /const repositoryCreateMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /const repositoryCreateMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => \{ return undefined \}\)/,
     );
     assert.match(generated, /findByName: repositoryFindByNameMock/);
     assert.match(generated, /create: repositoryCreateMock/);
@@ -185,6 +185,75 @@ export class CreateUser {
     assert.match(
       generated,
       /repositoryCreateMock\.mock\.calls\[0\]\.arguments, \[dto\]/,
+    );
+  },
+);
+
+
+test(
+  'gera mock assíncrono com retorno explícito para objeto literal',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-object-return-test-generator-'),
+    );
+    context.after(() =>
+      rm(projectPath, { recursive: true, force: true }),
+    );
+
+    await mkdir(
+      join(projectPath, 'src', 'application'),
+      { recursive: true },
+    );
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(
+        projectPath,
+        'src',
+        'application',
+        'find-products.ts',
+      ),
+      `
+interface ProductRepository {
+  findAll(): Promise<{
+    items: Array<{ id: string; name: string }>
+    quantity: number
+    page: number
+  }>
+}
+
+export class FindProducts {
+  constructor(
+    private readonly repository: ProductRepository,
+  ) {}
+
+  async execute() {
+    return this.repository.findAll()
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest(
+      'src/application/find-products.ts',
+      projectPath,
+    );
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /const repositoryFindAllMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => \{ return \{ items:/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /async \(\.\.\._args: unknown\[\]\) => \{\s*items:/,
     );
   },
 );
@@ -1330,7 +1399,7 @@ export class UserService {
     );
     assert.match(
       generated,
-      /const repositorySaveMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /const repositorySaveMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => \{ return undefined \}\)/,
     );
     assert.match(
       generated,
@@ -1392,7 +1461,7 @@ export class Runner {
 
     assert.match(
       generated,
-      /const portRunMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /const portRunMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => \{ return undefined \}\)/,
     );
     assert.match(
       generated,
@@ -1463,7 +1532,7 @@ export class CreateUser {
     );
     assert.match(
       generated,
-      /const repositorySaveMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /const repositorySaveMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => \{ return undefined \}\)/,
     );
     assert.match(
       generated,
@@ -1607,7 +1676,7 @@ export class Subject {
     );
     assert.match(
       observerTest,
-      /update: t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /update: t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => \{ return undefined \}\)/,
     );
     assert.match(
       observerTest,
@@ -1653,7 +1722,7 @@ export class Checkout {
 
     assert.match(
       strategyTest,
-      /const strategyCalculateMock = t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => 1\)/,
+      /const strategyCalculateMock = t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => \{ return 1 \}\)/,
     );
     assert.match(strategyTest, /calculate: strategyCalculateMock/);
     assert.match(
@@ -1696,7 +1765,7 @@ export class ProductFilter {
 
     assert.match(
       specificationTest,
-      /const specificationIsSatisfiedByMock = t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => true\)/,
+      /const specificationIsSatisfiedByMock = t\.mock\.fn\(\(\.\.\._args: unknown\[\]\) => \{ return true \}\)/,
     );
     assert.match(
       specificationTest,
@@ -1738,7 +1807,7 @@ export class LoggingDecorator {
 
     assert.match(
       decoratorTest,
-      /const innerExecuteMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /const innerExecuteMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => \{ return undefined \}\)/,
     );
     assert.match(decoratorTest, /execute: innerExecuteMock/);
     assert.match(
@@ -1777,7 +1846,7 @@ export class PaymentAdapter {
 
     assert.match(
       adapterTest,
-      /const portChargeMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => true\)/,
+      /const portChargeMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => \{ return true \}\)/,
     );
     assert.match(adapterTest, /charge: portChargeMock/);
     assert.match(
@@ -1931,7 +2000,7 @@ export class NotificationService {
 
     assert.match(
       inheritedTest,
-      /const portSendMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => undefined\)/,
+      /const portSendMock = t\.mock\.fn\(async \(\.\.\._args: unknown\[\]\) => \{ return undefined \}\)/,
     );
     assert.match(inheritedTest, /send: portSendMock/);
 

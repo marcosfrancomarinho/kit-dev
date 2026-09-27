@@ -68,7 +68,7 @@ pnpm dev
 | `dev` | Executa a aplicação e acompanha alterações |
 | `test` | Executa os testes em modo watch |
 | `test <arquivo>` | Gera ou atualiza o teste de uma classe |
-| `fmt` | Corrige apenas a identação dos arquivos JavaScript/TypeScript em `src/` e `test/` |
+| `fmt` | Formata arquivos JavaScript/TypeScript em `src/` e `test/`: identação, `;` e aspas simples |
 | `build` | Verifica os tipos e gera o bundle de produção |
 | `start` | Executa o bundle gerado |
 | `type` | Acompanha erros de TypeScript |
@@ -93,7 +93,7 @@ Use:
 npm run fmt
 ```
 
-O comando `fmt` é leve e não usa biblioteca externa de formatação. Ele corrige apenas a identação dos arquivos JavaScript e TypeScript encontrados em `src/` e `test/`, sem alterar regras de estilo como aspas, ponto e vírgula ou quebra de linhas.
+O comando `fmt` é leve e não adiciona uma biblioteca externa de formatação. Ele atua somente nos arquivos JavaScript e TypeScript de `src/` e `test/`, corrigindo a identação, adicionando ponto e vírgula aos statements reconhecidos e convertendo strings com aspas duplas para aspas simples. Template strings com crase, regex, comentários e atributos JSX com aspas permanecem intactos.
 
 ## Testes automáticos
 

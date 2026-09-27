@@ -1,4 +1,5 @@
 const { readdir, readFile, writeFile } = require('node:fs/promises');
+const { createRequire } = require('node:module');
 const { join, relative } = require('node:path');
 
 const projectRoot = join(__dirname, '..', '..');
@@ -8,6 +9,25 @@ const roots = [
 ];
 const supported = /\.(?:js|jsx|mjs|cjs|ts|tsx|mts|cts)$/i;
 const indentUnit = '  ';
+
+function loadTypeScript() {
+  const projectRequire = createRequire(join(projectRoot, 'package.json'));
+
+  try {
+    return projectRequire('@typescript/typescript6');
+  } catch {}
+
+  try {
+    return require('@typescript/typescript6');
+  } catch {
+    throw new Error(
+      'The TypeScript AST compatibility package is required to format code. ' +
+        'Run your package manager install command and try again.',
+    );
+  }
+}
+
+const ts = loadTypeScript();
 
 async function collectFiles(directory) {
   let entries;
@@ -175,6 +195,159 @@ function scanStructure(line, state) {
   return { opens, closes, leadingClosers };
 }
 
+
+
+function getScriptKind(fileName) {
+  if (/\.tsx$/i.test(fileName)) return ts.ScriptKind.TSX;
+  if (/\.jsx$/i.test(fileName)) return ts.ScriptKind.JSX;
+  if (/\.(?:js|mjs|cjs)$/i.test(fileName)) return ts.ScriptKind.JS;
+  return ts.ScriptKind.TS;
+}
+
+function convertDoubleQuotedLiteral(raw) {
+  const inner = raw.slice(1, -1);
+  let result = "'";
+
+  for (let index = 0; index < inner.length; index += 1) {
+    const char = inner[index];
+
+    if (char === '\\') {
+      const next = inner[index + 1];
+
+      if (next === '"') {
+        result += '"';
+        index += 1;
+        continue;
+      }
+
+      if (next === "'") {
+        result += "\\'";
+        index += 1;
+        continue;
+      }
+
+      result += char;
+
+      if (next !== undefined) {
+        result += next;
+        index += 1;
+      }
+
+      continue;
+    }
+
+    if (char === "'") {
+      result += "\\'";
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result + "'";
+}
+
+function useSingleQuotes(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  function visit(node) {
+    if (
+      ts.isStringLiteral(node) &&
+      !ts.isJsxAttribute(node.parent)
+    ) {
+      const start = node.getStart(sourceFile);
+      const end = node.getEnd();
+      const raw = source.slice(start, end);
+
+      if (raw.startsWith('"') && raw.endsWith('"')) {
+        replacements.push({
+          start,
+          end,
+          value: convertDoubleQuotedLiteral(raw),
+        });
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const replacement of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, replacement.start) +
+      replacement.value +
+      result.slice(replacement.end);
+  }
+
+  return result;
+}
+
+function shouldEndWithSemicolon(node) {
+  return (
+    ts.isVariableStatement(node) ||
+    ts.isExpressionStatement(node) ||
+    ts.isReturnStatement(node) ||
+    ts.isThrowStatement(node) ||
+    ts.isBreakStatement(node) ||
+    ts.isContinueStatement(node) ||
+    ts.isDebuggerStatement(node) ||
+    ts.isImportDeclaration(node) ||
+    ts.isImportEqualsDeclaration(node) ||
+    ts.isExportDeclaration(node) ||
+    ts.isTypeAliasDeclaration(node) ||
+    ts.isPropertyDeclaration(node) ||
+    ts.isPropertySignature(node) ||
+    ts.isMethodSignature(node) ||
+    ts.isCallSignatureDeclaration(node) ||
+    ts.isConstructSignatureDeclaration(node) ||
+    ts.isIndexSignatureDeclaration(node)
+  );
+}
+
+function addSemicolons(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const positions = new Set();
+
+  function visit(node) {
+    if (shouldEndWithSemicolon(node)) {
+      const end = node.getEnd();
+      const beforeEnd = source.slice(0, end).trimEnd();
+
+      if (!beforeEnd.endsWith(';')) {
+        positions.add(end);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const position of [...positions].sort((a, b) => b - a)) {
+    result = result.slice(0, position) + ';' + result.slice(position);
+  }
+
+  return result;
+}
+
 function indentSource(source) {
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   const hadFinalNewline = source.endsWith('\n');
@@ -228,7 +401,8 @@ async function main() {
 
   for (const file of files) {
     const source = await readFile(file, 'utf8');
-    const formatted = indentSource(source);
+    const quoted = useSingleQuotes(source, file);
+    const formatted = indentSource(addSemicolons(quoted, file));
 
     if (formatted === source) continue;
 
@@ -239,8 +413,8 @@ async function main() {
 
   console.log(
     changed === 0
-      ? '✨ src/ is already indented.'
-      : '\n✨ Indented ' + changed + ' file' + (changed === 1 ? '' : 's') + ' in src/ and test/.',
+      ? '✨ src/ and test/ are already formatted.'
+      : '\n✨ Formatted ' + changed + ' file' + (changed === 1 ? '' : 's') + ' in src/ and test/.',
   );
 }
 
@@ -253,5 +427,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  addSemicolons,
   indentSource,
+  useSingleQuotes,
 };

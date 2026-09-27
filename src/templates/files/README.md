@@ -68,7 +68,7 @@ pnpm dev
 | `dev` | Runs the application and watches for changes |
 | `test` | Runs tests in watch mode |
 | `test <file>` | Generates or updates a test for a class |
-| `fmt` | Fixes indentation only for JavaScript/TypeScript files in `src/` and `test/` |
+| `fmt` | Formats JavaScript/TypeScript files in `src/` and `test/`: indentation, `;` and single quotes |
 | `build` | Checks types and creates the production bundle |
 | `start` | Runs the generated bundle |
 | `type` | Watches TypeScript errors |
@@ -93,7 +93,7 @@ Run:
 npm run fmt
 ```
 
-The `fmt` command is lightweight and does not use an external formatting library. It only fixes indentation for JavaScript and TypeScript files found in `src/` and `test/`, without changing style rules such as quotes, semicolons or line wrapping.
+The `fmt` command is lightweight and does not add an external formatting library. It only processes JavaScript and TypeScript files in `src/` and `test/`, fixing indentation, adding semicolons to recognized statements, and converting double-quoted strings to single quotes. Backtick template strings, regexes, comments, and quoted JSX attributes are left unchanged.
 
 ## Automatic tests
 

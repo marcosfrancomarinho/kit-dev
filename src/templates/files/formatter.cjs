@@ -920,6 +920,190 @@ function formatSource(source, fileName = 'source.ts') {
   return indentSource(listed);
 }
 
+function matchingOpener(char) {
+  if (char === ')') return '(';
+  if (char === ']') return '[';
+  if (char === '}') return '{';
+  return null;
+}
+
+function effectiveIndentDepth(stack) {
+  return stack.reduce(
+    (depth, entry) => depth + (entry.indent ? 1 : 0),
+    0,
+  );
+}
+
+function scanIndentationLine(line, state, stack, lineNumber) {
+  let escaped = false;
+  let regexClass = false;
+  let previousCode = '';
+  let leading = true;
+  let leadingDedent = 0;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (state.blockComment) {
+      if (char === '*' && next === '/') {
+        state.blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+
+    if (state.quote) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === state.quote) {
+        state.quote = null;
+      }
+      continue;
+    }
+
+    if (state.template) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '`') {
+        state.template = false;
+      }
+      continue;
+    }
+
+    if (state.regex) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === '[') {
+        regexClass = true;
+        continue;
+      }
+
+      if (char === ']' && regexClass) {
+        regexClass = false;
+        continue;
+      }
+
+      if (char === '/' && !regexClass) {
+        state.regex = false;
+      }
+      continue;
+    }
+
+    if (char === '/' && next === '/') break;
+
+    if (char === '/' && next === '*') {
+      state.blockComment = true;
+      leading = false;
+      index += 1;
+      continue;
+    }
+
+    if (
+      char === '/' &&
+      next !== '/' &&
+      next !== '*' &&
+      (!previousCode || /[({[,:;=!?&|]/.test(previousCode))
+    ) {
+      state.regex = true;
+      regexClass = false;
+      previousCode = '/';
+      leading = false;
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      state.quote = char;
+      previousCode = char;
+      leading = false;
+      continue;
+    }
+
+    if (char === '`') {
+      state.template = true;
+      previousCode = char;
+      leading = false;
+      continue;
+    }
+
+    if (/\s/.test(char)) continue;
+
+    if (char === '(') {
+      stack.push({ char, indent: true, line: lineNumber });
+      previousCode = char;
+      leading = false;
+      continue;
+    }
+
+    if (char === '{' || char === '[') {
+      for (let stackIndex = stack.length - 1; stackIndex >= 0; stackIndex -= 1) {
+        const entry = stack[stackIndex];
+
+        if (entry.line !== lineNumber) break;
+
+        if (entry.char === '(' && entry.indent) {
+          entry.indent = false;
+          break;
+        }
+      }
+
+      stack.push({ char, indent: true, line: lineNumber });
+      previousCode = char;
+      leading = false;
+      continue;
+    }
+
+    const opener = matchingOpener(char);
+
+    if (opener) {
+      let matched = null;
+
+      for (let stackIndex = stack.length - 1; stackIndex >= 0; stackIndex -= 1) {
+        if (stack[stackIndex].char === opener) {
+          matched = stack.splice(stackIndex, 1)[0];
+          break;
+        }
+      }
+
+      if (leading && matched?.indent) {
+        leadingDedent += 1;
+      }
+
+      previousCode = char;
+      continue;
+    }
+
+    previousCode = char;
+    leading = false;
+  }
+
+  return leadingDedent;
+}
+
 function indentSource(source) {
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   const hadFinalNewline = source.endsWith('\n');
@@ -930,24 +1114,28 @@ function indentSource(source) {
     template: false,
     regex: false,
   };
+  const stack = [];
 
-  let depth = 0;
-
-  const formatted = lines.map((line) => {
+  const formatted = lines.map((line, lineNumber) => {
     if (line.trim() === '') return '';
 
     const wasInsideTemplate = state.template;
-    const trimmed = line.trim();
-    const structure = scanStructure(wasInsideTemplate ? line : trimmed, state);
+    const text = wasInsideTemplate ? line : line.trim();
+    const depthBefore = effectiveIndentDepth(stack);
+    const leadingDedent = scanIndentationLine(
+      text,
+      state,
+      stack,
+      lineNumber,
+    );
 
     if (wasInsideTemplate) {
       return line;
     }
 
-    const lineDepth = Math.max(0, depth - structure.leadingClosers);
-    depth = Math.max(0, depth + structure.opens - structure.closes);
+    const lineDepth = Math.max(0, depthBefore - leadingDedent);
 
-    return indentUnit.repeat(lineDepth) + trimmed;
+    return indentUnit.repeat(lineDepth) + text;
   });
 
   let result = formatted.join(newline);

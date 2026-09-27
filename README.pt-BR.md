@@ -93,7 +93,7 @@ Use:
 npm run fmt
 ```
 
-O comando `fmt` é leve e não adiciona uma biblioteca externa de formatação. Ele atua somente nos arquivos JavaScript e TypeScript de `src/` e `test/`, corrigindo a identação, adicionando ponto e vírgula aos statements reconhecidos e convertendo strings com aspas duplas para aspas simples. Template strings com crase, regex, comentários e atributos JSX com aspas permanecem intactos.
+O comando `fmt` é leve e não adiciona uma biblioteca externa de formatação. Ele atua somente nos arquivos JavaScript e TypeScript de `src/` e `test/`, corrigindo a identação, expandindo blocos compactos como `function teste(){console.log()}`, adicionando ponto e vírgula aos statements reconhecidos e convertendo strings com aspas duplas para aspas simples. Objetos literais não são expandidos. Template strings com crase, regex, comentários e atributos JSX com aspas permanecem intactos.
 
 ## Testes automáticos
 

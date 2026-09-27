@@ -154,6 +154,23 @@ describe('source formatter', () => {
   });
 
 
+
+  it('keeps only the used named import', () => {
+    const source = [
+      "import { Request, Response } from 'express';",
+      '',
+      'function handle(res: Response) {',
+      '  return res;',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = removeUnusedImports(source, 'example.ts');
+
+    assert.match(result, /import \{ Response \} from 'express';/);
+    assert.doesNotMatch(result, /Request/);
+  });
+
   it('removes an unused default import completely', () => {
     const source = [
       "import express from 'express';",

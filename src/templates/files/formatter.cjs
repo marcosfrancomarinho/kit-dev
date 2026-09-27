@@ -709,6 +709,33 @@ function formatDelimitedListsOnce(
   function visit(node, depth = 0) {
     const info = listFormattingInfo(node);
 
+    if (
+      info &&
+      info.kind === 'arguments' &&
+      info.items.length === 0
+    ) {
+      const nodeStart = node.getStart(sourceFile);
+      const nodeEnd = node.getEnd();
+      const openParen = source.lastIndexOf('(', info.items.pos);
+      const closeParen = source.indexOf(')', info.items.end);
+
+      if (
+        openParen >= nodeStart &&
+        closeParen >= 0 &&
+        closeParen < nodeEnd &&
+        source.slice(openParen + 1, closeParen).trim() === '' &&
+        (source.slice(openParen + 1, closeParen).includes('\n') ||
+          source.slice(openParen + 1, closeParen).includes('\r'))
+      ) {
+        candidates.push({
+          start: openParen + 1,
+          end: closeParen,
+          value: '',
+          depth,
+        });
+      }
+    }
+
     if (info && info.items.length > 0 && !info.items.hasTrailingComma) {
       const interiorStart = info.items.pos;
       const interiorEnd = info.items.end;

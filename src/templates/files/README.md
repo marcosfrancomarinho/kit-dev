@@ -73,14 +73,14 @@ pnpm dev
 | `type` | Watches TypeScript errors |
 | `di` | Installs the optional dependency injection setup |
 
-Examples with Yarn:
+Examples with npm:
 
 ```bash
-yarn dev
-yarn test
-yarn test create-user
-yarn build
-yarn start
+npm run dev
+npm test
+npm test -- create-user
+npm run build
+npm start
 ```
 
 ## Automatic tests
@@ -90,19 +90,19 @@ Every generated project already includes a test runner.
 Run:
 
 ```bash
-yarn test
+npm test
 ```
 
 To generate a test from a class:
 
 ```bash
-yarn test create-user
+npm test -- create-user
 ```
 
 or:
 
 ```bash
-yarn test src/application/create-user.ts
+npm test -- src/application/create-user.ts
 ```
 
 Kit Dev analyzes the class, constructor dependencies and public methods to create a useful starting test. When it cannot safely infer business behavior, it leaves a `TODO` instead of inventing an assertion.
@@ -114,7 +114,7 @@ Existing generated tests can be regenerated when the source changes.
 Run:
 
 ```bash
-yarn build
+npm run build
 ```
 
 The build checks the project and generates:
@@ -127,7 +127,7 @@ dist/bundle.cjs.map
 Then run the application with:
 
 ```bash
-yarn start
+npm start
 ```
 
 The bundle is optimized but remains readable.
@@ -139,7 +139,7 @@ Dependency injection is optional. You can use Kit Dev without it.
 Enable it once:
 
 ```bash
-yarn di
+npm run di
 ```
 
 After installation, the project gets the container and `src/di/providers.ts`. The `di` script is then removed because the setup is already installed.

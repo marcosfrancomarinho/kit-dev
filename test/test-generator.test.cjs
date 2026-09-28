@@ -2431,9 +2431,9 @@ export class Account {
       generated,
       /Account\.normalize\("value"\)/,
     );
-    assert.doesNotMatch(
+    assert.match(
       generated,
-      /const sut = new Account\(\)[\s\S]*Account\.normalize/,
+      /it\("normalize", \(\) => \{\s*Account\.normalize\("value"\)/,
     );
 
     const output = join(projectPath, 'generated-accessors.test.cjs');
@@ -2588,12 +2588,12 @@ export class Entity extends Base {
     assert.match(generated, /const id = "test-id"/);
     assert.match(
       generated,
-      /const input: ConstructorParameters<typeof Entity>\[1\]/,
+      /const input2: ConstructorParameters<typeof Entity>\[1\]/,
     );
-    assert.match(generated, /new Entity\(id, input\)/);
+    assert.match(generated, /new Entity\(id, input2\)/);
     assert.match(
       generated,
-      /assert\.equal\(result, input\.user\.address\.city\)/,
+      /assert\.equal\(result, input2\.user\.address\.city\)/,
     );
 
     const output = join(projectPath, 'generated-inheritance.test.cjs');

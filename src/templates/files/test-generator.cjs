@@ -35,6 +35,14 @@ async function generateTest(target, projectRoot = process.cwd()) {
     );
   }
 
+  if (metadata.abstract) {
+    throw new Error(
+      metadata.className +
+        ' is abstract and cannot be instantiated as a test subject. ' +
+        'Generate the test from a concrete implementation instead.',
+    );
+  }
+
   if (metadata.creation.kind === 'unavailable') {
     throw new Error(
       metadata.className +
@@ -320,6 +328,11 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
   if (!classNode || !classNode.name) return null;
 
   const className = classNode.name.text;
+  const abstract = hasModifier(
+    ts,
+    classNode,
+    ts.SyntaxKind.AbstractKeyword,
+  );
   const hierarchy = collectClassHierarchy(ts, checker, classNode);
   const effectiveConstructor = findEffectiveConstructor(ts, hierarchy);
   const constructorNode = effectiveConstructor.node;
@@ -372,7 +385,13 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
           methodName: null,
           async: false,
           parameters: constructorParameters,
-          negativeCases: [],
+          negativeCases: constructorNode
+            ? detectSimpleFactoryThrowCases(
+                ts,
+                constructorNode,
+                constructorSourceFile,
+              )
+            : [],
           sourceAliases: new Map(
             constructorParameters.map((parameter) => [
               parameter.name,
@@ -442,6 +461,7 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
 
   return {
     className,
+    abstract,
     constructorParameters,
     creation,
     methods,
@@ -1311,7 +1331,10 @@ function collectPublicPropertyFixtures(
   for (const member of classNode.members) {
     if (
       !ts.isPropertyDeclaration(member) ||
-      !ts.isIdentifier(member.name) ||
+      !(
+        ts.isIdentifier(member.name) ||
+        ts.isPrivateIdentifier?.(member.name)
+      ) ||
       hasModifier(ts, member, ts.SyntaxKind.StaticKeyword)
     ) {
       continue;
@@ -2793,15 +2816,12 @@ function renderTest({
     '',
   ].join('\n');
 
-  if (
-    creation.kind === 'factory' &&
-    creation.negativeCases?.length > 0
-  ) {
+  if (creation.negativeCases?.length > 0) {
     for (const negativeCase of creation.negativeCases) {
       const callback = creation.async ? 'async ()' : '()';
 
       lines.push(
-        `it(${JSON.stringify(creation.methodName + ' rejects invalid ' + negativeCase.parameterName)}, ${callback} => {`,
+        `it(${JSON.stringify((creation.methodName || 'constructor') + ' rejects invalid ' + negativeCase.parameterName)}, ${callback} => {`,
         ...renderCreationSetup(
           className,
           creation,
@@ -3242,14 +3262,19 @@ function renderCreationExpressionWithOverride(
     )
     .join(', ');
 
-  return (
-    className +
-    '.' +
-    creation.methodName +
-    '(' +
-    argumentsList +
-    ')'
-  );
+  if (creation.kind === 'factory') {
+    return (
+      (creation.async ? 'await ' : '') +
+      className +
+      '.' +
+      creation.methodName +
+      '(' +
+      argumentsList +
+      ')'
+    );
+  }
+
+  return 'new ' + className + '(' + argumentsList + ')';
 }
 
 function creationParameterType(

@@ -1,6 +1,6 @@
 const { spawn } = require('child_process');
 const { resolve } = require('path');
-const { context } = require('esbuild');
+const { build, context } = require('esbuild');
 const { buildOptions } = require('./esbuild.config.cjs');
 
 const projectRoot = resolve(__dirname, '..', '..');
@@ -19,25 +19,39 @@ function waitForExit(processToStop) {
     processToStop.exitCode !== null ||
     processToStop.signalCode !== null
   ) {
-    return Promise.resolve();
+    return Promise.resolve(processToStop?.exitCode ?? 0);
   }
 
   return new Promise((resolveExit) => {
     let finished = false;
-    const finish = () => {
+    const finish = (code) => {
       if (finished) return;
       finished = true;
       clearTimeout(forceTimer);
-      resolveExit();
+      resolveExit(code ?? 0);
     };
     const forceTimer = setTimeout(() => {
       processToStop.kill('SIGKILL');
-      finish();
+      finish(1);
     }, stopTimeout);
 
     processToStop.once('exit', finish);
     processToStop.kill('SIGTERM');
   });
+}
+
+function startChild() {
+  const nextChild = spawn(process.execPath, ['--enable-source-maps', outputFile], {
+    cwd: projectRoot,
+    stdio: 'inherit',
+  });
+
+  child = nextChild;
+  nextChild.once('exit', () => {
+    if (child === nextChild) child = undefined;
+  });
+
+  return nextChild;
 }
 
 async function stopChild() {
@@ -51,15 +65,7 @@ async function restartChild() {
 
   if (shuttingDown) return;
 
-  const nextChild = spawn(process.execPath, ['--enable-source-maps', outputFile], {
-    cwd: projectRoot,
-    stdio: 'inherit',
-  });
-
-  child = nextChild;
-  nextChild.once('exit', () => {
-    if (child === nextChild) child = undefined;
-  });
+  startChild();
 }
 
 function queueRestart() {
@@ -81,8 +87,8 @@ function queueRestart() {
 
 const restartPlugin = {
   name: 'kit-dev-restart',
-  setup(build) {
-    build.onStart(() => {
+  setup(esbuild) {
+    esbuild.onStart(() => {
       if (initialBuild) {
         initialBuild = false;
         return;
@@ -91,12 +97,49 @@ const restartPlugin = {
       if (process.stdout.isTTY) console.clear();
     });
 
-    build.onEnd((result) => {
+    esbuild.onEnd((result) => {
       if (result.errors.length > 0) return;
       return queueRestart();
     });
   },
 };
+
+function developmentBuildOptions() {
+  return {
+    ...buildOptions,
+    outfile: outputFile,
+    minify: false,
+    minifySyntax: false,
+    minifyWhitespace: false,
+    minifyIdentifiers: false,
+    sourcemap: true,
+    metafile: false,
+    logLevel: 'info',
+  };
+}
+
+async function runOnce() {
+  await build(developmentBuildOptions());
+
+  const processToRun = startChild();
+
+  await new Promise((resolveExit) => {
+    processToRun.once('exit', (code) => {
+      process.exitCode = code ?? 1;
+      resolveExit();
+    });
+  });
+}
+
+async function runWatch() {
+  buildContext = await context({
+    ...developmentBuildOptions(),
+    plugins: [...(buildOptions.plugins || []), restartPlugin],
+  });
+
+  await buildContext.watch();
+  console.log('Kit Dev: watching for changes...');
+}
 
 async function shutdown() {
   if (shuttingDown) return;
@@ -110,21 +153,16 @@ async function shutdown() {
 }
 
 async function run() {
-  buildContext = await context({
-    ...buildOptions,
-    outfile: outputFile,
-    minify: false,
-    minifySyntax: false,
-    minifyWhitespace: false,
-    minifyIdentifiers: false,
-    sourcemap: true,
-    metafile: false,
-    logLevel: 'info',
-    plugins: [...(buildOptions.plugins || []), restartPlugin],
-  });
+  const watchMode =
+    process.argv.slice(2).includes('--watch') ||
+    process.env.npm_config_watch === 'true';
 
-  await buildContext.watch();
-  console.log('Kit Dev: watching for changes...');
+  if (watchMode) {
+    await runWatch();
+    return;
+  }
+
+  await runOnce();
 }
 
 async function handleSignal() {

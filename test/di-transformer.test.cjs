@@ -44,7 +44,7 @@ class ProjectFixtureTemplates {
           start: 'node --enable-source-maps dist/bundle.cjs',
           dev: 'node kit-dev/build/dev.cjs',
           build: 'node kit-dev/build/esbuild.config.cjs',
-          type: 'tsc --watch --noEmit',
+          type: 'node kit-dev/build/type.cjs',
           test: 'node kit-dev/test/test.cjs',
           di: 'node kit-dev/di/install.cjs',
         },
@@ -133,6 +133,7 @@ class ProjectFixtureGenerator {
       ),
       writeProjectFile(projectPath, '.gitignore', 'node_modules/\ndist/\n'),
       copyFile(join(templateFilesPath, 'dev.cjs'), join(buildPath, 'dev.cjs')),
+      copyFile(join(templateFilesPath, 'type.cjs'), join(buildPath, 'type.cjs')),
       copyFile(join(templateFilesPath, 'di.cjs'), join(diPath, 'install.cjs')),
       copyFile(
         join(templateFilesPath, 'dependency-injection.ts'),
@@ -171,6 +172,7 @@ test('configura o desenvolvimento somente com esbuild', () => {
     'node kit-dev/build/esbuild.config.cjs',
   );
   assert.equal(packageJson.scripts.test, 'node kit-dev/test/test.cjs');
+  assert.equal(packageJson.scripts.type, 'node kit-dev/build/type.cjs');
   assert.equal(packageJson.scripts.di, 'node kit-dev/di/install.cjs');
   assert.doesNotMatch(JSON.stringify(packageJson), /\btsx\b/);
 });
@@ -192,7 +194,7 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   ]);
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'build'))).sort(),
-    ['dev.cjs', 'esbuild.config.cjs'],
+    ['dev.cjs', 'esbuild.config.cjs', 'type.cjs'],
   );
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'test'))).sort(),
@@ -277,7 +279,7 @@ test('executa o modo dev com esbuild antes da DI', async (context) => {
   ]);
 
   let stderr = '';
-  devProcess = spawn(process.execPath, ['kit-dev/build/dev.cjs'], {
+  devProcess = spawn(process.execPath, ['kit-dev/build/dev.cjs', '--watch'], {
     cwd: projectPath,
     env: {
       ...process.env,

@@ -31,7 +31,7 @@ const generatorTemplate = join(
   'test-generator.cjs',
 );
 
-test('executa testes TypeScript e permanece em watch', async (context) => {
+test('executa testes TypeScript e permanece em watch com --watch', async (context) => {
   const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-test-runner-'));
   const runnerPath = join(projectPath, 'kit-dev', 'test', 'test.cjs');
   let runner;
@@ -89,7 +89,7 @@ test('sum', () => {
     copyFile(runnerTemplate, runnerPath),
   ]);
 
-  runner = spawn(process.execPath, ['kit-dev/test/test.cjs'], {
+  runner = spawn(process.execPath, ['kit-dev/test/test.cjs', '--watch'], {
     cwd: projectPath,
     env: {
       ...process.env,

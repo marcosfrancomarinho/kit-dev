@@ -161,6 +161,10 @@ describe('self-hosted architecture', () => {
       packageJson.scripts.fmt,
       'node kit-dev/format/fmt.cjs',
     );
+    assert.equal(
+      packageJson.scripts.type,
+      'node kit-dev/build/type.cjs',
+    );
   });
 
 });

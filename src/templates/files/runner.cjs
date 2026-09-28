@@ -14,7 +14,7 @@ let structureWatcher;
 let knownTestFiles = '';
 let recreateTimer;
 let closing = false;
-let runOnce = false;
+let watchMode = false;
 
 async function collectFiles(directory, matcher) {
   let entries;
@@ -102,7 +102,7 @@ async function runTests() {
       testProcess = undefined;
     }
 
-    if (runOnce) {
+    if (!watchMode) {
       close(code ?? 1).catch(fail);
       return;
     }
@@ -152,6 +152,10 @@ async function createTestContext(files) {
             if (result.errors.length > 0) {
               stopTestProcess();
               reportBuildErrors(result.errors);
+
+              if (!watchMode) {
+                await close(1);
+              }
               return;
             }
 
@@ -167,7 +171,7 @@ async function refreshContext(force = false) {
   const files = await findTests();
   const signature = files.map((file) => relative(testRoot, file)).join('\n');
 
-  if (!force && signature === knownTestFiles) return;
+  if (!force && signature === knownTestFiles) return files.length > 0;
   knownTestFiles = signature;
 
   stopTestProcess();
@@ -180,12 +184,17 @@ async function refreshContext(force = false) {
   if (files.length === 0) {
     await rm(cacheRoot, { recursive: true, force: true });
     console.log('🧪 No test files found.');
-    console.log('👀 Kit Dev: watching test/ for new tests...');
-    return;
+
+    if (watchMode) {
+      console.log('👀 Kit Dev: watching test/ for new tests...');
+    }
+
+    return false;
   }
 
   buildContext = await createTestContext(files);
   await buildContext.watch();
+  return true;
 }
 
 function scheduleStructureRefresh() {
@@ -218,8 +227,9 @@ function fail(error) {
 
 async function main() {
   const args = process.argv.slice(2);
-  runOnce = args.includes('--once');
-  const target = args.find((argument) => argument !== '--once');
+  watchMode =
+    args.includes('--watch') || process.env.npm_config_watch === 'true';
+  const target = args.find((argument) => argument !== '--watch');
 
   if (target) {
     const { generateTest } = require('./generator.cjs');
@@ -232,7 +242,12 @@ async function main() {
   }
 
   await mkdir(testRoot, { recursive: true });
-  await refreshContext(true);
+  const hasTests = await refreshContext(true);
+
+  if (!watchMode) {
+    if (!hasTests) await close(0);
+    return;
+  }
 
   structureWatcher = watch(
     testRoot,

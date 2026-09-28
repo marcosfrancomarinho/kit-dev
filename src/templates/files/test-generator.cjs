@@ -210,6 +210,13 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
     constructorNode,
     sourceFile,
   );
+  const publicPropertyFixtures = collectPublicPropertyFixtures(
+    ts,
+    checker,
+    classNode,
+    sourceFile,
+    fixtureContext,
+  );
   const factory = findStaticFactory(
     ts,
     checker,
@@ -283,6 +290,7 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
         constructorParameters,
         constructorNames: knownNames,
         propertySources,
+        publicPropertyFixtures,
         sourceAliases: creation.sourceAliases,
         fixtureContext,
       }),
@@ -881,6 +889,7 @@ function analyzeMethod({
   constructorParameters,
   constructorNames,
   propertySources,
+  publicPropertyFixtures,
   sourceAliases,
   fixtureContext,
 }) {
@@ -1069,6 +1078,40 @@ function analyzeMethod({
 
   if (method.body) visit(method.body);
 
+  const detectedReturn = detectExpectedReturn(
+    ts,
+    method,
+    propertySources,
+    sourceFile,
+  );
+  let expectedReturn = translateSourceExpression(
+    detectedReturn,
+    sourceAliases,
+  );
+  const instanceSetup = [];
+
+  if (!expectedReturn && method.body?.statements.length === 1) {
+    const statement = method.body.statements[0];
+
+    if (ts.isReturnStatement(statement) && statement.expression) {
+      const path = getThisPropertyPath(ts, statement.expression);
+
+      if (path?.length === 1) {
+        const property = publicPropertyFixtures?.get(path[0]);
+
+        if (property?.fixture !== null && property?.fixture !== undefined) {
+          expectedReturn = property.fixture;
+
+          if (!property.initialized) {
+            instanceSetup.push(
+              `sut.${path[0]} = ${property.fixture}`,
+            );
+          }
+        }
+      }
+    }
+  }
+
   return {
     name: methodName,
     async: Boolean(
@@ -1078,15 +1121,8 @@ function analyzeMethod({
     ),
     parameters,
     calls: [...calls.values()],
-    expectedReturn: translateSourceExpression(
-      detectExpectedReturn(
-        ts,
-        method,
-        propertySources,
-        sourceFile,
-      ),
-      sourceAliases,
-    ),
+    expectedReturn,
+    instanceSetup,
   };
 }
 
@@ -1108,6 +1144,70 @@ function translateSourceExpression(source, aliases) {
   }
 
   return aliases.size > 0 ? null : source;
+}
+
+function collectPublicPropertyFixtures(
+  ts,
+  checker,
+  classNode,
+  sourceFile,
+  fixtureContext,
+) {
+  const fixtures = new Map();
+
+  for (const member of classNode.members) {
+    if (
+      !ts.isPropertyDeclaration(member) ||
+      !ts.isIdentifier(member.name) ||
+      hasModifier(ts, member, ts.SyntaxKind.PrivateKeyword) ||
+      hasModifier(ts, member, ts.SyntaxKind.ProtectedKeyword) ||
+      hasModifier(ts, member, ts.SyntaxKind.StaticKeyword) ||
+      hasModifier(ts, member, ts.SyntaxKind.ReadonlyKeyword)
+    ) {
+      continue;
+    }
+
+    const name = member.name.text;
+    const initializer = renderInitializerFixture(
+      ts,
+      member.initializer,
+      sourceFile,
+    );
+
+    let fixture = initializer;
+
+    if (fixture === null) {
+      try {
+        const type = member.type
+          ? checker.getTypeFromTypeNode(member.type)
+          : checker.getTypeAtLocation(member);
+
+        fixture = renderTypeFixture(
+          ts,
+          checker,
+          type,
+          name,
+          sourceFile,
+          0,
+          { fixtureContext, preferNull: false },
+        );
+      } catch {
+        fixture = member.type
+          ? renderTypeTextFixture(
+              member.type.getText(sourceFile),
+              name,
+            )
+          : null;
+      }
+    }
+
+    fixtures.set(name, {
+      fixture,
+      initialized: Boolean(member.initializer),
+    });
+  }
+
+  return fixtures;
 }
 
 function collectBindingAliases(
@@ -2610,8 +2710,16 @@ function renderTest({
         className,
         creation,
       )}`,
-      '',
     );
+
+    if (method.instanceSetup?.length > 0) {
+      lines.push(
+        '',
+        ...method.instanceSetup.map((setup) => `  ${setup}`),
+      );
+    }
+
+    lines.push('');
 
     const argumentsList = method.parameters
       .map((parameter) =>

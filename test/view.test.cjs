@@ -1,13 +1,22 @@
 const assert = require('node:assert/strict');
-const { mkdtemp, mkdir, readFile, rm, writeFile } = require('node:fs/promises');
+const {
+  chmod,
+  mkdtemp,
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { describe, it } = require('node:test');
 
 const {
+  ensureMicro,
   findViewCandidates,
   formatBeforeOpen,
   microAsset,
+  openWithMicro,
   renderMicroTips,
   renderSelection,
   shouldFormat,
@@ -192,6 +201,158 @@ describe('project file viewer', () => {
     assert.match(tips, /Ctrl\+F  Find/);
     assert.match(tips, /Ctrl\+E  Command \/ Help/);
     assert.match(tips, /help defaultkeys/);
+  });
+
+
+  it('rejects exact paths outside the current project', async (context) => {
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-root-'));
+    const outside = await mkdtemp(join(tmpdir(), 'kit-dev-view-outside-'));
+    context.after(async () => {
+      await rm(root, { recursive: true, force: true });
+      await rm(outside, { recursive: true, force: true });
+    });
+
+    const externalFile = join(outside, 'secret.ts');
+    await writeFile(externalFile, 'export {}\n', 'utf8');
+
+    await assert.rejects(
+      () => findViewCandidates(externalFile, root),
+      /only opens files inside the current project/,
+    );
+  });
+
+  it('matches file names case-insensitively', async (context) => {
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-case-'));
+    context.after(() =>
+      rm(root, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(root, 'src'), { recursive: true });
+    const file = join(root, 'src', 'ProductService.ts');
+    await writeFile(file, 'export {}\n', 'utf8');
+
+    assert.deepEqual(
+      await findViewCandidates('productservice.ts', root),
+      [file],
+    );
+    assert.deepEqual(
+      await findViewCandidates('SERVICE', root),
+      [file],
+    );
+  });
+
+  it('returns project files when view is used without a query', async (context) => {
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-all-'));
+    context.after(() =>
+      rm(root, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(root, 'src'), { recursive: true });
+    await writeFile(join(root, 'README.md'), '# test\n', 'utf8');
+    await writeFile(join(root, 'src', 'main.ts'), 'export {}\n', 'utf8');
+
+    const files = await findViewCandidates(null, root);
+
+    assert.deepEqual(files.sort(), [
+      join(root, 'README.md'),
+      join(root, 'src', 'main.ts'),
+    ].sort());
+  });
+
+  it('returns the cached Micro binary without downloading again', async (context) => {
+    const home = await mkdtemp(join(tmpdir(), 'kit-dev-view-home-'));
+    context.after(() =>
+      rm(home, { recursive: true, force: true }),
+    );
+
+    const bin = join(home, '.kit-dev', 'bin');
+    await mkdir(bin, { recursive: true });
+    const expected = join(
+      bin,
+      process.platform === 'win32' ? 'micro.exe' : 'micro',
+    );
+    await writeFile(expected, '', 'utf8');
+
+    const result = await ensureMicro({
+      home,
+      skipPathCheck: true,
+    });
+
+    assert.equal(result, expected);
+  });
+
+  it('keeps the original file when fmt fails before opening', async (context) => {
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-format-fail-'));
+    context.after(() =>
+      rm(root, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(root, 'src'), { recursive: true });
+    await mkdir(join(root, 'kit-dev', 'format'), { recursive: true });
+
+    const file = join(root, 'src', 'product.ts');
+    const original = 'const value="raw"\n';
+    await writeFile(file, original, 'utf8');
+    await writeFile(
+      join(root, 'kit-dev', 'format', 'fmt.cjs'),
+      'process.exitCode = 1\n',
+      'utf8',
+    );
+
+    const originalWarn = console.warn;
+    console.warn = () => {};
+
+    try {
+      assert.equal(formatBeforeOpen(file, root), false);
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    assert.equal(await readFile(file, 'utf8'), original);
+  });
+
+  it('formats then opens a source file through the selected editor', async (context) => {
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-open-'));
+    context.after(() =>
+      rm(root, { recursive: true, force: true }),
+    );
+
+    await mkdir(join(root, 'src'), { recursive: true });
+    await mkdir(join(root, 'kit-dev', 'format'), { recursive: true });
+
+    const file = join(root, 'src', 'open-me.js');
+    await writeFile(
+      file,
+      "if (process.argv[1]) { process.exitCode = 0 }\n",
+      'utf8',
+    );
+    await writeFile(
+      join(root, 'kit-dev', 'format', 'fmt.cjs'),
+      [
+        "const { appendFileSync } = require('node:fs');",
+        "const { resolve } = require('node:path');",
+        "const file = resolve(process.cwd(), process.argv[2]);",
+        "appendFileSync(file, '\\n// formatted-before-open\\n');",
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+
+    const originalWrite = process.stdout.write;
+    process.stdout.write = () => true;
+
+    try {
+      assert.doesNotThrow(() =>
+        openWithMicro(process.execPath, file, root),
+      );
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+
+    assert.match(
+      await readFile(file, 'utf8'),
+      /formatted-before-open/,
+    );
   });
 
 });

@@ -14,9 +14,12 @@ const { describe, it } = require('node:test');
 
 const {
   ensureMicro,
+  ensureMicroLsp,
   findViewCandidates,
   formatBeforeOpen,
+  lspSettings,
   microAsset,
+  microConfigDirectory,
   openWithMicro,
   renderMicroTips,
   renderSelection,
@@ -425,6 +428,105 @@ describe('project file viewer', () => {
       /return join\(this\.kitDev\(\), 'view'\)/,
     );
     assert.match(paths, /this\.view\(\)/);
+  });
+
+
+  it('keeps the Micro LSP configuration isolated under .kit-dev', async (context) => {
+    const home = await mkdtemp(join(tmpdir(), 'kit-dev-lsp-home-'));
+    context.after(() =>
+      rm(home, { recursive: true, force: true }),
+    );
+
+    const calls = [];
+    const configDirectory = microConfigDirectory(home);
+
+    const result = await ensureMicroLsp('micro', {
+      home,
+      spawn(command, args) {
+        calls.push({ command, args });
+        require('node:fs').mkdirSync(
+          join(configDirectory, 'plug', 'lsp'),
+          { recursive: true },
+        );
+        return { status: 0, error: null };
+      },
+    });
+
+    assert.equal(result, join(home, '.kit-dev', 'micro'));
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].command, 'micro');
+    assert.deepEqual(calls[0].args.slice(-3), [
+      '-plugin',
+      'install',
+      'lsp',
+    ]);
+
+    const settings = JSON.parse(
+      await readFile(join(result, 'settings.json'), 'utf8'),
+    );
+
+    assert.equal(settings['lsp.tabcompletion'], true);
+    assert.equal(settings['lsp.formatOnSave'], false);
+    assert.match(
+      settings['lsp.server'],
+      /typescript=npx --no-install typescript-language-server --stdio/,
+    );
+    assert.match(
+      settings['lsp.server'],
+      /javascript=npx --no-install typescript-language-server --stdio/,
+    );
+    assert.doesNotMatch(result, /[\\/]\.config[\\/]micro(?:[\\/]|$)/);
+  });
+
+  it('does not reinstall the LSP plugin when it is already cached', async (context) => {
+    const home = await mkdtemp(join(tmpdir(), 'kit-dev-lsp-cache-'));
+    context.after(() =>
+      rm(home, { recursive: true, force: true }),
+    );
+
+    const configDirectory = microConfigDirectory(home);
+    await mkdir(join(configDirectory, 'plug', 'lsp'), {
+      recursive: true,
+    });
+
+    let calls = 0;
+    await ensureMicroLsp('micro', {
+      home,
+      spawn() {
+        calls += 1;
+        return { status: 0, error: null };
+      },
+    });
+
+    assert.equal(calls, 0);
+  });
+
+  it('fails safely when Micro reports success but the LSP plugin was not installed', async (context) => {
+    const home = await mkdtemp(join(tmpdir(), 'kit-dev-lsp-fail-'));
+    context.after(() =>
+      rm(home, { recursive: true, force: true }),
+    );
+
+    await assert.rejects(
+      () =>
+        ensureMicroLsp('micro', {
+          home,
+          spawn() {
+            return { status: 0, error: null };
+          },
+        }),
+      /Could not install the Micro LSP plugin/,
+    );
+  });
+
+  it('uses a local TypeScript language server with tab completion enabled', () => {
+    const settings = lspSettings();
+
+    assert.equal(settings['lsp.tabcompletion'], true);
+    assert.match(
+      settings['lsp.server'],
+      /^typescript=npx --no-install typescript-language-server --stdio/,
+    );
   });
 
 });

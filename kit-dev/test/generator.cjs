@@ -1068,6 +1068,201 @@ function isConditionalExecution(ts, node, boundary) {
   return false;
 }
 
+function renderKnownExpression(
+  ts,
+  node,
+  parameterMap,
+  propertySources,
+  publicPropertyFixtures,
+  sourceAliases,
+  sourceFile,
+) {
+  const direct = renderSafeExpression(
+    ts,
+    node,
+    parameterMap,
+    sourceFile,
+  );
+
+  if (direct !== null) return direct;
+
+  if (ts.isParenthesizedExpression(node)) {
+    const inner = renderKnownExpression(
+      ts,
+      node.expression,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+
+    return inner === null ? null : '(' + inner + ')';
+  }
+
+  const thisPath = getThisPropertyPath(ts, node);
+
+  if (thisPath?.length) {
+    const [root, ...rest] = thisPath;
+    const source = propertySources?.get(root);
+
+    if (source) {
+      const translated = translateSourceExpression(
+        rest.length > 0
+          ? source + '.' + rest.join('.')
+          : source,
+        sourceAliases,
+      );
+
+      if (translated) return translated;
+    }
+
+    if (rest.length === 0) {
+      const property = publicPropertyFixtures?.get(root);
+
+      if (property?.fixture !== null && property?.fixture !== undefined) {
+        return property.fixture;
+      }
+    }
+  }
+
+  if (ts.isBinaryExpression(node)) {
+    const allowedOperators = new Set([
+      ts.SyntaxKind.PlusToken,
+      ts.SyntaxKind.MinusToken,
+      ts.SyntaxKind.AsteriskToken,
+      ts.SyntaxKind.SlashToken,
+      ts.SyntaxKind.PercentToken,
+      ts.SyntaxKind.AsteriskAsteriskToken,
+      ts.SyntaxKind.LessThanToken,
+      ts.SyntaxKind.LessThanEqualsToken,
+      ts.SyntaxKind.GreaterThanToken,
+      ts.SyntaxKind.GreaterThanEqualsToken,
+      ts.SyntaxKind.EqualsEqualsToken,
+      ts.SyntaxKind.EqualsEqualsEqualsToken,
+      ts.SyntaxKind.ExclamationEqualsToken,
+      ts.SyntaxKind.ExclamationEqualsEqualsToken,
+      ts.SyntaxKind.AmpersandAmpersandToken,
+      ts.SyntaxKind.BarBarToken,
+      ts.SyntaxKind.QuestionQuestionToken,
+      ts.SyntaxKind.AmpersandToken,
+      ts.SyntaxKind.BarToken,
+      ts.SyntaxKind.CaretToken,
+      ts.SyntaxKind.LessThanLessThanToken,
+      ts.SyntaxKind.GreaterThanGreaterThanToken,
+      ts.SyntaxKind.GreaterThanGreaterThanGreaterThanToken,
+    ]);
+
+    if (!allowedOperators.has(node.operatorToken.kind)) return null;
+
+    const left = renderKnownExpression(
+      ts,
+      node.left,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+    const right = renderKnownExpression(
+      ts,
+      node.right,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+
+    if (left === null || right === null) return null;
+
+    return (
+      '(' +
+      left +
+      ' ' +
+      node.operatorToken.getText(sourceFile) +
+      ' ' +
+      right +
+      ')'
+    );
+  }
+
+  if (ts.isPrefixUnaryExpression(node)) {
+    const allowedPrefix = new Set([
+      ts.SyntaxKind.ExclamationToken,
+      ts.SyntaxKind.PlusToken,
+      ts.SyntaxKind.MinusToken,
+      ts.SyntaxKind.TildeToken,
+    ]);
+
+    if (!allowedPrefix.has(node.operator)) return null;
+
+    const operand = renderKnownExpression(
+      ts,
+      node.operand,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+
+    if (operand === null) return null;
+
+    return node.getText(sourceFile).slice(0, 1) + operand;
+  }
+
+  if (ts.isConditionalExpression(node)) {
+    const condition = renderKnownExpression(
+      ts,
+      node.condition,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+    const whenTrue = renderKnownExpression(
+      ts,
+      node.whenTrue,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+    const whenFalse = renderKnownExpression(
+      ts,
+      node.whenFalse,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+
+    if (
+      condition === null ||
+      whenTrue === null ||
+      whenFalse === null
+    ) {
+      return null;
+    }
+
+    return (
+      '(' +
+      condition +
+      ' ? ' +
+      whenTrue +
+      ' : ' +
+      whenFalse +
+      ')'
+    );
+  }
+
+  return null;
+}
+
 function analyzeMethod({
   ts,
   checker,
@@ -1336,10 +1531,13 @@ function analyzeMethod({
     ts.isReturnStatement(method.body.statements[0]) &&
     method.body.statements[0].expression
   ) {
-    expectedReturn = renderSafeExpression(
+    expectedReturn = renderKnownExpression(
       ts,
       method.body.statements[0].expression,
       parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
       sourceFile,
     );
   }

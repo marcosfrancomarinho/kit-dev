@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: yarn install --non-interactive
 
+      - name: Check types
+        run: yarn type
+
       - name: Test
         run: yarn test
 

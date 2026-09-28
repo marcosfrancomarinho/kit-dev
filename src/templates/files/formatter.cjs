@@ -1209,6 +1209,12 @@ function normalizeAstSpacing(source, fileName = 'source.ts') {
   return result;
 }
 
+function scannerLanguageVariant(fileName) {
+  return /\.(?:jsx|tsx)$/i.test(fileName)
+    ? ts.LanguageVariant.JSX
+    : ts.LanguageVariant.Standard;
+}
+
 function normalizeCommaSpacing(source, fileName = 'source.ts') {
   const scanner = ts.createScanner(
     ts.ScriptTarget.Latest,

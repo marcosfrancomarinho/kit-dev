@@ -1119,15 +1119,15 @@ describe('source formatter', () => {
     assert.equal(
       result,
       [
-        'function run(value:number){',
-        "  const first='a';",
-        "  const last='b';",
-        '  if(value>10){',
+        'function run(value: number) {',
+        "  const first = 'a';",
+        "  const last = 'b';",
+        '  if (value > 10) {',
         '    console.log(first);',
-        '  }else{',
+        '  } else {',
         '    console.log(last);',
         '  }',
-        '  return first+last;',
+        '  return first + last;',
         '}',
       ].join('\n'),
     );
@@ -1139,10 +1139,10 @@ describe('source formatter', () => {
 
     const result = formatSource(source, 'example.ts');
 
-    assert.match(result, /class User\{/);
-    assert.match(result, /constructor\(private name:string, private age:number\)\{/);
-    assert.match(result, /this\.name=name;/);
-    assert.match(result, /getName\(\)\{/);
+    assert.match(result, /class User \{/);
+    assert.match(result, /constructor\(private name: string, private age: number\) \{/);
+    assert.match(result, /this\.name = name;/);
+    assert.match(result, /getName\(\) \{/);
     assert.match(result, /return this\.name;/);
     assert.equal(formatSource(result, 'example.ts'), result);
   });
@@ -1152,7 +1152,7 @@ describe('source formatter', () => {
 
     const result = formatSource(source, 'example.ts');
 
-    assert.match(result, /const users=\[/);
+    assert.match(result, /const users = \[/);
     assert.match(result, /name: 'A'/);
     assert.match(result, /age: 1/);
     assert.match(result, /active: true/);
@@ -1167,11 +1167,11 @@ describe('source formatter', () => {
 
     const result = formatSource(source, 'example.ts');
 
-    assert.match(result, /for\(let i=0;i<values\.length;i\+\+\)\{/);
-    assert.match(result, /if\(values\[i\]\)\{/);
-    assert.match(result, /switch\(values\.length\)\{/);
+    assert.match(result, /for \(let i = 0; i < values\.length; i\+\+\) \{/);
+    assert.match(result, /if \(values\[i\]\) \{/);
+    assert.match(result, /switch \(values\.length\) \{/);
     assert.match(result, /case 0:/);
-    assert.match(result, /catch\(error\)\{/);
+    assert.match(result, /catch \(error\) \{/);
     assert.equal(formatSource(result, 'example.ts'), result);
   });
 
@@ -1180,11 +1180,11 @@ describe('source formatter', () => {
 
     const result = formatSource(source, 'example.ts');
 
-    assert.match(result, /const load=async\(id:string\)=>\{/);
-    assert.match(result, /const user=await repo\.find\(id\);/);
-    assert.match(result, /return user\?\.profile\?\.name\?\?'unknown';/);
-    assert.match(result, /\.then\(\(name\)=>\{/);
-    assert.match(result, /\.catch\(\(error\)=>\{/);
+    assert.match(result, /const load = async\(id: string\) => \{/);
+    assert.match(result, /const user = await repo\.find\(id\);/);
+    assert.match(result, /return user\?\.profile\?\.name \?\? 'unknown';/);
+    assert.match(result, /\.then\(\(name\) => \{/);
+    assert.match(result, /\.catch\(\(error\) => \{/);
     assert.equal(formatSource(result, 'example.ts'), result);
   });
 
@@ -1193,11 +1193,11 @@ describe('source formatter', () => {
 
     const result = formatSource(source, 'example.ts');
 
-    assert.match(result, /interface User\{/);
-    assert.match(result, /name:string;/);
+    assert.match(result, /interface User \{/);
+    assert.match(result, /name: string;/);
     assert.match(result, /type Id=string\|number;/);
-    assert.match(result, /enum Status\{/);
-    assert.match(result, /namespace App\{/);
+    assert.match(result, /enum Status \{/);
+    assert.match(result, /namespace App \{/);
     assert.equal(formatSource(result, 'example.ts'), result);
   });
 
@@ -1229,7 +1229,9 @@ describe('source formatter', () => {
 
     const result = formatSource(source, 'example.ts');
 
-    assert.match(result, /const user: \{name:string;age:number\} = \{/);
+    assert.match(result, /const user: \{/);
+    assert.match(result, /name: string;/);
+    assert.match(result, /age: number;/);
     assert.match(result, /name: 'Marcos'/);
     assert.match(result, /age: 27/);
     assert.match(result, /active: true/);

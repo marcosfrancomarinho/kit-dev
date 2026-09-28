@@ -378,8 +378,27 @@ function formatBeforeOpen(file, root = projectRoot) {
   return true;
 }
 
+function renderMicroTips() {
+  return [
+    '',
+    'Micro shortcuts:',
+    '  Ctrl+S  Save',
+    '  Ctrl+Q  Quit',
+    '  Ctrl+F  Find',
+    '  Ctrl+E  Command / Help',
+    '',
+    'Tip: Ctrl+E → help defaultkeys',
+    '',
+  ].join('\n');
+}
+
+function showMicroTips() {
+  process.stdout.write(renderMicroTips());
+}
+
 function openWithMicro(editor, file, root = projectRoot) {
   formatBeforeOpen(file, root);
+  showMicroTips();
 
   const result = spawnSync(editor, [file], {
     cwd: root,
@@ -397,7 +416,29 @@ function openWithMicro(editor, file, root = projectRoot) {
 }
 
 async function main() {
-  const query = process.argv.slice(2).join(' ').trim() || null;
+  const args = process.argv.slice(2);
+
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(
+      [
+        'Kit Dev View',
+        '',
+        'Usage:',
+        '  yarn v [file-or-name]',
+        '  yarn view [file-or-name]',
+        '',
+        'Examples:',
+        '  yarn v product',
+        '  yarn v product.ts',
+        '  yarn v src/domain/entities/product.ts',
+        '',
+        renderMicroTips().trimEnd(),
+      ].join('\n'),
+    );
+    return;
+  }
+
+  const query = args.join(' ').trim() || null;
   const matches = await findViewCandidates(query, projectRoot);
 
   if (matches.length === 0) {
@@ -431,6 +472,7 @@ module.exports = {
   formatBeforeOpen,
   microAsset,
   openWithMicro,
+  renderMicroTips,
   renderSelection,
   selectFile,
   shouldFormat,

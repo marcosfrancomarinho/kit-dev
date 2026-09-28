@@ -136,6 +136,7 @@ Atalhos mostrados antes de abrir o Micro:
 Ctrl+S  Salvar
 Ctrl+Q  Sair
 Ctrl+F  Buscar
+Ctrl+B  Terminal / modo shell
 Ctrl+E  Comando / Ajuda
 ```
 

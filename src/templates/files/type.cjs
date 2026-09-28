@@ -1,5 +1,5 @@
 const { spawnSync } = require('node:child_process');
-const { resolve } = require('node:path');
+const { dirname, resolve } = require('node:path');
 
 const projectRoot = resolve(__dirname, '..', '..');
 
@@ -8,9 +8,16 @@ function main() {
   const watchMode =
     args.includes('--watch') || process.env.npm_config_watch === 'true';
 
-  const tscPath = require.resolve('typescript/bin/tsc', {
+  // TypeScript 7 exports package.json, but not the internal bin/tsc path.
+  const packagePath = require.resolve('typescript/package.json', {
     paths: [projectRoot],
   });
+  const { bin } = require(packagePath);
+  const compiler = typeof bin === 'string' ? bin : bin?.tsc;
+
+  if (!compiler) throw new Error('The installed TypeScript package does not provide tsc.');
+
+  const tscPath = resolve(dirname(packagePath), compiler);
 
   const result = spawnSync(
     process.execPath,

@@ -2361,3 +2361,147 @@ export class Veiculo {
     );
   },
 );
+
+
+test(
+  'gera testes para getter setter e metodo static sem tratar factory como metodo comum',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-accessors-static-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'account.ts'),
+      `
+export class Account {
+  private _name = 'Marcos'
+
+  get name(): string {
+    return this._name
+  }
+
+  set name(value: string) {
+    if (value === '') {
+      throw new Error('invalid name')
+    }
+
+    this._name = value
+  }
+
+  static normalize(value: string): string {
+    return value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/account.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(generated, /it\("get name",/);
+    assert.match(generated, /const result = sut\.name/);
+    assert.match(generated, /it\("set name",/);
+    assert.match(generated, /sut\.name = "value"/);
+    assert.match(
+      generated,
+      /it\("name rejects invalid value",/,
+    );
+    assert.match(
+      generated,
+      /assert\.throws\(\(\) => \{/,
+    );
+    assert.match(generated, /sut\.name = ""/);
+    assert.match(generated, /it\("normalize",/);
+    assert.match(
+      generated,
+      /Account\.normalize\("value"\)/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /const sut = new Account\(\)[\s\S]*Account\.normalize/,
+    );
+
+    const output = join(projectPath, 'generated-accessors.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);
+
+test(
+  'gera assert throws para guarda simples em metodo de instancia',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-method-guard-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'wallet.ts'),
+      `
+export class Wallet {
+  withdraw(amount: number): void {
+    if (amount < 0) {
+      throw new Error('invalid amount')
+    }
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/wallet.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(
+      generated,
+      /it\("withdraw rejects invalid amount",/,
+    );
+    assert.match(
+      generated,
+      /assert\.throws\(\(\) => sut\.withdraw\(-1\)\)/,
+    );
+  },
+);

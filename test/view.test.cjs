@@ -8,6 +8,7 @@ const {
   findViewCandidates,
   formatBeforeOpen,
   microAsset,
+  renderMicroTips,
   renderSelection,
   shouldFormat,
 } = require('../src/templates/files/view.cjs');
@@ -182,4 +183,15 @@ describe('project file viewer', () => {
     assert.equal(formatBeforeOpen(readme, root), true);
     assert.equal(await readFile(readme, 'utf8'), '# README\n');
   });
+
+  it('shows concise Micro shortcuts before opening the editor', () => {
+    const tips = renderMicroTips();
+
+    assert.match(tips, /Ctrl\+S  Save/);
+    assert.match(tips, /Ctrl\+Q  Quit/);
+    assert.match(tips, /Ctrl\+F  Find/);
+    assert.match(tips, /Ctrl\+E  Command \/ Help/);
+    assert.match(tips, /help defaultkeys/);
+  });
+
 });

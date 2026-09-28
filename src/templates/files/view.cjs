@@ -77,6 +77,12 @@ async function findViewCandidates(query, root = projectRoot) {
       ? resolve(query)
       : resolve(root, query);
 
+    if (!isInside(root, exact)) {
+      throw new Error(
+        'view only opens files inside the current project.',
+      );
+    }
+
     try {
       const stats = await require('node:fs/promises').stat(exact);
       if (stats.isFile()) return [exact];

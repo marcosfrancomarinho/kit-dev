@@ -2285,3 +2285,79 @@ export class Range {
     );
   },
 );
+
+
+test(
+  'inicializa propriedades publicas sem construtor antes de testar getters',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-public-properties-getters-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'domain', 'entities'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'entities', 'veiculo.ts'),
+      `
+export interface Input {
+  marca: string
+  ano: number
+}
+
+export class Veiculo {
+  public marca!: string
+  public ano!: number
+
+  public getMarca(): string {
+    return this.marca
+  }
+
+  public getAno(): number {
+    return this.ano
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest(
+      'src/domain/entities/veiculo.ts',
+      projectPath,
+    );
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(generated, /const sut = new Veiculo\(\)/);
+    assert.match(generated, /sut\.marca = "marca"/);
+    assert.match(generated, /sut\.ano = 1/);
+    assert.match(
+      generated,
+      /assert\.equal\(result, "marca"\)/,
+    );
+    assert.match(
+      generated,
+      /assert\.equal\(result, 1\)/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /TODO: add assertions for the business behavior/,
+    );
+  },
+);

@@ -117,4 +117,26 @@ describe('self-hosted architecture', () => {
     assert.match(messages.join('\n'), /Format src\/ and test\/ code/);
   });
 
+  it('shows view shortcut in the final command list', () => {
+    const terminal = new TerminalAdapter(new TerminalPalette());
+    const messages: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      messages.push(String(message ?? ''));
+    };
+
+    try {
+      terminal.showFinalInstructions('api', 'yarn');
+    } finally {
+      console.log = originalLog;
+    }
+
+    assert.match(messages.join('\n'), /yarn v/);
+    assert.match(
+      messages.join('\n'),
+      /Find and open a file with Micro/,
+    );
+  });
+
 });

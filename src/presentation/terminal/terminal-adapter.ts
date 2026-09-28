@@ -52,6 +52,8 @@ export class TerminalAdapter implements Terminal {
         '\n  ' +
         this.formatCommand(runCommand, 'fmt', 'Format src/ and test/ code') +
         '\n  ' +
+        this.formatCommand(runCommand, 'v', 'Find and open a file with Micro') +
+        '\n  ' +
         this.formatCommand(runCommand, 'build', 'Build the project') +
         '\n  ' +
         this.formatCommand(runCommand, 'start', 'Run bundled output') +

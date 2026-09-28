@@ -75,7 +75,8 @@ pnpm dev
 | `view [file]` / `v [file]` | Finds a project file, formats supported source files, and opens it in Micro |
 | `build` | Checks types and creates the production bundle |
 | `start` | Runs the generated bundle |
-| `type` | Watches TypeScript errors |
+| `type` | Checks TypeScript types once |
+| `type --watch` | Keeps TypeScript type checking active on changes |
 | `di` | Installs the optional dependency injection setup |
 
 Examples with npm:
@@ -88,6 +89,8 @@ npm test --watch
 npm test -- create-user
 npm run fmt
 npm run v -- product
+npm run type
+npm run type --watch
 npm run build
 npm start
 ```

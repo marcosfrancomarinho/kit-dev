@@ -2505,3 +2505,189 @@ export class Wallet {
     );
   },
 );
+
+
+test(
+  'cobre heranca de construtor metodos herdados override overload e destructuring aninhado',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-inheritance-overloads-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'base.ts'),
+      `
+export class Base {
+  constructor(private readonly id: string) {}
+
+  getId(): string {
+    return this.id
+  }
+
+  describe(value: string): string
+  describe(value: number): string
+  describe(value: string | number): string {
+    return String(value)
+  }
+}
+`,
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'entity.ts'),
+      `
+import { Base } from './base.js'
+
+interface Input {
+  user: {
+    address: {
+      city: string
+    }
+  }
+}
+
+export class Entity extends Base {
+  private city: string
+
+  constructor(id: string, { user: { address: { city } } }: Input) {
+    super(id)
+    this.city = city
+  }
+
+  override getId(): string {
+    return super.getId()
+  }
+
+  getCity(): string {
+    return this.city
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/entity.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(generated, /const id = "test-id"/);
+    assert.match(
+      generated,
+      /const input: ConstructorParameters<typeof Entity>\[1\]/,
+    );
+    assert.match(generated, /new Entity\(id, input\)/);
+    assert.match(
+      generated,
+      /assert\.equal\(result, input\.user\.address\.city\)/,
+    );
+
+    const output = join(projectPath, 'generated-inheritance.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);
+
+test(
+  'gera fixtures para utility types record partial pick omit e literal unions',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-utility-types-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'utility.ts'),
+      `
+interface User {
+  name: string
+  age: number
+  email: string
+}
+
+export class UtilityExample {
+  execute(
+    partial: Partial<User>,
+    picked: Pick<User, 'name'>,
+    omitted: Omit<User, 'email'>,
+    record: Record<string, number>,
+    role: 'admin' | 'user',
+  ): void {
+    void partial
+    void picked
+    void omitted
+    void record
+    void role
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/utility.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(generated, /sut\.execute\(/);
+
+    const output = join(projectPath, 'generated-utility.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);

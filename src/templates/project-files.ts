@@ -10,7 +10,7 @@ export class ProjectTemplateCatalog {
           start: 'node --enable-source-maps dist/bundle.cjs',
           dev: 'node kit-dev/build/dev.cjs',
           build: 'node kit-dev/build/esbuild.config.cjs',
-          type: 'tsc --watch --noEmit',
+          type: 'node kit-dev/build/type.cjs',
           test: 'node kit-dev/test/test.cjs',
           fmt: 'node kit-dev/format/fmt.cjs',
           view: 'node kit-dev/view/view.cjs',

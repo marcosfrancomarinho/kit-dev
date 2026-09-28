@@ -467,6 +467,7 @@ describe('project file viewer', () => {
 
     assert.equal(settings['lsp.tabcompletion'], true);
     assert.equal(settings['lsp.formatOnSave'], false);
+    assert.equal(settings['lsp.ignoreTriggerCharacters'], 'signature');
     assert.match(
       settings['lsp.server'],
       /typescript=npx --no-install typescript-language-server --stdio/,
@@ -475,6 +476,11 @@ describe('project file viewer', () => {
       settings['lsp.server'],
       /javascript=npx --no-install typescript-language-server --stdio/,
     );
+    const bindings = JSON.parse(
+      await readFile(join(result, 'bindings.json'), 'utf8'),
+    );
+    assert.equal(bindings.Tab, 'command:lspcompletion');
+    assert.equal(bindings.CtrlSpace, 'command:lspcompletion');
     assert.doesNotMatch(result, /[\\/]\.config[\\/]micro(?:[\\/]|$)/);
   });
 
@@ -523,6 +529,7 @@ describe('project file viewer', () => {
     const settings = lspSettings();
 
     assert.equal(settings['lsp.tabcompletion'], true);
+    assert.equal(settings['lsp.ignoreTriggerCharacters'], 'signature');
     assert.match(
       settings['lsp.server'],
       /^typescript=npx --no-install typescript-language-server --stdio/,

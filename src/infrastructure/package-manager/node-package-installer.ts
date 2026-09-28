@@ -13,7 +13,7 @@ export class NodePackageInstaller implements PackageInstaller {
     '@typescript/typescript6@6.0.2',
     'esbuild@0.28.2',
     '@types/node@22',
-    'typescript-language-server@6.0.1',
+    'typescript-language-server@5.3.0',
   ]);
 
   constructor(

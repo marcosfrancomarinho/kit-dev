@@ -29,7 +29,7 @@ test('atualiza a DI entre rebuilds sem recriar o plugin', async (context) => {
 
   context.after(async () => {
     if (buildContext) await buildContext.dispose();
-    await rm(projectPath, { recursive: true, force: true });
+    await rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   buildContext = await createBuildContext({

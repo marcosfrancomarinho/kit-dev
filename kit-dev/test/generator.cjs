@@ -1043,6 +1043,26 @@ function hasModifier(ts, node, kind) {
   );
 }
 
+function isConditionalExecution(ts, node, boundary) {
+  let current = node.parent;
+
+  while (current && current !== boundary) {
+    if (
+      ts.isIfStatement(current) ||
+      ts.isConditionalExpression(current) ||
+      ts.isSwitchStatement(current) ||
+      ts.isCaseClause?.(current) ||
+      ts.isDefaultClause?.(current)
+    ) {
+      return true;
+    }
+
+    current = current.parent;
+  }
+
+  return false;
+}
+
 function analyzeMethod({
   ts,
   checker,
@@ -1142,6 +1162,7 @@ function analyzeMethod({
       returnsPromise: false,
       returnFixture: 'undefined',
       expectedArguments: null,
+      conditional: false,
     };
 
     const returnInfo = getCallReturnInfo(
@@ -1162,6 +1183,9 @@ function analyzeMethod({
       parameterMap,
       sourceFile,
     );
+    current.conditional =
+      current.conditional ||
+      isConditionalExecution(ts, node, method.body);
     calls.set(key, current);
   }
 
@@ -1259,6 +1283,21 @@ function analyzeMethod({
     sourceAliases,
   );
   const instanceSetup = [];
+  const stateAssertions = [];
+
+  if (
+    !expectedReturn &&
+    method.body?.statements.length === 1 &&
+    ts.isReturnStatement(method.body.statements[0]) &&
+    method.body.statements[0].expression
+  ) {
+    expectedReturn = renderSafeExpression(
+      ts,
+      method.body.statements[0].expression,
+      parameterMap,
+      sourceFile,
+    );
+  }
 
   if (!expectedReturn && method.body?.statements.length === 1) {
     const statement = method.body.statements[0];
@@ -1282,6 +1321,41 @@ function analyzeMethod({
     }
   }
 
+  if (method.body && !isStatic) {
+    for (const statement of method.body.statements) {
+      if (
+        !ts.isExpressionStatement(statement) ||
+        !ts.isBinaryExpression(statement.expression) ||
+        statement.expression.operatorToken.kind !==
+          ts.SyntaxKind.EqualsToken ||
+        !ts.isPropertyAccessExpression(statement.expression.left) ||
+        statement.expression.left.expression.kind !==
+          ts.SyntaxKind.ThisKeyword
+      ) {
+        continue;
+      }
+
+      const propertyName = statement.expression.left.name.text;
+      const property = publicPropertyFixtures?.get(propertyName);
+
+      if (!property?.writableFromTest) continue;
+
+      const expected = renderSafeExpression(
+        ts,
+        statement.expression.right,
+        parameterMap,
+        sourceFile,
+      );
+
+      if (expected !== null) {
+        stateAssertions.push({
+          property: propertyName,
+          expected,
+        });
+      }
+    }
+  }
+
   return {
     name: methodName,
     kind: memberKind,
@@ -1295,6 +1369,7 @@ function analyzeMethod({
     calls: [...calls.values()],
     expectedReturn,
     instanceSetup,
+    stateAssertions,
     negativeCases:
       memberKind === 'method' || memberKind === 'setter'
         ? detectSimpleFactoryThrowCases(ts, method, sourceFile)
@@ -3056,10 +3131,23 @@ function renderTest({
     } else {
       lines.push(`  ${awaitKeyword}${invocation}`);
 
-      if (method.calls.length === 0) {
+      if (
+        method.calls.length === 0 &&
+        method.stateAssertions.length === 0
+      ) {
         lines.push(
           '',
           '  // TODO: add assertions for the business behavior.',
+        );
+      }
+    }
+
+    if (method.stateAssertions.length > 0) {
+      lines.push('');
+
+      for (const state of method.stateAssertions) {
+        lines.push(
+          `  assert.equal(sut.${state.property}, ${state.expected})`,
         );
       }
     }
@@ -3068,6 +3156,13 @@ function renderTest({
       lines.push('');
 
       for (const call of method.calls) {
+        if (call.conditional) {
+          lines.push(
+            `  // TODO: conditional call ${call.dependency}.${call.method} depends on runtime branch.`,
+          );
+          continue;
+        }
+
         const access = call.collection
           ? (call.mockTarget || call.dependency) +
             '.' +

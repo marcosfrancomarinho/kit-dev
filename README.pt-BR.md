@@ -137,7 +137,7 @@ Windows:     %USERPROFILE%\.kit-dev\bin\micro.exe
 
 O mesmo binário em cache é reutilizado por todos os projetos Kit Dev da máquina. O download automático contempla os builds oficiais do Micro mapeados pelo Kit Dev para Windows, Linux, macOS, FreeBSD, NetBSD, OpenBSD, Solaris e illumos quando a combinação de plataforma e runtime Node.js estiver disponível.
 
-Os projetos gerados instalam `typescript-language-server@5.3.0` como dependência de desenvolvimento. No primeiro uso de `view` / `v`, o Kit Dev instala o plugin oficial `lsp` do Micro em uma configuração isolada em `~/.kit-dev/micro` e conecta o editor ao language server local do projeto. Isso habilita diagnósticos de TypeScript/JavaScript, hover/definições e autocomplete inteligente sem alterar as configurações normais do usuário em `~/.config/micro`.
+Os projetos gerados instalam `typescript-language-server@5.3.0` como dependência de desenvolvimento. No primeiro uso de `view` / `v`, o Kit Dev instala o plugin oficial `lsp` do Micro em uma configuração isolada em `~/.kit-dev/micro` e conecta o editor ao language server local do projeto. Isso habilita diagnósticos de TypeScript/JavaScript, hover/definições, autocomplete inteligente por `Tab`/`Ctrl+Space` e sugestões automáticas ao digitar gatilhos como `.` sem alterar as configurações normais do usuário em `~/.config/micro`.
 
 Atalhos mostrados antes de abrir o Micro:
 
@@ -147,7 +147,7 @@ Ctrl+Q  Sair
 Ctrl+F  Buscar
 Ctrl+B  Terminal / modo shell
 Ctrl+E  Comando / Ajuda
-Tab / Ctrl+Space  Autocomplete LSP
+Tab / Ctrl+Space  Autocomplete LSP\n.  Sugestões automáticas de membros
 ```
 
 Para consultar os atalhos padrão do Micro, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do view está disponível com `yarn v --help`.

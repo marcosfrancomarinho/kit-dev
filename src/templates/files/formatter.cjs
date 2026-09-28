@@ -1569,6 +1569,398 @@ function normalizeSpacing(source, fileName = 'source.ts') {
   return normalizeForSpacing(controlSpaced, fileName);
 }
 
+function hasLineBreak(text) {
+  return text.includes('\n') || text.includes('\r');
+}
+
+function applySafeReplacements(source, replacements) {
+  let result = source;
+  let lastStart = Infinity;
+
+  for (const change of [...replacements].sort(
+    (a, b) => b.start - a.start || b.end - a.end,
+  )) {
+    if (change.end > lastStart) continue;
+
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+    lastStart = change.start;
+  }
+
+  return result;
+}
+
+function chainSegmentCount(node) {
+  if (!node) return 0;
+
+  if (
+    ts.isCallExpression(node) ||
+    ts.isNewExpression(node)
+  ) {
+    return 1 + chainSegmentCount(node.expression);
+  }
+
+  if (
+    ts.isPropertyAccessExpression(node) ||
+    ts.isElementAccessExpression(node)
+  ) {
+    return 1 + chainSegmentCount(node.expression);
+  }
+
+  if (
+    ts.isParenthesizedExpression(node) ||
+    ts.isNonNullExpression(node)
+  ) {
+    return chainSegmentCount(node.expression);
+  }
+
+  return 0;
+}
+
+function chainRoot(node) {
+  let current = node;
+
+  while (current.parent) {
+    const parent = current.parent;
+    const continuesChain =
+      ((ts.isCallExpression(parent) || ts.isNewExpression(parent)) &&
+        parent.expression === current) ||
+      ((ts.isPropertyAccessExpression(parent) ||
+        ts.isElementAccessExpression(parent)) &&
+        parent.expression === current) ||
+      (ts.isNonNullExpression(parent) && parent.expression === current);
+
+    if (!continuesChain) break;
+    current = parent;
+  }
+
+  return current;
+}
+
+function isLongFluentChain(node, maxSegments = 3) {
+  return chainSegmentCount(chainRoot(node)) > maxSegments;
+}
+
+function compactMemberAccesses(
+  source,
+  fileName = 'source.ts',
+  maxLineLength = 100,
+) {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  function visit(node) {
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      !isLongFluentChain(node)
+    ) {
+      const start = node.expression.getEnd();
+      const end = node.name.getStart(sourceFile);
+      const gap = source.slice(start, end);
+
+      if (
+        hasLineBreak(gap) &&
+        !containsComment(gap)
+      ) {
+        const compact = gap.replace(/\s+/g, '');
+
+        if (
+          (compact === '.' || compact === '?.') &&
+          lineLengthWithReplacement(
+            source,
+            start,
+            end,
+            compact,
+          ) <= maxLineLength
+        ) {
+          replacements.push({
+            start,
+            end,
+            value: compact,
+          });
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  return applySafeReplacements(source, replacements);
+}
+
+function compactCallBoundaries(
+  source,
+  fileName = 'source.ts',
+  maxLineLength = 100,
+) {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  function visit(node) {
+    if (
+      (ts.isCallExpression(node) || ts.isNewExpression(node)) &&
+      node.arguments &&
+      !isLongFluentChain(node)
+    ) {
+      const expressionEnd = node.expression.getEnd();
+      const searchEnd =
+        node.arguments.length > 0
+          ? node.arguments[0].getStart(sourceFile)
+          : node.getEnd();
+      const openParen = source.lastIndexOf('(', searchEnd);
+
+      if (
+        openParen >= expressionEnd &&
+        openParen < node.getEnd()
+      ) {
+        const gap = source.slice(expressionEnd, openParen);
+
+        if (
+          hasLineBreak(gap) &&
+          !containsComment(gap) &&
+          lineLengthWithReplacement(
+            source,
+            expressionEnd,
+            openParen,
+            '',
+          ) <= maxLineLength
+        ) {
+          replacements.push({
+            start: expressionEnd,
+            end: openParen,
+            value: '',
+          });
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  return applySafeReplacements(source, replacements);
+}
+
+function compactBinaryExpressions(
+  source,
+  fileName = 'source.ts',
+  maxLineLength = 100,
+) {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  function visit(node) {
+    if (ts.isBinaryExpression(node)) {
+      const start = node.left.getEnd();
+      const end = node.right.getStart(sourceFile);
+      const gap = source.slice(start, end);
+
+      if (
+        hasLineBreak(gap) &&
+        !containsComment(gap)
+      ) {
+        const operator = node.operatorToken.getText(sourceFile);
+        const value = ' ' + operator + ' ';
+
+        if (
+          lineLengthWithReplacement(
+            source,
+            start,
+            end,
+            value,
+          ) <= maxLineLength
+        ) {
+          replacements.push({ start, end, value });
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  return applySafeReplacements(source, replacements);
+}
+
+function compactInitializerBreaks(
+  source,
+  fileName = 'source.ts',
+  maxLineLength = 100,
+) {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  function visit(node) {
+    if (
+      (ts.isVariableDeclaration(node) ||
+        ts.isPropertyDeclaration(node)) &&
+      node.initializer
+    ) {
+      const left = node.type || node.name;
+      const start = left.getEnd();
+      const end = node.initializer.getStart(sourceFile);
+      const gap = source.slice(start, end);
+
+      if (
+        hasLineBreak(gap) &&
+        !containsComment(gap) &&
+        gap.includes('=') &&
+        lineLengthWithReplacement(
+          source,
+          start,
+          end,
+          ' = ',
+        ) <= maxLineLength
+      ) {
+        replacements.push({
+          start,
+          end,
+          value: ' = ',
+        });
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  return applySafeReplacements(source, replacements);
+}
+
+function isCompactableDeclaration(node) {
+  return (
+    ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isGetAccessorDeclaration(node) ||
+    ts.isSetAccessorDeclaration(node) ||
+    ts.isConstructorDeclaration(node)
+  );
+}
+
+function compactDeclarationHeaders(
+  source,
+  fileName = 'source.ts',
+  maxLineLength = 100,
+) {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  function visit(node) {
+    if (
+      isCompactableDeclaration(node) &&
+      node.body
+    ) {
+      const start = node.getStart(sourceFile);
+      const end = node.body.getStart(sourceFile);
+      const header = source.slice(start, end);
+
+      if (
+        hasLineBreak(header) &&
+        !containsComment(header) &&
+        !header.includes('@')
+      ) {
+        const compact = header
+          .replace(/\s+/g, ' ')
+          .replace(/function\s+\*/g, 'function*')
+          .replace(/\s+\(/g, '(')
+          .trimEnd() + ' ';
+
+        if (
+          !hasLineBreak(compact) &&
+          compact.length <= maxLineLength
+        ) {
+          replacements.push({
+            start,
+            end,
+            value: compact,
+          });
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  return applySafeReplacements(source, replacements);
+}
+
+function compactSafeMultilineExpressions(
+  source,
+  fileName = 'source.ts',
+  maxLineLength = 100,
+) {
+  let result = source;
+
+  for (let pass = 0; pass < 6; pass += 1) {
+    const next = compactDeclarationHeaders(
+      compactInitializerBreaks(
+        compactBinaryExpressions(
+          compactCallBoundaries(
+            compactMemberAccesses(
+              result,
+              fileName,
+              maxLineLength,
+            ),
+            fileName,
+            maxLineLength,
+          ),
+          fileName,
+          maxLineLength,
+        ),
+        fileName,
+        maxLineLength,
+      ),
+      fileName,
+      maxLineLength,
+    );
+
+    if (next === result) break;
+    result = next;
+  }
+
+  return result;
+}
+
 function normalizeContainerBraceSpacing(source, fileName = 'source.ts') {
   const sourceFile = ts.createSourceFile(
     fileName,
@@ -1693,7 +2085,8 @@ function formatSource(source, fileName = 'source.ts') {
   const splitStatements = splitSameLineStatements(expandedContainers, fileName);
   const splitMembers = splitSameLineMembers(splitStatements, fileName);
   const spaced = normalizeSpacing(splitMembers, fileName);
-  const containerSpaced = normalizeContainerBraceSpacing(spaced, fileName);
+  const compacted = compactSafeMultilineExpressions(spaced, fileName);
+  const containerSpaced = normalizeContainerBraceSpacing(compacted, fileName);
   const blockSpaced = normalizeBlockSpacing(containerSpaced, fileName);
   const listed = formatDelimitedLists(blockSpaced, fileName);
 
@@ -2018,6 +2411,7 @@ if (require.main === module) {
 
 module.exports = {
   addSemicolons,
+  compactSafeMultilineExpressions,
   compactShortCalls,
   expandCompactBlocks,
   expandCompactContainers,

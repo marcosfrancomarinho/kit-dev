@@ -62,7 +62,9 @@ export class TerminalAdapter implements Terminal {
         '\n  ' +
         this.formatCommand(runCommand, 'start', 'Run bundled output') +
         '\n  ' +
-        this.formatCommand(runCommand, 'type', 'Check TypeScript types') +
+        this.formatCommand(runCommand, 'type', 'Check TypeScript types once') +
+        '\n  ' +
+        this.formatCommand(runCommand, 'type --watch', 'Check TypeScript types in watch mode') +
         '\n  ' +
         this.formatCommand(runCommand, 'di', 'Add optional dependency injection') +
         '\n',

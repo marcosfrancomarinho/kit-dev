@@ -29,7 +29,7 @@ Em vez de configurar tudo do zero, você já começa com:
 - injeção de dependência opcional;
 - suporte a npm, Yarn e pnpm.
 
-A proposta é simples: gastar menos tempo configurando o projeto e mais tempo escrevendo a aplicação.
+A proposta do Kit Dev é ser uma CLI minimalista: simples, rápida e com poucas dependências externas. A ideia não é impor uma arquitetura ou um tipo específico de aplicação, mas oferecer uma base enxuta que possa ser usada em APIs, serviços, CLIs, aplicações web, ferramentas internas, estudos, protótipos e outros projetos TypeScript de pequeno e médio porte. O objetivo é reduzir configuração e trabalho repetitivo sem transformar o projeto em um framework pesado.
 
 ## Começando
 

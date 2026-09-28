@@ -476,6 +476,7 @@ function renderMicroTips() {
     '  Ctrl+Q  Quit',
     '  Ctrl+F  Find',
     '  Ctrl+E  Command / Help',
+    '  Tab / Ctrl+Space  LSP autocomplete',
     '',
     'Tip: Ctrl+E → help defaultkeys',
     '',

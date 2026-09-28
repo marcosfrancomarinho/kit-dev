@@ -1,0 +1,55 @@
+name: Publish npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'yarn'
+
+      - name: Install Yarn
+        run: npm install --global yarn@1.22.22
+
+      - name: Ensure supported npm CLI
+        run: npm install --global npm@^11.5.1
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Verify tag matches package version
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if [ "v$PACKAGE_VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package version v$PACKAGE_VERSION"
+            exit 1
+          fi
+
+      - name: Test
+        run: yarn test
+
+      - name: Build
+        run: yarn build
+
+      - name: Check package
+        run: npm pack --dry-run
+
+      - name: Publish
+        run: npm publish --access public --provenance

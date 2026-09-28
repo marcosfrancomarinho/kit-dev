@@ -2808,3 +2808,136 @@ export class Token {
     assert.doesNotMatch(generated, /sut\.#value/);
   },
 );
+
+
+test(
+  'infere retorno direto de parametro e mutacao publica sem inventar regra de negocio',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-safe-return-state-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'profile.ts'),
+      `
+export class Profile {
+  public name = 'before'
+
+  identity(value: string): string {
+    return value
+  }
+
+  rename(name: string): void {
+    this.name = name
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/profile.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(
+      generated,
+      /const result = sut\.identity\("value"\)/,
+    );
+    assert.match(
+      generated,
+      /assert\.equal\(result, "value"\)/,
+    );
+    assert.match(generated, /sut\.rename\("Marcos"\)/);
+    assert.match(
+      generated,
+      /assert\.equal\(sut\.name, "Marcos"\)/,
+    );
+  },
+);
+
+test(
+  'nao exige chamada de dependencia dentro de branch condicional',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-conditional-call-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'service.ts'),
+      `
+interface Repository {
+  save(): void
+}
+
+export class Service {
+  constructor(private readonly repository: Repository) {}
+
+  execute(enabled: boolean): void {
+    if (!enabled) {
+      this.repository.save()
+    }
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/service.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(
+      generated,
+      /TODO: conditional call repository\.save depends on runtime branch/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /repositorySaveMock\.mock\.callCount\(\), 1/,
+    );
+
+    const output = join(projectPath, 'generated-conditional.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);

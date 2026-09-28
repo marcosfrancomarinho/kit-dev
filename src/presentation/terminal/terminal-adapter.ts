@@ -48,11 +48,11 @@ export class TerminalAdapter implements Terminal {
         '\n\n🚀 Available commands:\n  ' +
         this.formatCommand(runCommand, 'dev', 'Run application once') +
         '\n  ' +
-        this.formatCommand(runCommand, 'dev -- --watch', 'Run application in watch mode') +
+        this.formatCommand(runCommand, 'dev --watch', 'Run application in watch mode') +
         '\n  ' +
         this.formatCommand(runCommand, 'test', 'Run tests once') +
         '\n  ' +
-        this.formatCommand(runCommand, 'test -- --watch', 'Run tests in watch mode') +
+        this.formatCommand(runCommand, 'test --watch', 'Run tests in watch mode') +
         '\n  ' +
         this.formatCommand(runCommand, 'fmt', 'Format src/ and test/ code') +
         '\n  ' +

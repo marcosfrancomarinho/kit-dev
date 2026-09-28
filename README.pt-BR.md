@@ -21,10 +21,10 @@ O **Kit Dev** é uma CLI que cria um projeto TypeScript pronto para começar a p
 
 Em vez de configurar tudo do zero, você já começa com:
 
-- modo de desenvolvimento com rebuild e reinício automático;
+- comando de desenvolvimento que executa uma vez por padrão, com modo watch opcional;
 - build de produção;
 - verificação de tipos;
-- testes em modo watch;
+- testes que executam uma vez por padrão, com modo watch opcional;
 - geração automática de testes a partir de classes;
 - busca e edição rápida de arquivos com Micro pelos comandos `view` / `v`;
 - injeção de dependência opcional;
@@ -66,8 +66,10 @@ pnpm dev
 
 | Comando | O que faz |
 |---|---|
-| `dev` | Executa a aplicação e acompanha alterações |
-| `test` | Executa os testes em modo watch |
+| `dev` | Faz o build e executa a aplicação uma vez |
+| `dev -- --watch` | Mantém a aplicação ativa e reinicia quando houver alterações |
+| `test` | Executa os testes uma vez |
+| `test -- --watch` | Mantém os testes ativos e executa novamente quando houver alterações |
 | `test <arquivo>` | Gera ou atualiza o teste de uma classe |
 | `fmt [arquivo]` | Formata `src/` e `test/` por completo ou somente um arquivo informado |
 | `view [arquivo]` / `v [arquivo]` | Localiza um arquivo do projeto, formata código suportado e abre no Micro |
@@ -80,7 +82,9 @@ Exemplos com npm:
 
 ```bash
 npm run dev
+npm run dev -- --watch
 npm test
+npm test -- --watch
 npm test -- create-user
 npm run fmt
 npm run v -- product
@@ -144,12 +148,18 @@ Para consultar os atalhos padrão do Micro, pressione `Ctrl+E` e execute `help d
 
 ## Testes automáticos
 
-Todo projeto gerado já possui um runner de testes.
+Todo projeto gerado já possui um runner de testes. Por padrão, os testes executam uma única vez. Use `--watch` apenas quando quiser reexecução contínua.
 
-Execute:
+Execute uma vez:
 
 ```bash
 npm test
+```
+
+Acompanhar alterações:
+
+```bash
+npm test -- --watch
 ```
 
 Para gerar um teste a partir de uma classe:

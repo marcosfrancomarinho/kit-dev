@@ -2691,3 +2691,120 @@ export class UtilityExample {
     );
   },
 );
+
+
+test(
+  'gera guardas de construtor e recusa classe abstrata com mensagem clara',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-constructor-guard-abstract-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'age.ts'),
+      `
+export class Age {
+  constructor(private readonly value: number) {
+    if (value < 0) {
+      throw new Error('invalid age')
+    }
+  }
+
+  getValue(): number {
+    return this.value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const ageResult = await generateTest('src/age.ts', projectPath);
+    const ageGenerated = await readFile(
+      ageResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      ageGenerated,
+      /it\("constructor rejects invalid value",/,
+    );
+    assert.match(
+      ageGenerated,
+      /assert\.throws\(\(\) => new Age\(-1\)\)/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'base.ts'),
+      `
+export abstract class Base {
+  abstract execute(): void
+}
+`,
+      'utf-8',
+    );
+
+    await assert.rejects(
+      () => generateTest('src/base.ts', projectPath),
+      /is abstract and cannot be instantiated as a test subject/,
+    );
+  },
+);
+
+test(
+  'infere getter baseado em private field inicializado sem acessar campo privado no teste',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-private-field-getter-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'token.ts'),
+      `
+export class Token {
+  #value = 'token'
+
+  get value(): string {
+    return this.#value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/token.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(generated, /const result = sut\.value/);
+    assert.match(generated, /assert\.equal\(result, "token"\)/);
+    assert.doesNotMatch(generated, /sut\.#value/);
+  },
+);

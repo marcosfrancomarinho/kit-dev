@@ -179,12 +179,29 @@ async function selectFile(files, root = projectRoot) {
 
 function microAsset(platform = process.platform, arch = process.arch) {
   const assets = {
+    'win32:ia32': 'win32.zip',
     'win32:x64': 'win64.zip',
     'win32:arm64': 'win-arm64.zip',
+
+    'linux:ia32': 'linux32.tar.gz',
     'linux:x64': 'linux64.tar.gz',
+    'linux:arm': 'linux-arm.tar.gz',
     'linux:arm64': 'linux-arm64.tar.gz',
+
     'darwin:x64': 'osx.tar.gz',
     'darwin:arm64': 'macos-arm64.tar.gz',
+
+    'freebsd:ia32': 'freebsd32.tar.gz',
+    'freebsd:x64': 'freebsd64.tar.gz',
+
+    'netbsd:ia32': 'netbsd32.tar.gz',
+    'netbsd:x64': 'netbsd64.tar.gz',
+
+    'openbsd:ia32': 'openbsd32.tar.gz',
+    'openbsd:x64': 'openbsd64.tar.gz',
+
+    'sunos:x64': 'solaris64.tar.gz',
+    'illumos:x64': 'illumos64.tar.gz',
   };
 
   const asset = assets[platform + ':' + arch];

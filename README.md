@@ -136,6 +136,7 @@ Useful shortcuts shown before Micro opens:
 Ctrl+S  Save
 Ctrl+Q  Quit
 Ctrl+F  Find
+Ctrl+B  Terminal / Shell mode
 Ctrl+E  Command / Help
 ```
 

@@ -178,7 +178,7 @@ test('configura o desenvolvimento somente com esbuild', () => {
 test('gera as pastas visíveis de build e DI', async (context) => {
   const parentPath = await mkdtemp(join(tmpdir(), 'kit-dev-generator-test-'));
   const projectPath = join(parentPath, 'my-api');
-  context.after(() => rm(parentPath, { recursive: true, force: true }));
+  context.after(() => rm(parentPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
   await new ProjectFixtureGenerator(projectTemplates).create(
     projectPath,
@@ -249,7 +249,7 @@ test('executa o modo dev com esbuild antes da DI', async (context) => {
       await exit;
     }
 
-    await rm(projectPath, { recursive: true, force: true });
+    await rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   await Promise.all([
@@ -311,7 +311,7 @@ test('gera build com logs e sourcemap externo', async (context) => {
   const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-config-test-'));
   const buildPath = join(projectPath, 'kit-dev', 'build');
   const diPath = join(projectPath, 'kit-dev', 'di');
-  context.after(() => rm(projectPath, { recursive: true, force: true }));
+  context.after(() => rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
   await Promise.all([
     mkdir(buildPath, { recursive: true }),
@@ -374,7 +374,7 @@ test('gera build com logs e sourcemap externo', async (context) => {
 
 test('mantém o build normal quando a DI não foi instalada', async (context) => {
   const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-build-test-'));
-  context.after(() => rm(projectPath, { recursive: true, force: true }));
+  context.after(() => rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
   await writeProjectFile(
     projectPath,
@@ -397,7 +397,7 @@ test('instala o container interno fora de src', async (context) => {
   const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-di-installer-test-'));
   const buildPath = join(projectPath, 'kit-dev', 'build');
   const diPath = join(projectPath, 'kit-dev', 'di');
-  context.after(() => rm(projectPath, { recursive: true, force: true }));
+  context.after(() => rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
   await Promise.all([
     mkdir(buildPath, { recursive: true }),
@@ -483,7 +483,7 @@ test('instala o container interno fora de src', async (context) => {
 
 test('injeta interface e classe concreta sem decorators', async (context) => {
   const projectPath = await createFixture();
-  context.after(() => rm(projectPath, { recursive: true, force: true }));
+  context.after(() => rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
   await writeProjectFile(
     projectPath,
@@ -519,7 +519,7 @@ export const container = createApplicationContext(providers);
 
 test('injeta classe registrada por factory', async (context) => {
   const projectPath = await createFixture();
-  context.after(() => rm(projectPath, { recursive: true, force: true }));
+  context.after(() => rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
   await Promise.all([
     writeProjectFile(
@@ -594,7 +594,7 @@ console.log(container.get(DatabaseService).execute());
 
 test('usa classe abstrata como token', async (context) => {
   const projectPath = await createFixture();
-  context.after(() => rm(projectPath, { recursive: true, force: true }));
+  context.after(() => rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
   await Promise.all([
     writeProjectFile(
@@ -675,7 +675,7 @@ console.log(container.get(RepositoryService).execute());
 
 test('ignora outra classe chamada AppConfig', async (context) => {
   const projectPath = await createFixture();
-  context.after(() => rm(projectPath, { recursive: true, force: true }));
+  context.after(() => rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
   await writeProjectFile(
     projectPath,
@@ -707,7 +707,7 @@ console.log(result === Unrelated ? 'untouched' : 'changed');
 
 test('orienta dependência explícita para tipos primitivos', async (context) => {
   const projectPath = await createFixture();
-  context.after(() => rm(projectPath, { recursive: true, force: true }));
+  context.after(() => rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
 
   await writeProjectFile(
     projectPath,

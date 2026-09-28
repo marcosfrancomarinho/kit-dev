@@ -133,13 +133,13 @@ The cached binary is reused by every Kit Dev project on the machine. Automatic d
 Useful shortcuts shown before Micro opens:
 
 ```text
-Ctrl+S  Save
-Ctrl+Q  Quit
-Ctrl+F  Find
-Ctrl+E  Command / Help
+Ctrl+S        Save
+Ctrl+F        Find
+Ctrl+E        Command / Help
+Ctrl+E → quit Safe quit
 ```
 
-For Micro's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev view help is available with `yarn v --help`.
+To quit safely across terminal environments, press `Ctrl+E`, type `quit`, and press Enter. Some terminal emulators may capture `Ctrl+Q` before Micro receives it, so Kit Dev does not advertise that shortcut. For Micro's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev view help is available with `yarn v --help`.
 
 ## Automatic tests
 

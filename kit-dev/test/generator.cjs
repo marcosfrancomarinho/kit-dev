@@ -244,7 +244,7 @@ function findEffectiveConstructor(ts, hierarchy) {
 
 function collectHierarchyMembers(ts, hierarchy) {
   const result = [];
-  const seen = new Set();
+  const indexes = new Map();
 
   for (const classNode of hierarchy) {
     for (const member of classNode.members) {
@@ -263,9 +263,18 @@ function collectHierarchyMembers(ts, hierarchy) {
       const key =
         kind + ':' + (isStatic ? 'static:' : '') + member.name.text;
 
-      if (seen.has(key)) continue;
-      seen.add(key);
-      result.push(member);
+      if (!indexes.has(key)) {
+        indexes.set(key, result.length);
+        result.push(member);
+        continue;
+      }
+
+      const index = indexes.get(key);
+      const previous = result[index];
+
+      if (!previous.body && member.body) {
+        result[index] = member;
+      }
     }
   }
 
@@ -3286,7 +3295,9 @@ function fallbackCreationParameter(
 
 function methodParameterType(className, method, index) {
   if (method.kind === 'setter') {
-    return className + "['" + method.name + "']";
+    return method.static
+      ? "(typeof " + className + ")['" + method.name + "']"
+      : className + "['" + method.name + "']";
   }
 
   if (method.static) {

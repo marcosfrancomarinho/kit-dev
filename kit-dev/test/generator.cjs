@@ -296,6 +296,21 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
   };
 }
 
+function getParameterFixtureName(ts, parameter, index) {
+  if (ts.isIdentifier(parameter.name)) {
+    return parameter.name.text;
+  }
+
+  if (
+    ts.isObjectBindingPattern(parameter.name) ||
+    ts.isArrayBindingPattern(parameter.name)
+  ) {
+    return index === 0 ? 'input' : `input${index + 1}`;
+  }
+
+  return `argument${index + 1}`;
+}
+
 function analyzeParameters(
   ts,
   checker,
@@ -304,9 +319,14 @@ function analyzeParameters(
   fixtureContext,
 ) {
   return parameters
-    .filter((parameter) => ts.isIdentifier(parameter.name))
+    .filter(
+      (parameter) =>
+        ts.isIdentifier(parameter.name) ||
+        ts.isObjectBindingPattern(parameter.name) ||
+        ts.isArrayBindingPattern(parameter.name),
+    )
     .map((parameter, index) => {
-      const name = parameter.name.text;
+      const name = getParameterFixtureName(ts, parameter, index);
       const fixture = renderParameterFixture(
         ts,
         checker,
@@ -1090,6 +1110,72 @@ function translateSourceExpression(source, aliases) {
   return aliases.size > 0 ? null : source;
 }
 
+function collectBindingAliases(
+  ts,
+  bindingName,
+  source,
+  aliases,
+  sourceFile,
+) {
+  if (ts.isIdentifier(bindingName)) {
+    aliases.set(bindingName.text, source);
+    return;
+  }
+
+  if (ts.isObjectBindingPattern(bindingName)) {
+    for (const element of bindingName.elements) {
+      if (element.dotDotDotToken) continue;
+
+      let propertySource = null;
+
+      if (element.propertyName) {
+        if (ts.isIdentifier(element.propertyName)) {
+          propertySource = source + '.' + element.propertyName.text;
+        } else if (
+          ts.isStringLiteral(element.propertyName) ||
+          ts.isNumericLiteral(element.propertyName)
+        ) {
+          propertySource =
+            source + '[' + JSON.stringify(element.propertyName.text) + ']';
+        } else {
+          propertySource =
+            source + '[' + element.propertyName.getText(sourceFile) + ']';
+        }
+      } else if (ts.isIdentifier(element.name)) {
+        propertySource = source + '.' + element.name.text;
+      }
+
+      if (propertySource) {
+        collectBindingAliases(
+          ts,
+          element.name,
+          propertySource,
+          aliases,
+          sourceFile,
+        );
+      }
+    }
+
+    return;
+  }
+
+  if (ts.isArrayBindingPattern(bindingName)) {
+    bindingName.elements.forEach((element, index) => {
+      if (ts.isOmittedExpression(element) || element.dotDotDotToken) {
+        return;
+      }
+
+      collectBindingAliases(
+        ts,
+        element.name,
+        source + '[' + index + ']',
+        aliases,
+        sourceFile,
+      );
+    });
+  }
+}
+
 function collectConstructorPropertySources(
   ts,
   constructorNode,
@@ -1099,27 +1185,42 @@ function collectConstructorPropertySources(
 
   if (!constructorNode) return sources;
 
-  const parameterNames = new Set();
+  const parameterAliases = new Map();
 
-  for (const parameter of constructorNode.parameters) {
-    if (!ts.isIdentifier(parameter.name)) continue;
+  constructorNode.parameters.forEach((parameter, index) => {
+    if (ts.isIdentifier(parameter.name)) {
+      parameterAliases.set(parameter.name.text, parameter.name.text);
 
-    parameterNames.add(parameter.name.text);
+      const modifiers = parameter.modifiers || [];
+      const isParameterProperty = modifiers.some((modifier) =>
+        [
+          ts.SyntaxKind.PublicKeyword,
+          ts.SyntaxKind.PrivateKeyword,
+          ts.SyntaxKind.ProtectedKeyword,
+          ts.SyntaxKind.ReadonlyKeyword,
+        ].includes(modifier.kind),
+      );
 
-    const modifiers = parameter.modifiers || [];
-    const isParameterProperty = modifiers.some((modifier) =>
-      [
-        ts.SyntaxKind.PublicKeyword,
-        ts.SyntaxKind.PrivateKeyword,
-        ts.SyntaxKind.ProtectedKeyword,
-        ts.SyntaxKind.ReadonlyKeyword,
-      ].includes(modifier.kind),
-    );
+      if (isParameterProperty) {
+        sources.set(parameter.name.text, parameter.name.text);
+      }
 
-    if (isParameterProperty) {
-      sources.set(parameter.name.text, parameter.name.text);
+      return;
     }
-  }
+
+    if (
+      ts.isObjectBindingPattern(parameter.name) ||
+      ts.isArrayBindingPattern(parameter.name)
+    ) {
+      collectBindingAliases(
+        ts,
+        parameter.name,
+        getParameterFixtureName(ts, parameter, index),
+        parameterAliases,
+        sourceFile,
+      );
+    }
+  });
 
   function visit(node) {
     if (
@@ -1131,7 +1232,7 @@ function collectConstructorPropertySources(
       const source = renderParameterSourceExpression(
         ts,
         node.right,
-        parameterNames,
+        parameterAliases,
         sourceFile,
       );
 
@@ -1151,7 +1252,7 @@ function collectConstructorPropertySources(
 function renderParameterSourceExpression(
   ts,
   node,
-  parameterNames,
+  parameterAliases,
   sourceFile,
 ) {
   let current = node;
@@ -1165,9 +1266,11 @@ function renderParameterSourceExpression(
 
   if (
     ts.isIdentifier(current) &&
-    parameterNames.has(current.text)
+    parameterAliases.has(current.text)
   ) {
-    return node.getText(sourceFile);
+    const rendered = node.getText(sourceFile);
+    const root = current.getText(sourceFile);
+    return parameterAliases.get(current.text) + rendered.slice(root.length);
   }
 
   return null;

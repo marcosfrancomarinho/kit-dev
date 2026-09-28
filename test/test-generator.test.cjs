@@ -3116,3 +3116,79 @@ export class Child extends Base {}
     );
   },
 );
+
+
+test(
+  'infere retorno calculado apenas quando expressao e deterministica e conhecida',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-computed-return-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'product.ts'),
+      `
+export class Product {
+  constructor(
+    private readonly price: number,
+    private readonly quantity: number,
+  ) {}
+
+  total(): number {
+    return this.price * this.quantity
+  }
+
+  isExpensive(limit: number): boolean {
+    return this.price > limit
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/product.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(
+      generated,
+      /assert\.equal\(result, \(price \* quantity\)\)/,
+    );
+    assert.match(
+      generated,
+      /assert\.equal\(result, \(price > 1\)\)/,
+    );
+
+    const output = join(projectPath, 'generated-computed.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);

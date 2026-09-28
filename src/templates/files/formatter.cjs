@@ -724,6 +724,22 @@ function expandCompactContainers(source, fileName = 'source.ts') {
     if (ts.isCaseBlock(node)) {
       addContainerEdges(node, node.clauses);
 
+      for (let index = 1; index < node.clauses.length; index += 1) {
+        const previous = node.clauses[index - 1];
+        const current = node.clauses[index];
+        const start = previous.getEnd();
+        const end = current.getStart(sourceFile);
+        const gap = source.slice(start, end);
+
+        if (
+          !gap.includes('\n') &&
+          !gap.includes('\r') &&
+          gap.trim() === ''
+        ) {
+          insertions.add(end);
+        }
+      }
+
       for (const clause of node.clauses) {
         if (clause.statements.length === 0) continue;
 
@@ -811,9 +827,16 @@ function normalizeControlSpacing(source, fileName = 'source.ts') {
 
     if (gap === null) continue;
 
+    const previous = index > 0 ? tokens[index - 1] : null;
+    const isPropertyKeyword =
+      previous &&
+      (previous.kind === ts.SyntaxKind.DotToken ||
+        previous.kind === ts.SyntaxKind.QuestionDotToken);
+
     if (
       beforeParen.has(current.kind) &&
-      next.kind === ts.SyntaxKind.OpenParenToken
+      next.kind === ts.SyntaxKind.OpenParenToken &&
+      !isPropertyKeyword
     ) {
       addSpacingReplacement(
         replacements,
@@ -1546,6 +1569,79 @@ function normalizeSpacing(source, fileName = 'source.ts') {
   return normalizeForSpacing(controlSpaced, fileName);
 }
 
+function normalizeContainerBraceSpacing(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  function normalizeOpenBrace(node, items) {
+    if (!items || items.length === 0) return;
+
+    const firstStart = items[0].getStart(sourceFile);
+    const openBrace = source.lastIndexOf('{', firstStart);
+
+    if (openBrace < node.getStart(sourceFile)) return;
+
+    let start = openBrace;
+
+    while (start > 0 && /[ \t]/.test(source[start - 1])) {
+      start -= 1;
+    }
+
+    if (
+      start > 0 &&
+      source[start - 1] !== '\n' &&
+      source[start - 1] !== '\r' &&
+      source[start - 1] !== ' '
+    ) {
+      replacements.push({
+        start,
+        end: openBrace,
+        value: ' ',
+      });
+    }
+  }
+
+  function visit(node) {
+    if (
+      ts.isClassDeclaration(node) ||
+      ts.isClassExpression(node) ||
+      ts.isInterfaceDeclaration(node) ||
+      ts.isEnumDeclaration(node)
+    ) {
+      normalizeOpenBrace(node, node.members);
+    }
+
+    if (ts.isModuleBlock(node)) {
+      normalizeOpenBrace(node, node.statements);
+    }
+
+    if (ts.isCaseBlock(node)) {
+      normalizeOpenBrace(node, node.clauses);
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const change of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+  }
+
+  return result;
+}
+
 function normalizeBlockSpacing(source, fileName = 'source.ts') {
   const sourceFile = ts.createSourceFile(
     fileName,
@@ -1597,7 +1693,8 @@ function formatSource(source, fileName = 'source.ts') {
   const splitStatements = splitSameLineStatements(expandedContainers, fileName);
   const splitMembers = splitSameLineMembers(splitStatements, fileName);
   const spaced = normalizeSpacing(splitMembers, fileName);
-  const blockSpaced = normalizeBlockSpacing(spaced, fileName);
+  const containerSpaced = normalizeContainerBraceSpacing(spaced, fileName);
+  const blockSpaced = normalizeBlockSpacing(containerSpaced, fileName);
   const listed = formatDelimitedLists(blockSpaced, fileName);
 
   return indentSource(listed);

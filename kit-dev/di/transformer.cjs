@@ -1,5 +1,5 @@
 const { createHash } = require('crypto');
-const { existsSync, readFileSync, statSync } = require('fs');
+const { existsSync, readFileSync, realpathSync, statSync } = require('fs');
 const { dirname, isAbsolute, relative, resolve } = require('path');
 
 const CONTRACT_PREFIX = 'kit-dev:';
@@ -17,7 +17,7 @@ function kitDevDiPlugin(options = {}) {
   return {
     name: 'kit-dev-di',
     setup(build) {
-      const projectRoot = resolve(
+      const projectRoot = canonicalPath(
         build.initialOptions.absWorkingDir || process.cwd(),
       );
       const containerPath = resolve(
@@ -65,7 +65,7 @@ function kitDevDiPlugin(options = {}) {
           };
         }
 
-        const sourceFile = compiler.getSourceFile(resolve(args.path));
+        const sourceFile = compiler.getSourceFile(canonicalPath(args.path));
 
         if (!sourceFile) return undefined;
 
@@ -276,6 +276,18 @@ async function createNativeCompiler(projectRoot, customTsconfig) {
   };
 }
 
+function canonicalPath(fileName) {
+  const resolved = resolve(fileName);
+
+  try {
+    return typeof realpathSync.native === 'function'
+      ? realpathSync.native(resolved)
+      : realpathSync(resolved);
+  } catch {
+    return resolved;
+  }
+}
+
 function captureFileState(fileNames) {
   return new Map(fileNames.map((fileName) => [fileName, getFileStamp(fileName)]));
 }
@@ -332,7 +344,10 @@ function hasFileChanges(fileChanges) {
 }
 
 function isProjectFile(fileName, projectRoot) {
-  const relativePath = relative(projectRoot, fileName);
+  const relativePath = relative(
+    canonicalPath(projectRoot),
+    canonicalPath(fileName),
+  );
 
   return (
     relativePath === '' ||
@@ -609,8 +624,8 @@ function getAppConfigMethod(node, compiler, containerTypesPath) {
 }
 
 function isSamePath(left, right) {
-  const resolvedLeft = resolve(left);
-  const resolvedRight = resolve(right);
+  const resolvedLeft = canonicalPath(left);
+  const resolvedRight = canonicalPath(right);
 
   return process.platform === 'win32'
     ? resolvedLeft.toLowerCase() === resolvedRight.toLowerCase()
@@ -793,8 +808,13 @@ function createNamedToken(symbol, compiler, projectRoot, required = true) {
     return undefined;
   }
 
-  const sourcePath = declaration.getSourceFile().fileName;
-  const relativePath = relative(projectRoot, sourcePath)
+  const sourcePath = canonicalPath(
+    declaration.getSourceFile().fileName,
+  );
+  const relativePath = relative(
+    canonicalPath(projectRoot),
+    sourcePath,
+  )
     .replace(/\\/g, '/')
     .replace(/\.(?:d\.)?[cm]?tsx?$/, '');
 

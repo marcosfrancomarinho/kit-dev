@@ -13,6 +13,7 @@ import { ProjectName } from '../src/domain/project/project-name.js';
 import { NodePackageManagerDetector } from '../src/infrastructure/package-manager/node-package-manager-detector.js';
 import { TerminalAdapter } from '../src/presentation/terminal/terminal-adapter.js';
 import { TerminalPalette } from '../src/presentation/terminal/terminal-palette.js';
+import { ProjectTemplateCatalog } from '../src/templates/project-files.js';
 
 class ProjectScaffolderSpy implements ProjectScaffolder {
   readonly calls: unknown[] = [];
@@ -136,6 +137,29 @@ describe('self-hosted architecture', () => {
     assert.match(
       messages.join('\n'),
       /Find and open a file with Micro/,
+    );
+  });
+
+
+  it('generates both view and v scripts with the same viewer command', () => {
+    const templates = new ProjectTemplateCatalog();
+    const packageJson = JSON.parse(
+      templates.packageJson('api'),
+    ) as {
+      scripts: Record<string, string>;
+    };
+
+    assert.equal(
+      packageJson.scripts.view,
+      'node kit-dev/view/view.cjs',
+    );
+    assert.equal(
+      packageJson.scripts.v,
+      packageJson.scripts.view,
+    );
+    assert.equal(
+      packageJson.scripts.fmt,
+      'node kit-dev/format/fmt.cjs',
     );
   });
 

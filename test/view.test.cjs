@@ -203,10 +203,11 @@ describe('project file viewer', () => {
   it('shows concise Micro shortcuts before opening the editor', () => {
     const tips = renderMicroTips();
 
-    assert.match(tips, /Ctrl\+S  Save/);
-    assert.match(tips, /Ctrl\+Q  Quit/);
-    assert.match(tips, /Ctrl\+F  Find/);
-    assert.match(tips, /Ctrl\+E  Command \/ Help/);
+    assert.match(tips, /Ctrl\+S\s+Save/);
+    assert.match(tips, /Ctrl\+F\s+Find/);
+    assert.match(tips, /Ctrl\+E\s+Command \/ Help/);
+    assert.match(tips, /Ctrl\+E → quit\s+Safe quit/);
+    assert.doesNotMatch(tips, /Ctrl\+Q/);
     assert.match(tips, /help defaultkeys/);
   });
 

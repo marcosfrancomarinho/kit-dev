@@ -13,6 +13,8 @@ export class ProjectTemplateCatalog {
           type: 'tsc --watch --noEmit',
           test: 'node kit-dev/test/test.cjs',
           fmt: 'node kit-dev/format/fmt.cjs',
+          view: 'node kit-dev/view/view.cjs',
+          v: 'node kit-dev/view/view.cjs',
           di: 'node kit-dev/di/install.cjs',
         },
         dependencies: {},

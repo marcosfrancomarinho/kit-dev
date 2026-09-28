@@ -1286,4 +1286,166 @@ describe('source formatter', () => {
   });
 
 
+
+  it('compacts a short call when the opening parenthesis is on the next line', () => {
+    const source = [
+      'console.log',
+      "('Hello World!');",
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.equal(result, "console.log('Hello World!');\n");
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('compacts a short member access split around the dot', () => {
+    const source = [
+      'console.',
+      "log('teste');",
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.equal(result, "console.log('teste');\n");
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('compacts a short multiline variable expression', () => {
+    const source = [
+      'var total =',
+      '1 +',
+      '1;',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.equal(result, 'var total = 1 + 1;\n');
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('compacts a broken short function declaration header', () => {
+    const source = [
+      'function',
+      'name()',
+      '{',
+      "console.log('teste');",
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.equal(
+      result,
+      [
+        'function name() {',
+        "  console.log('teste');",
+        '}',
+        '',
+      ].join('\n'),
+    );
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('compacts a short method call split across member and call boundaries', () => {
+    const source = [
+      'service',
+      '.execute',
+      '(input);',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.equal(result, 'service.execute(input);\n');
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('compacts a short new expression split before its arguments', () => {
+    const source = [
+      'const user =',
+      'new User',
+      "('Marcos');",
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.equal(result, "const user = new User('Marcos');\n");
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('compacts a short optional property chain safely', () => {
+    const source = [
+      'const name = user',
+      '?.profile',
+      '?.name;',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.equal(result, 'const name = user?.profile?.name;\n');
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('preserves long fluent chains on separate lines', () => {
+    const source = [
+      'const providers = new AppConfig()',
+      '  .useClass<CommandRunner>(NodeCommandRunner)',
+      '  .useClass<Terminal>(TerminalAdapter)',
+      '  .useClass<PackageManagerDetector>(NodePackageManagerDetector)',
+      '  .useClass<PathResolver>(NodePathResolver)',
+      '  .useClass<ProjectScaffolder>(NodeProjectScaffolder)',
+      '  .useClass<PackageInstaller>(NodePackageInstaller)',
+      '  .useClass(TerminalPalette)',
+      '  .useClass(ProjectTemplateCatalog)',
+      '  .useClass(PackageManagerRegistry)',
+      '  .useClass(NodeVersionPolicy)',
+      '  .useClass(CreateProject)',
+      '  .useClass(CliApplication);',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.equal(result, source);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('does not compact multiline expressions across comments', () => {
+    const source = [
+      'const total =',
+      '  first + // keep this explanation',
+      '  second;',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /first \+ \/\/ keep this explanation\n/);
+    assert.match(result, /second;/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('keeps long multiline expressions multiline', () => {
+    const source = [
+      'const message =',
+      "  firstVeryLongVariableName +",
+      "  secondVeryLongVariableName +",
+      "  thirdVeryLongVariableName +",
+      "  fourthVeryLongVariableName;",
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /firstVeryLongVariableName \+\n/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
 });

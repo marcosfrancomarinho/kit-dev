@@ -476,6 +476,7 @@ function shouldEndWithSemicolon(node) {
     ts.isBreakStatement(node) ||
     ts.isContinueStatement(node) ||
     ts.isDebuggerStatement(node) ||
+    ts.isDoStatement(node) ||
     ts.isImportDeclaration(node) ||
     ts.isImportEqualsDeclaration(node) ||
     ts.isExportDeclaration(node) ||

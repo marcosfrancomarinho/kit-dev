@@ -383,6 +383,7 @@ function lspSettings() {
     'lsp.tabcompletion': true,
     'lsp.autocompleteDetails': false,
     'lsp.formatOnSave': false,
+    'lsp.ignoreTriggerCharacters': 'signature',
   };
 }
 
@@ -427,6 +428,19 @@ async function ensureMicroLsp(editor, options = {}) {
   await writeFile(
     join(configDirectory, 'settings.json'),
     JSON.stringify(lspSettings(), null, 2) + '\n',
+    'utf8',
+  );
+
+  await writeFile(
+    join(configDirectory, 'bindings.json'),
+    JSON.stringify(
+      {
+        Tab: 'command:lspcompletion',
+        CtrlSpace: 'command:lspcompletion',
+      },
+      null,
+      2,
+    ) + '\n',
     'utf8',
   );
 
@@ -477,6 +491,7 @@ function renderMicroTips() {
     '  Ctrl+F  Find',
     '  Ctrl+E  Command / Help',
     '  Tab / Ctrl+Space  LSP autocomplete',
+    '  .  Automatic suggestions for members',
     '',
     'Tip: Ctrl+E → help defaultkeys',
     '',

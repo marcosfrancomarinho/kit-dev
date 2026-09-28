@@ -1110,4 +1110,93 @@ describe('source formatter', () => {
   });
 
 
+  it('formats fully minified functions and nested control flow', () => {
+    const source = "function run(value:number){const first='a';const last='b';if(value>10){console.log(first)}else{console.log(last)}return first+last}";
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.equal(
+      result,
+      [
+        'function run(value:number){',
+        "  const first='a';",
+        "  const last='b';",
+        '  if(value>10){',
+        '    console.log(first);',
+        '  }else{',
+        '    console.log(last);',
+        '  }',
+        '  return first+last;',
+        '}',
+      ].join('\n'),
+    );
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('formats fully minified classes constructors and methods', () => {
+    const source = "class User{constructor(private name:string,private age:number){this.name=name;this.age=age}getName(){return this.name}setName(name:string){this.name=name}}";
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /class User\{/);
+    assert.match(result, /constructor\(private name:string, private age:number\)\{/);
+    assert.match(result, /this\.name=name;/);
+    assert.match(result, /getName\(\)\{/);
+    assert.match(result, /return this\.name;/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('formats minified arrays objects calls and callbacks', () => {
+    const source = "const users=[{name:'A',age:1,active:true},{name:'B',age:2,active:false},{name:'C',age:3,active:true},{name:'D',age:4,active:false}];users.map((user)=>{console.log(user.name);return user})";
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /const users=\[/);
+    assert.match(result, /name: 'A'/);
+    assert.match(result, /users\.map\(\(user\)=>\{/);
+    assert.match(result, /console\.log\(user\.name\);/);
+    assert.match(result, /return user;/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('formats minified loops try catch and switch without corrupting syntax', () => {
+    const source = "function run(values:string[]){try{for(let i=0;i<values.length;i++){if(values[i]){console.log(values[i])}}switch(values.length){case 0:return 'empty';default:return 'ok'}}catch(error){throw error}}";
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /for\(let i=0;i<values\.length;i\+\+\)\{/);
+    assert.match(result, /if\(values\[i\]\)\{/);
+    assert.match(result, /switch\(values\.length\)\{/);
+    assert.match(result, /case 0:/);
+    assert.match(result, /catch\(error\)\{/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('formats minified async arrow and promise chains', () => {
+    const source = "const load=async(id:string)=>{const user=await repo.find(id);return user?.profile?.name??'unknown'};load('1').then((name)=>{console.log(name)}).catch((error)=>{console.error(error)})";
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /const load=async\(id:string\)=>\{/);
+    assert.match(result, /const user=await repo\.find\(id\);/);
+    assert.match(result, /return user\?\.profile\?\.name\?\?'unknown';/);
+    assert.match(result, /\.then\(\(name\)=>\{/);
+    assert.match(result, /\.catch\(\(error\)=>\{/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('formats minified TypeScript interface type enum and namespace declarations', () => {
+    const source = "interface User{name:string;age?:number}type Id=string|number;enum Status{Active='active',Disabled='disabled'}namespace App{export const version='1'}";
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /interface User\{/);
+    assert.match(result, /name:string;/);
+    assert.match(result, /type Id=string\|number;/);
+    assert.match(result, /enum Status\{/);
+    assert.match(result, /namespace App\{/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+
 });

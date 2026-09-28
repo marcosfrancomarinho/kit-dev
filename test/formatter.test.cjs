@@ -8,6 +8,7 @@ const {
   formatDelimitedLists,
   formatSource,
   indentSource,
+  normalizeSpacing,
   removeUnusedImports,
   resolveTarget,
   splitSameLineStatements,
@@ -1153,7 +1154,9 @@ describe('source formatter', () => {
 
     assert.match(result, /const users=\[/);
     assert.match(result, /name: 'A'/);
-    assert.match(result, /users\.map\(\(user\)=>\{/);
+    assert.match(result, /age: 1/);
+    assert.match(result, /active: true/);
+    assert.match(result, /users\.map\(\(user\) => \{/);
     assert.match(result, /console\.log\(user\.name\);/);
     assert.match(result, /return user;/);
     assert.equal(formatSource(result, 'example.ts'), result);
@@ -1196,6 +1199,88 @@ describe('source formatter', () => {
     assert.match(result, /enum Status\{/);
     assert.match(result, /namespace App\{/);
     assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+
+  it('reduces excessive horizontal whitespace safely', () => {
+    const source = [
+      "const     first     =     'first';",
+      "const last        =        'last';",
+      'const result = first      +       last;',
+      '',
+    ].join('\n');
+
+    assert.equal(
+      formatSource(source, 'example.ts'),
+      [
+        "const first = 'first';",
+        "const last = 'last';",
+        'const result = first + last;',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('adds readable spacing to minified object properties and types', () => {
+    const source = [
+      "const user:{name:string;age:number}={name:'Marcos',age:27,active:true};",
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /const user: \{name:string;age:number\} = \{/);
+    assert.match(result, /name: 'Marcos'/);
+    assert.match(result, /age: 27/);
+    assert.match(result, /active: true/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('normalizes binary assignment and arrow spacing without touching strings', () => {
+    const source = [
+      "const text='a  =  b, c:d';",
+      'const sum=(a:number,b:number)=>a+b;',
+      'const ok=a===b&&b!==c;',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.ts');
+
+    assert.match(result, /const text = 'a  =  b, c:d';/);
+    assert.match(result, /const sum = \(a: number, b: number\) => a \+ b;/);
+    assert.match(result, /const ok = a === b && b !== c;/);
+    assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('normalizes comma spacing in generics and calls', () => {
+    const source = [
+      'const map = new Map<string,number>();',
+      "run('a','b','c');",
+      '',
+    ].join('\n');
+
+    const result = normalizeSpacing(source, 'example.ts');
+
+    assert.match(result, /Map<string, number>/);
+    assert.match(result, /run\('a', 'b', 'c'\)/);
+  });
+
+  it('preserves comments templates regex and JSX while normalizing whitespace', () => {
+    const source = [
+      "const value     =     'a   b'; // keep   comment",
+      'const template = `a   b`;',
+      'const regex = /a   b/;',
+      'const view = <div title="a   b">a   b</div>;',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'example.tsx');
+
+    assert.match(result, /'a   b'/);
+    assert.match(result, /\/\/ keep   comment/);
+    assert.match(result, /`a   b`/);
+    assert.match(result, /\/a   b\//);
+    assert.match(result, /title="a   b"/);
   });
 
 

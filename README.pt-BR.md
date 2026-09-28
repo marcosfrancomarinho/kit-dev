@@ -29,7 +29,7 @@ Em vez de configurar tudo do zero, você já começa com:
 - injeção de dependência opcional;
 - suporte a npm, Yarn e pnpm.
 
-A proposta é simples: gastar menos tempo configurando o projeto e mais tempo escrevendo a aplicação.
+A proposta do Kit Dev é ser uma CLI minimalista: simples, rápida e com poucas dependências externas. A ideia não é impor uma arquitetura ou um tipo específico de aplicação, mas oferecer uma base enxuta que possa ser usada em APIs, serviços, CLIs, aplicações web, ferramentas internas, estudos, protótipos e outros projetos TypeScript de pequeno e médio porte. O objetivo é reduzir configuração e trabalho repetitivo sem transformar o projeto em um framework pesado.
 
 ## Começando
 
@@ -99,7 +99,7 @@ npm run fmt -- src/application/create-user.ts
 ```
 
 
-O comando `fmt` é leve e não adiciona uma biblioteca externa de formatação. Ele atua somente nos arquivos JavaScript e TypeScript de `src/` e `test/`, corrigindo a indentação, expandindo blocos compactos como `function teste(){console.log()}`, adicionando ponto e vírgula aos statements reconhecidos, convertendo strings com aspas duplas para aspas simples, separando statements independentes que estão na mesma linha, compactando chamadas curtas quebradas em várias linhas e expandindo arrays, objetos, listas de argumentos, parâmetros de funções e construtores, destructuring e imports/exports nomeados médios ou grandes quando isso melhora a leitura. O formatador preserva comentários, template strings, regex, atributos JSX com aspas, listas multilinha com vírgula final e os ponto e vírgula internos de `for`. Ele também remove bindings de import confirmados como não usados e apaga completamente imports com bindings quando nenhum deles é utilizado.
+O `fmt` é um formatador leve para JavaScript e TypeScript em `src/` e `test/`. Ele corrige indentação, organiza código compacto ou minificado, normaliza espaços, adiciona ponto e vírgula quando necessário, ajusta listas e chamadas e remove imports não usados. Comentários, strings, templates, regex, JSX e estruturas sensíveis são preservados.
 
 ## Testes automáticos
 
@@ -477,6 +477,7 @@ minha-api/
 ├── kit-dev/
 │   ├── build/
 │   ├── di/
+│   ├── fmt/
 │   └── test/
 ├── src/
 │   └── main.ts

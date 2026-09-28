@@ -22,7 +22,7 @@ test(
       join(tmpdir(), 'kit-dev-entity-test-generator-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(
@@ -89,7 +89,7 @@ test(
       join(tmpdir(), 'kit-dev-usecase-test-generator-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(
@@ -197,7 +197,7 @@ test(
       join(tmpdir(), 'kit-dev-object-return-test-generator-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(
@@ -266,7 +266,7 @@ test(
       join(tmpdir(), 'kit-dev-static-factory-test-generator-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(
@@ -384,7 +384,7 @@ test(
       join(tmpdir(), 'kit-dev-type-matrix-test-generator-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src'), { recursive: true });
@@ -501,7 +501,7 @@ test(
       join(tmpdir(), 'kit-dev-async-factory-test-generator-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src'), { recursive: true });
@@ -561,7 +561,7 @@ test(
       join(tmpdir(), 'kit-dev-private-constructor-test-generator-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src'), { recursive: true });
@@ -601,7 +601,7 @@ test(
       join(tmpdir(), 'kit-dev-typed-object-fixtures-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src'), { recursive: true });
@@ -711,7 +711,7 @@ test(
       join(tmpdir(), 'kit-dev-ddd-value-object-fixtures-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src', 'domain'), {
@@ -845,7 +845,7 @@ test(
       join(tmpdir(), 'kit-dev-cqrs-clean-fixtures-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src', 'application'), {
@@ -927,7 +927,7 @@ test(
       join(tmpdir(), 'kit-dev-recursive-domain-fixtures-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src'), { recursive: true });
@@ -986,7 +986,7 @@ test(
       join(tmpdir(), 'kit-dev-public-vo-fixture-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src', 'domain', 'value-objects'), {
@@ -1082,7 +1082,7 @@ test(
       join(tmpdir(), 'kit-dev-architectural-dependency-fixture-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src', 'application'), {
@@ -1158,7 +1158,7 @@ test(
       join(tmpdir(), 'kit-dev-nested-portuguese-factory-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src', 'domain', 'value-objects'), {
@@ -1268,7 +1268,7 @@ test(
       join(tmpdir(), 'kit-dev-overwrite-test-generator-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src'), { recursive: true });
@@ -1342,7 +1342,7 @@ test(
       join(tmpdir(), 'kit-dev-interface-kind-fixtures-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src', 'domain'), {
@@ -1420,7 +1420,7 @@ test(
       join(tmpdir(), 'kit-dev-callback-port-fixture-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src'), { recursive: true });
@@ -1479,7 +1479,7 @@ test(
       join(tmpdir(), 'kit-dev-interface-classification-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src', 'application'), {
@@ -1553,7 +1553,7 @@ test(
       join(tmpdir(), 'kit-dev-domain-fallback-value-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src', 'domain'), {
@@ -1627,7 +1627,7 @@ test(
       join(tmpdir(), 'kit-dev-design-patterns-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src', 'patterns'), {
@@ -1899,7 +1899,7 @@ test(
       join(tmpdir(), 'kit-dev-advanced-domain-matrix-'),
     );
     context.after(() =>
-      rm(projectPath, { recursive: true, force: true }),
+      rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }),
     );
 
     await mkdir(join(projectPath, 'src', 'domain'), {
@@ -2102,7 +2102,7 @@ export class Age {
 
 test('gera um describe por classe e executa métodos sem assertions com comentário TODO', async (context) => {
   const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-describe-'));
-  context.after(() => rm(projectPath, { recursive: true, force: true }));
+  context.after(() => rm(projectPath, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
   await mkdir(join(projectPath, 'src'));
   await writeFile(join(projectPath, 'src', 'example.ts'), `
 export class Example {

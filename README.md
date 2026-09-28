@@ -29,7 +29,7 @@ Instead of configuring the project from scratch, you start with:
 - optional dependency injection;
 - npm, Yarn and pnpm support.
 
-The goal is simple: spend less time configuring the project and more time writing application code.
+Kit Dev is designed to stay minimalist: simple, fast, and with few external dependencies. It does not force a specific architecture or application type. Instead, it provides a lightweight base that can be used for APIs, services, CLIs, web applications, internal tools, learning projects, prototypes, and other small-to-medium TypeScript projects. The goal is to reduce configuration and repetitive work without turning the project into a heavy framework.
 
 ## Quick start
 
@@ -99,7 +99,7 @@ npm run fmt -- src/application/create-user.ts
 ```
 
 
-The `fmt` command is lightweight and does not add an external formatting library. It only processes JavaScript and TypeScript files in `src/` and `test/`, fixing indentation, expanding compact code blocks such as `function teste(){console.log()}`, adding semicolons to recognized statements, converting double-quoted strings to single quotes, separating independent statements that share one line, compacting short multiline calls, and expanding medium or large arrays, objects, argument lists, function parameters, constructor parameters, destructuring lists, and named import/export lists when needed for readability. The formatter preserves comments, template strings, regexes, JSX quoted attributes, trailing-comma multiline lists, and `for` statement semicolons. It also removes import bindings confirmed as unused and removes an import declaration entirely when none of its bindings are used.
+The `fmt` command is a lightweight formatter for JavaScript and TypeScript files in `src/` and `test/`. It fixes indentation, organizes compact or minified code, normalizes spacing, adds semicolons when needed, adjusts lists and calls, and removes unused imports. Comments, strings, templates, regexes, JSX, and other sensitive syntax are preserved.
 
 ## Automatic tests
 
@@ -477,6 +477,7 @@ my-api/
 ├── kit-dev/
 │   ├── build/
 │   ├── di/
+│   ├── fmt/
 │   └── test/
 ├── src/
 │   └── main.ts

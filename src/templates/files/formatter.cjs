@@ -476,6 +476,7 @@ function shouldEndWithSemicolon(node) {
     ts.isBreakStatement(node) ||
     ts.isContinueStatement(node) ||
     ts.isDebuggerStatement(node) ||
+    ts.isDoStatement(node) ||
     ts.isImportDeclaration(node) ||
     ts.isImportEqualsDeclaration(node) ||
     ts.isExportDeclaration(node) ||
@@ -592,6 +593,331 @@ function splitSameLineStatements(source, fileName = 'source.ts') {
             end: currentStart,
             value: newline,
           });
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const change of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+  }
+
+  return result;
+}
+
+function splitSameLineMembers(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const newline = source.includes('\r\n') ? '\r\n' : '\n';
+  const replacements = [];
+
+  function visit(node) {
+    const members = node.members;
+
+    if (members && typeof members.length === 'number') {
+      for (let index = 1; index < members.length; index += 1) {
+        const previous = members[index - 1];
+        const current = members[index];
+        const start = previous.getEnd();
+        const end = current.getStart(sourceFile);
+        const gap = source.slice(start, end);
+
+        if (
+          !gap.includes('\n') &&
+          !gap.includes('\r') &&
+          gap.trim() === ''
+        ) {
+          replacements.push({ start, end, value: newline });
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const change of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+  }
+
+  return result;
+}
+
+function expandCompactContainers(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const newline = source.includes('\r\n') ? '\r\n' : '\n';
+  const insertions = new Set();
+
+  function addContainerEdges(node, items) {
+    if (!items || items.length === 0) return;
+
+    const nodeStart = node.getStart(sourceFile);
+    const nodeEnd = node.getEnd();
+    const firstStart = items[0].getStart(sourceFile);
+    const lastEnd = items[items.length - 1].getEnd();
+    const openBrace = source.lastIndexOf('{', firstStart);
+    const closeBrace = source.indexOf('}', lastEnd);
+
+    if (
+      openBrace < nodeStart ||
+      closeBrace < 0 ||
+      closeBrace >= nodeEnd
+    ) {
+      return;
+    }
+
+    const beforeFirst = source.slice(openBrace + 1, firstStart);
+    const afterLast = source.slice(lastEnd, closeBrace);
+
+    if (
+      !beforeFirst.includes('\n') &&
+      !beforeFirst.includes('\r') &&
+      beforeFirst.trim() === ''
+    ) {
+      insertions.add(openBrace + 1);
+    }
+
+    if (
+      !afterLast.includes('\n') &&
+      !afterLast.includes('\r') &&
+      afterLast.trim() === ''
+    ) {
+      insertions.add(closeBrace);
+    }
+  }
+
+  function visit(node) {
+    if (node.members && typeof node.members.length === 'number') {
+      addContainerEdges(node, node.members);
+    }
+
+    if (ts.isModuleBlock(node)) {
+      addContainerEdges(node, node.statements);
+    }
+
+    if (ts.isCaseBlock(node)) {
+      addContainerEdges(node, node.clauses);
+
+      for (let index = 1; index < node.clauses.length; index += 1) {
+        const previous = node.clauses[index - 1];
+        const current = node.clauses[index];
+        const start = previous.getEnd();
+        const end = current.getStart(sourceFile);
+        const gap = source.slice(start, end);
+
+        if (
+          !gap.includes('\n') &&
+          !gap.includes('\r') &&
+          gap.trim() === ''
+        ) {
+          insertions.add(end);
+        }
+      }
+
+      for (const clause of node.clauses) {
+        if (clause.statements.length === 0) continue;
+
+        const first = clause.statements[0];
+        const start = clause.getStart(sourceFile);
+        const firstStart = first.getStart(sourceFile);
+        const colon = source.lastIndexOf(':', firstStart);
+
+        if (colon >= start) {
+          const gap = source.slice(colon + 1, firstStart);
+
+          if (
+            !gap.includes('\n') &&
+            !gap.includes('\r') &&
+            gap.trim() === ''
+          ) {
+            insertions.add(colon + 1);
+          }
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const position of [...insertions].sort((a, b) => b - a)) {
+    result =
+      result.slice(0, position) +
+      newline +
+      result.slice(position);
+  }
+
+  return result;
+}
+
+function normalizeControlSpacing(source, fileName = 'source.ts') {
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    scannerLanguageVariant(fileName),
+    source,
+  );
+  const tokens = [];
+
+  while (scanner.scan() !== ts.SyntaxKind.EndOfFileToken) {
+    const kind = scanner.getToken();
+
+    if (
+      kind === ts.SyntaxKind.WhitespaceTrivia ||
+      kind === ts.SyntaxKind.NewLineTrivia
+    ) {
+      continue;
+    }
+
+    tokens.push({
+      kind,
+      start: scanner.getTokenPos(),
+      end: scanner.getTextPos(),
+    });
+  }
+
+  const beforeParen = new Set([
+    ts.SyntaxKind.IfKeyword,
+    ts.SyntaxKind.ForKeyword,
+    ts.SyntaxKind.WhileKeyword,
+    ts.SyntaxKind.SwitchKeyword,
+    ts.SyntaxKind.CatchKeyword,
+    ts.SyntaxKind.WithKeyword,
+  ]);
+  const afterBrace = new Set([
+    ts.SyntaxKind.ElseKeyword,
+    ts.SyntaxKind.CatchKeyword,
+    ts.SyntaxKind.FinallyKeyword,
+  ]);
+  const replacements = [];
+
+  for (let index = 0; index < tokens.length - 1; index += 1) {
+    const current = tokens[index];
+    const next = tokens[index + 1];
+    const gap = safeSameLineGap(source, current.end, next.start);
+
+    if (gap === null) continue;
+
+    const previous = index > 0 ? tokens[index - 1] : null;
+    const isPropertyKeyword =
+      previous &&
+      (previous.kind === ts.SyntaxKind.DotToken ||
+        previous.kind === ts.SyntaxKind.QuestionDotToken);
+
+    if (
+      beforeParen.has(current.kind) &&
+      next.kind === ts.SyntaxKind.OpenParenToken &&
+      !isPropertyKeyword
+    ) {
+      addSpacingReplacement(
+        replacements,
+        source,
+        current.end,
+        next.start,
+        ' ',
+      );
+    }
+
+    if (
+      current.kind === ts.SyntaxKind.CloseBraceToken &&
+      afterBrace.has(next.kind)
+    ) {
+      addSpacingReplacement(
+        replacements,
+        source,
+        current.end,
+        next.start,
+        ' ',
+      );
+    }
+
+    if (
+      current.kind === ts.SyntaxKind.ElseKeyword &&
+      next.kind === ts.SyntaxKind.IfKeyword
+    ) {
+      addSpacingReplacement(
+        replacements,
+        source,
+        current.end,
+        next.start,
+        ' ',
+      );
+    }
+  }
+
+  let result = source;
+
+  for (const change of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+  }
+
+  return result;
+}
+
+function normalizeForSpacing(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  function visit(node) {
+    if (ts.isForStatement(node)) {
+      const parts = [
+        [node.initializer, node.condition],
+        [node.condition, node.incrementor],
+      ];
+
+      for (const [left, right] of parts) {
+        if (!left || !right) continue;
+
+        const start = left.getEnd();
+        const end = right.getStart(sourceFile);
+        const gap = safeSameLineGap(source, start, end);
+
+        if (gap !== null && gap.includes(';')) {
+          addSpacingReplacement(
+            replacements,
+            source,
+            start,
+            end,
+            '; ',
+          );
         }
       }
     }
@@ -909,13 +1235,467 @@ function compactShortCalls(source, fileName = 'source.ts', maxLineLength = 100) 
   return formatDelimitedLists(source, fileName, maxLineLength);
 }
 
+function normalizeDeclarationKeywordSpacing(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+
+    const declarations = statement.declarationList.declarations;
+    if (declarations.length === 0) continue;
+
+    const listStart = statement.declarationList.getStart(sourceFile);
+    const firstStart = declarations[0].getStart(sourceFile);
+    const prefix = source.slice(listStart, firstStart);
+    const match = /^(const|let|var)([ \t]+)$/.exec(prefix);
+
+    if (match && match[2] !== ' ') {
+      replacements.push({
+        start: listStart,
+        end: firstStart,
+        value: match[1] + ' ',
+      });
+    }
+  }
+
+  let result = source;
+
+  for (const change of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+  }
+
+  return result;
+}
+
+function safeSameLineGap(source, start, end) {
+  if (start > end) return null;
+
+  const gap = source.slice(start, end);
+
+  if (
+    gap.includes('\n') ||
+    gap.includes('\r') ||
+    containsComment(gap)
+  ) {
+    return null;
+  }
+
+  return gap;
+}
+
+function addSpacingReplacement(replacements, source, start, end, value) {
+  const gap = safeSameLineGap(source, start, end);
+
+  if (gap === null || gap === value) return;
+
+  replacements.push({ start, end, value });
+}
+
+function normalizeBoundarySpace(replacements, source, position, direction) {
+  if (direction === 'before') {
+    let start = position;
+
+    while (start > 0 && /[ \t]/.test(source[start - 1])) {
+      start -= 1;
+    }
+
+    if (
+      start > 0 &&
+      source[start - 1] !== '\n' &&
+      source[start - 1] !== '\r'
+    ) {
+      replacements.push({ start, end: position, value: ' ' });
+    }
+
+    return;
+  }
+
+  let end = position;
+
+  while (end < source.length && /[ \t]/.test(source[end])) {
+    end += 1;
+  }
+
+  if (
+    end < source.length &&
+    source[end] !== '\n' &&
+    source[end] !== '\r'
+  ) {
+    replacements.push({ start: position, end, value: ' ' });
+  }
+}
+
+function normalizeAstSpacing(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  function normalizeTypeSpacing(node) {
+    if (!node.name || !node.type) return;
+
+    const start = node.name.getEnd();
+    const end = node.type.getStart(sourceFile);
+    const gap = safeSameLineGap(source, start, end);
+
+    if (gap === null || !gap.includes(':')) return;
+
+    const compact = gap.replace(/\s+/g, '');
+    const value = compact.endsWith(':')
+      ? compact + ' '
+      : compact;
+
+    addSpacingReplacement(
+      replacements,
+      source,
+      start,
+      end,
+      value,
+    );
+  }
+
+  function normalizeInitializerSpacing(node) {
+    if (!node.initializer) return;
+
+    const left = node.type || node.name;
+    if (!left) return;
+
+    const start = left.getEnd();
+    const end = node.initializer.getStart(sourceFile);
+    const gap = safeSameLineGap(source, start, end);
+
+    if (gap === null || !gap.includes('=')) return;
+
+    addSpacingReplacement(
+      replacements,
+      source,
+      start,
+      end,
+      ' = ',
+    );
+  }
+
+  function visit(node) {
+    if (ts.isBinaryExpression(node)) {
+      const start = node.left.getEnd();
+      const end = node.right.getStart(sourceFile);
+      const operator = node.operatorToken.getText(sourceFile);
+
+      addSpacingReplacement(
+        replacements,
+        source,
+        start,
+        end,
+        ' ' + operator + ' ',
+      );
+    }
+
+    if (ts.isPropertyAssignment(node)) {
+      const start = node.name.getEnd();
+      const end = node.initializer.getStart(sourceFile);
+      const gap = safeSameLineGap(source, start, end);
+
+      if (gap !== null && gap.includes(':')) {
+        addSpacingReplacement(
+          replacements,
+          source,
+          start,
+          end,
+          ': ',
+        );
+      }
+    }
+
+    if (ts.isShorthandPropertyAssignment(node) && node.objectAssignmentInitializer) {
+      addSpacingReplacement(
+        replacements,
+        source,
+        node.name.getEnd(),
+        node.objectAssignmentInitializer.getStart(sourceFile),
+        ' = ',
+      );
+    }
+
+    if (
+      ts.isVariableDeclaration(node) ||
+      ts.isParameter(node) ||
+      ts.isPropertyDeclaration(node) ||
+      ts.isPropertySignature(node)
+    ) {
+      normalizeTypeSpacing(node);
+    }
+
+    if (
+      ts.isVariableDeclaration(node) ||
+      ts.isParameter(node) ||
+      ts.isPropertyDeclaration(node)
+    ) {
+      normalizeInitializerSpacing(node);
+    }
+
+    if (ts.isArrowFunction(node)) {
+      normalizeBoundarySpace(
+        replacements,
+        source,
+        node.equalsGreaterThanToken.getStart(sourceFile),
+        'before',
+      );
+      normalizeBoundarySpace(
+        replacements,
+        source,
+        node.equalsGreaterThanToken.getEnd(),
+        'after',
+      );
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+  const ordered = replacements
+    .sort((a, b) => b.start - a.start || b.end - a.end);
+  let lastStart = Infinity;
+
+  for (const change of ordered) {
+    if (change.end > lastStart) continue;
+
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+    lastStart = change.start;
+  }
+
+  return result;
+}
+
+function scannerLanguageVariant(fileName) {
+  return /\.(?:jsx|tsx)$/i.test(fileName)
+    ? ts.LanguageVariant.JSX
+    : ts.LanguageVariant.Standard;
+}
+
+function normalizeCommaSpacing(source, fileName = 'source.ts') {
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    scannerLanguageVariant(fileName),
+    source,
+  );
+  const tokens = [];
+
+  while (scanner.scan() !== ts.SyntaxKind.EndOfFileToken) {
+    const kind = scanner.getToken();
+
+    if (
+      kind === ts.SyntaxKind.WhitespaceTrivia ||
+      kind === ts.SyntaxKind.NewLineTrivia
+    ) {
+      continue;
+    }
+
+    tokens.push({
+      kind,
+      start: scanner.getTokenPos(),
+      end: scanner.getTextPos(),
+    });
+  }
+
+  const replacements = [];
+
+  for (let index = 0; index < tokens.length - 1; index += 1) {
+    const current = tokens[index];
+    const next = tokens[index + 1];
+
+    if (current.kind !== ts.SyntaxKind.CommaToken) continue;
+
+    const gap = safeSameLineGap(source, current.end, next.start);
+
+    if (gap === null) continue;
+
+    if (
+      next.kind === ts.SyntaxKind.SingleLineCommentTrivia ||
+      next.kind === ts.SyntaxKind.MultiLineCommentTrivia
+    ) {
+      continue;
+    }
+
+    addSpacingReplacement(
+      replacements,
+      source,
+      current.end,
+      next.start,
+      ' ',
+    );
+  }
+
+  let result = source;
+
+  for (const change of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+  }
+
+  return result;
+}
+
+function normalizeSpacing(source, fileName = 'source.ts') {
+  const declarationSpaced = normalizeDeclarationKeywordSpacing(
+    source,
+    fileName,
+  );
+  const astSpaced = normalizeAstSpacing(declarationSpaced, fileName);
+  const commaSpaced = normalizeCommaSpacing(astSpaced, fileName);
+  const controlSpaced = normalizeControlSpacing(commaSpaced, fileName);
+
+  return normalizeForSpacing(controlSpaced, fileName);
+}
+
+function normalizeContainerBraceSpacing(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  function normalizeOpenBrace(node, items) {
+    if (!items || items.length === 0) return;
+
+    const firstStart = items[0].getStart(sourceFile);
+    const openBrace = source.lastIndexOf('{', firstStart);
+
+    if (openBrace < node.getStart(sourceFile)) return;
+
+    let start = openBrace;
+
+    while (start > 0 && /[ \t]/.test(source[start - 1])) {
+      start -= 1;
+    }
+
+    if (
+      start > 0 &&
+      source[start - 1] !== '\n' &&
+      source[start - 1] !== '\r' &&
+      source[start - 1] !== ' '
+    ) {
+      replacements.push({
+        start,
+        end: openBrace,
+        value: ' ',
+      });
+    }
+  }
+
+  function visit(node) {
+    if (
+      ts.isClassDeclaration(node) ||
+      ts.isClassExpression(node) ||
+      ts.isInterfaceDeclaration(node) ||
+      ts.isEnumDeclaration(node)
+    ) {
+      normalizeOpenBrace(node, node.members);
+    }
+
+    if (ts.isModuleBlock(node)) {
+      normalizeOpenBrace(node, node.statements);
+    }
+
+    if (ts.isCaseBlock(node)) {
+      normalizeOpenBrace(node, node.clauses);
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const change of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+  }
+
+  return result;
+}
+
+function normalizeBlockSpacing(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const insertions = new Set();
+
+  function visit(node) {
+    if (ts.isBlock(node)) {
+      const start = node.getStart(sourceFile);
+
+      if (
+        start > 0 &&
+        source[start - 1] !== ' ' &&
+        source[start - 1] !== '\t' &&
+        source[start - 1] !== '\n' &&
+        source[start - 1] !== '\r'
+      ) {
+        insertions.add(start);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+
+  for (const position of [...insertions].sort((a, b) => b - a)) {
+    result =
+      result.slice(0, position) +
+      ' ' +
+      result.slice(position);
+  }
+
+  return result;
+}
+
 function formatSource(source, fileName = 'source.ts') {
   const withoutUnusedImports = removeUnusedImports(source, fileName);
   const quoted = useSingleQuotes(withoutUnusedImports, fileName);
   const withSemicolons = addSemicolons(quoted, fileName);
   const expanded = expandCompactBlocks(withSemicolons, fileName);
-  const split = splitSameLineStatements(expanded, fileName);
-  const listed = formatDelimitedLists(split, fileName);
+  const expandedContainers = expandCompactContainers(expanded, fileName);
+  const splitStatements = splitSameLineStatements(expandedContainers, fileName);
+  const splitMembers = splitSameLineMembers(splitStatements, fileName);
+  const spaced = normalizeSpacing(splitMembers, fileName);
+  const containerSpaced = normalizeContainerBraceSpacing(spaced, fileName);
+  const blockSpaced = normalizeBlockSpacing(containerSpaced, fileName);
+  const listed = formatDelimitedLists(blockSpaced, fileName);
 
   return indentSource(listed);
 }
@@ -1240,11 +2020,14 @@ module.exports = {
   addSemicolons,
   compactShortCalls,
   expandCompactBlocks,
+  expandCompactContainers,
   formatDelimitedLists,
   formatSource,
   indentSource,
+  normalizeSpacing,
   removeUnusedImports,
   resolveTarget,
+  splitSameLineMembers,
   splitSameLineStatements,
   useSingleQuotes,
 };

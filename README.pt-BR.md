@@ -75,7 +75,8 @@ pnpm dev
 | `view [arquivo]` / `v [arquivo]` | Localiza um arquivo do projeto, formata código suportado e abre no Micro |
 | `build` | Verifica os tipos e gera o bundle de produção |
 | `start` | Executa o bundle gerado |
-| `type` | Acompanha erros de TypeScript |
+| `type` | Verifica os tipos TypeScript uma vez |
+| `type --watch` | Mantém a verificação de tipos ativa nas alterações |
 | `di` | Instala a injeção de dependência opcional |
 
 Exemplos com npm:
@@ -88,6 +89,8 @@ npm test --watch
 npm test -- create-user
 npm run fmt
 npm run v -- product
+npm run type
+npm run type --watch
 npm run build
 npm start
 ```

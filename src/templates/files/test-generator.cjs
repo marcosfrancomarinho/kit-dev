@@ -958,7 +958,11 @@ function analyzeMethod({
         parameter.fixture ||
         fallbackMethodParameter(
           className,
-          methodName,
+          {
+            name: methodName,
+            kind: memberKind,
+            static: isStatic,
+          },
           parameter.index,
           parameter.name,
         ),
@@ -2590,6 +2594,49 @@ function renderSafeExpression(
   return null;
 }
 
+function renderMemberInvocation(
+  className,
+  method,
+  argumentsList,
+  target = 'sut',
+) {
+  if (method.kind === 'getter') {
+    return (method.static ? className : target) + '.' + method.name;
+  }
+
+  if (method.kind === 'setter') {
+    return (
+      (method.static ? className : target) +
+      '.' +
+      method.name +
+      ' = ' +
+      (argumentsList[0] || 'undefined')
+    );
+  }
+
+  return (
+    (method.static ? className : target) +
+    '.' +
+    method.name +
+    '(' +
+    argumentsList.join(', ') +
+    ')'
+  );
+}
+
+function renderMethodArguments(
+  className,
+  method,
+  overrideIndex = -1,
+  overrideFixture = null,
+) {
+  return method.parameters.map((parameter, index) =>
+    index === overrideIndex
+      ? overrideFixture
+      : renderMethodArgument(className, method, parameter),
+  );
+}
+
 function renderTest({
   className,
   creation,
@@ -2698,15 +2745,106 @@ function renderTest({
         ? '(t)'
         : '()';
 
-    lines.push(`it(${JSON.stringify(method.name)}, ${callback} => {`);
+    if (method.negativeCases?.length > 0) {
+      for (const negativeCase of method.negativeCases) {
+        lines.push(
+          `it(${JSON.stringify(method.name + ' rejects invalid ' + negativeCase.parameterName)}, ${method.async ? 'async ()' : '()'} => {`,
+        );
+
+        if (!method.static) {
+          lines.push(
+            ...renderCreationSetup(
+              className,
+              creation,
+              [],
+            ),
+          );
+        }
+
+        const methodParameterLines = renderMethodParameterSetup(
+          className,
+          method,
+        );
+
+        if (
+          (!method.static && creation.parameters.length > 0) ||
+          methodParameterLines.length > 0
+        ) {
+          lines.push('');
+        }
+
+        lines.push(...methodParameterLines);
+
+        if (!method.static) {
+          if (
+            creation.parameters.length > 0 ||
+            methodParameterLines.length > 0
+          ) {
+            lines.push('');
+          }
+
+          lines.push(
+            `  const sut = ${renderCreationExpression(
+              className,
+              creation,
+            )}`,
+          );
+        }
+
+        const invalidArguments = renderMethodArguments(
+          className,
+          method,
+          negativeCase.index,
+          negativeCase.fixture,
+        );
+        const invalidInvocation = renderMemberInvocation(
+          className,
+          method,
+          invalidArguments,
+        );
+
+        if (method.async) {
+          lines.push(
+            '',
+            `  await assert.rejects(() => ${invalidInvocation})`,
+          );
+        } else if (method.kind === 'setter') {
+          lines.push(
+            '',
+            '  assert.throws(() => {',
+            `    ${invalidInvocation}`,
+            '  })',
+          );
+        } else {
+          lines.push(
+            '',
+            `  assert.throws(() => ${invalidInvocation})`,
+          );
+        }
+
+        lines.push('})', '');
+      }
+    }
 
     lines.push(
-      ...renderCreationSetup(
-        className,
-        creation,
-        method.calls,
-      ),
+      `it(${JSON.stringify(
+        method.kind === 'getter'
+          ? 'get ' + method.name
+          : method.kind === 'setter'
+            ? 'set ' + method.name
+            : method.name,
+      )}, ${callback} => {`,
     );
+
+    if (!method.static) {
+      lines.push(
+        ...renderCreationSetup(
+          className,
+          creation,
+          method.calls,
+        ),
+      );
+    }
 
     const methodParameterLines = renderMethodParameterSetup(
       className,
@@ -2714,7 +2852,7 @@ function renderTest({
     );
 
     if (
-      creation.parameters.length > 0 &&
+      (!method.static && creation.parameters.length > 0) &&
       methodParameterLines.length > 0
     ) {
       lines.push('');
@@ -2723,37 +2861,42 @@ function renderTest({
     lines.push(...methodParameterLines);
 
     if (
-      creation.parameters.length > 0 ||
+      (!method.static && creation.parameters.length > 0) ||
       methodParameterLines.length > 0
     ) {
       lines.push('');
     }
 
-    lines.push(
-      `  const sut = ${renderCreationExpression(
-        className,
-        creation,
-      )}`,
-    );
-
-    if (method.instanceSetup?.length > 0) {
+    if (!method.static) {
       lines.push(
-        '',
-        ...method.instanceSetup.map((setup) => `  ${setup}`),
+        `  const sut = ${renderCreationExpression(
+          className,
+          creation,
+        )}`,
       );
+
+      if (method.instanceSetup?.length > 0) {
+        lines.push(
+          '',
+          ...method.instanceSetup.map((setup) => `  ${setup}`),
+        );
+      }
+
+      lines.push('');
     }
 
-    lines.push('');
-
-    const argumentsList = method.parameters
-      .map((parameter) =>
-        renderMethodArgument(className, method, parameter),
-      )
-      .join(', ');
-    const invocation = `sut.${method.name}(${argumentsList})`;
+    const argumentsList = renderMethodArguments(
+      className,
+      method,
+    );
+    const invocation = renderMemberInvocation(
+      className,
+      method,
+      argumentsList,
+    );
     const awaitKeyword = method.async ? 'await ' : '';
 
-    if (method.expectedReturn) {
+    if (method.expectedReturn && method.kind !== 'setter') {
       lines.push(
         `  const result = ${awaitKeyword}${invocation}`,
         '',
@@ -3019,6 +3162,34 @@ function fallbackCreationParameter(
   );
 }
 
+function methodParameterType(className, method, index) {
+  if (method.kind === 'setter') {
+    return className + "['" + method.name + "']";
+  }
+
+  if (method.static) {
+    return (
+      'Parameters<typeof ' +
+      className +
+      '.' +
+      method.name +
+      '>[' +
+      index +
+      ']'
+    );
+  }
+
+  return (
+    'Parameters<' +
+    className +
+    "['" +
+    method.name +
+    "']>[" +
+    index +
+    ']'
+  );
+}
+
 function renderMethodParameterSetup(className, method) {
   const lines = [];
 
@@ -3029,13 +3200,17 @@ function renderMethodParameterSetup(className, method) {
       parameter.fixture ??
       fallbackMethodParameter(
         className,
-        method.name,
+        method,
         parameter.index,
         parameter.name,
       );
 
     lines.push(
-      `  const ${parameter.variableName}: Parameters<${className}['${method.name}']>[${parameter.index}] = ${fixture}`,
+      `  const ${parameter.variableName}: ${methodParameterType(
+        className,
+        method,
+        parameter.index,
+      )} = ${fixture}`,
     );
   }
 
@@ -3048,11 +3223,12 @@ function renderMethodArgument(className, method, parameter) {
 
   return fallbackMethodParameter(
     className,
-    method.name,
+    method,
     parameter.index,
     parameter.name,
   );
 }
+
 
 function fallbackConstructorParameter(
   className,
@@ -3072,18 +3248,14 @@ function fallbackConstructorParameter(
 
 function fallbackMethodParameter(
   className,
-  methodName,
+  method,
   index,
   name,
 ) {
   return (
-    '{} as Parameters<' +
-    className +
-    "['" +
-    methodName +
-    "']>[" +
-    index +
-    '] /* TODO: provide ' +
+    '{} as ' +
+    methodParameterType(className, method, index) +
+    ' /* TODO: provide ' +
     name +
     ' */'
   );

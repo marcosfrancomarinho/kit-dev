@@ -46,7 +46,7 @@ test('initial dependency install includes the TypeScript language server', async
     '--save-dev',
   ]);
   assert.ok(
-    calls[0].args.includes('typescript-language-server@6.0.1'),
+    calls[0].args.includes('typescript-language-server@5.3.0'),
   );
   assert.ok(calls[0].args.includes('typescript@7.0.2'));
 });

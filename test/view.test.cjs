@@ -25,28 +25,34 @@ const {
 
 describe('project file viewer', () => {
   it('maps supported platforms to the correct Micro release asset', () => {
-    assert.equal(microAsset('win32', 'x64'), 'micro-2.0.15-win64.zip');
-    assert.equal(
-      microAsset('win32', 'arm64'),
-      'micro-2.0.15-win-arm64.zip',
+    const cases = [
+      ['win32', 'ia32', 'micro-2.0.15-win32.zip'],
+      ['win32', 'x64', 'micro-2.0.15-win64.zip'],
+      ['win32', 'arm64', 'micro-2.0.15-win-arm64.zip'],
+      ['linux', 'ia32', 'micro-2.0.15-linux32.tar.gz'],
+      ['linux', 'x64', 'micro-2.0.15-linux64.tar.gz'],
+      ['linux', 'arm', 'micro-2.0.15-linux-arm.tar.gz'],
+      ['linux', 'arm64', 'micro-2.0.15-linux-arm64.tar.gz'],
+      ['darwin', 'x64', 'micro-2.0.15-osx.tar.gz'],
+      ['darwin', 'arm64', 'micro-2.0.15-macos-arm64.tar.gz'],
+      ['freebsd', 'ia32', 'micro-2.0.15-freebsd32.tar.gz'],
+      ['freebsd', 'x64', 'micro-2.0.15-freebsd64.tar.gz'],
+      ['netbsd', 'ia32', 'micro-2.0.15-netbsd32.tar.gz'],
+      ['netbsd', 'x64', 'micro-2.0.15-netbsd64.tar.gz'],
+      ['openbsd', 'ia32', 'micro-2.0.15-openbsd32.tar.gz'],
+      ['openbsd', 'x64', 'micro-2.0.15-openbsd64.tar.gz'],
+      ['sunos', 'x64', 'micro-2.0.15-solaris64.tar.gz'],
+      ['illumos', 'x64', 'micro-2.0.15-illumos64.tar.gz'],
+    ];
+
+    for (const [platform, arch, asset] of cases) {
+      assert.equal(microAsset(platform, arch), asset);
+    }
+
+    assert.throws(
+      () => microAsset('aix', 'ppc64'),
+      /not automatically supported/,
     );
-    assert.equal(
-      microAsset('linux', 'x64'),
-      'micro-2.0.15-linux64.tar.gz',
-    );
-    assert.equal(
-      microAsset('linux', 'arm64'),
-      'micro-2.0.15-linux-arm64.tar.gz',
-    );
-    assert.equal(
-      microAsset('darwin', 'x64'),
-      'micro-2.0.15-osx.tar.gz',
-    );
-    assert.equal(
-      microAsset('darwin', 'arm64'),
-      'micro-2.0.15-macos-arm64.tar.gz',
-    );
-    assert.throws(() => microAsset('freebsd', 'x64'), /not automatically supported/);
   });
 
   it('opens an exact path before searching by file name', async (context) => {

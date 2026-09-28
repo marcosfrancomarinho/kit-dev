@@ -25,6 +25,13 @@ const readline = require('node:readline');
 
 const projectRoot = process.cwd();
 const MICRO_VERSION = '2.0.15';
+const LSP_PLUGIN = 'lsp';
+const LSP_SERVER =
+  'npx --no-install typescript-language-server --stdio';
+const LSP_SERVER_MAP = [
+  'typescript=' + LSP_SERVER,
+  'javascript=' + LSP_SERVER,
+].join(',');
 const ignoredDirectories = new Set([
   '.git',
   'node_modules',
@@ -366,6 +373,66 @@ async function ensureMicro(options = {}) {
   return executable;
 }
 
+function microConfigDirectory(home = homedir()) {
+  return join(home, '.kit-dev', 'micro');
+}
+
+function lspSettings() {
+  return {
+    'lsp.server': LSP_SERVER_MAP,
+    'lsp.tabcompletion': true,
+    'lsp.autocompleteDetails': false,
+    'lsp.formatOnSave': false,
+  };
+}
+
+async function ensureMicroLsp(editor, options = {}) {
+  const home = options.home || homedir();
+  const spawn = options.spawn || spawnSync;
+  const configDirectory =
+    options.configDirectory || microConfigDirectory(home);
+  const pluginDirectory = join(configDirectory, 'plug', LSP_PLUGIN);
+
+  await mkdir(configDirectory, { recursive: true });
+
+  if (!existsSync(pluginDirectory)) {
+    const result = spawn(
+      editor,
+      [
+        '-config-dir',
+        configDirectory,
+        '-plugin',
+        'install',
+        LSP_PLUGIN,
+      ],
+      {
+        cwd: projectRoot,
+        stdio: 'pipe',
+        encoding: 'utf8',
+        shell: false,
+      },
+    );
+
+    if (
+      result.error ||
+      result.status !== 0 ||
+      !existsSync(pluginDirectory)
+    ) {
+      throw new Error(
+        'Could not install the Micro LSP plugin in the Kit Dev configuration.',
+      );
+    }
+  }
+
+  await writeFile(
+    join(configDirectory, 'settings.json'),
+    JSON.stringify(lspSettings(), null, 2) + '\n',
+    'utf8',
+  );
+
+  return configDirectory;
+}
+
 function shouldFormat(file, root = projectRoot) {
   if (!sourcePattern.test(file)) return false;
 
@@ -419,14 +486,29 @@ function showMicroTips() {
   process.stdout.write(renderMicroTips());
 }
 
-function openWithMicro(editor, file, root = projectRoot) {
+function openWithMicro(
+  editor,
+  file,
+  root = projectRoot,
+  options = {},
+) {
   formatBeforeOpen(file, root);
   showMicroTips();
 
-  const result = spawnSync(editor, [file], {
+  const args = [];
+  if (options.configDirectory) {
+    args.push('-config-dir', options.configDirectory);
+  }
+  args.push(file);
+
+  const result = spawnSync(editor, args, {
     cwd: root,
     stdio: 'inherit',
     shell: false,
+    env: {
+      ...process.env,
+      MICRO_LSP: LSP_SERVER_MAP,
+    },
   });
 
   if (result.error) throw result.error;
@@ -476,7 +558,23 @@ async function main() {
   if (!selected) return;
 
   const editor = await ensureMicro();
-  openWithMicro(editor, selected, projectRoot);
+  let configDirectory = null;
+
+  try {
+    configDirectory = await ensureMicroLsp(editor);
+    console.log('✓ TypeScript LSP enabled (Tab / Ctrl+Space autocomplete)');
+  } catch (error) {
+    console.warn(
+      '⚠ TypeScript LSP unavailable. Opening Micro without intelligent autocomplete.',
+    );
+    if (process.env.KIT_DEV_DEBUG && error instanceof Error) {
+      console.warn(error.message);
+    }
+  }
+
+  openWithMicro(editor, selected, projectRoot, {
+    configDirectory,
+  });
 }
 
 if (require.main === module) {
@@ -488,12 +586,17 @@ if (require.main === module) {
 }
 
 module.exports = {
+  LSP_PLUGIN,
+  LSP_SERVER_MAP,
   MICRO_VERSION,
   collectProjectFiles,
   ensureMicro,
+  ensureMicroLsp,
   findViewCandidates,
   formatBeforeOpen,
+  lspSettings,
   microAsset,
+  microConfigDirectory,
   openWithMicro,
   renderMicroTips,
   renderSelection,

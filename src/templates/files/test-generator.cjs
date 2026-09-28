@@ -232,9 +232,13 @@ function collectClassHierarchy(ts, checker, classNode) {
 
 function findEffectiveConstructor(ts, hierarchy) {
   for (const classNode of hierarchy) {
-    const constructorNode = classNode.members.find(
+    const constructors = classNode.members.filter(
       ts.isConstructorDeclaration,
     );
+    const constructorNode =
+      constructors.find((item) => item.body) ||
+      constructors[0] ||
+      null;
 
     if (constructorNode) {
       return {
@@ -528,6 +532,7 @@ function analyzeParameters(
       return {
         index,
         name,
+        rest: Boolean(parameter.dotDotDotToken),
         type: parameter.type
           ? parameter.type.getText(sourceFile)
           : checker.typeToString(
@@ -1080,10 +1085,15 @@ function analyzeMethod({
   isStatic = false,
 }) {
   const methodName = method.name.text;
-  const parameters = method.parameters
-    .filter((parameter) => ts.isIdentifier(parameter.name))
-    .map((parameter, index) => {
-      const name = parameter.name.text;
+  const supportedMethodParameters = method.parameters.filter(
+    (parameter) =>
+      ts.isIdentifier(parameter.name) ||
+      ts.isObjectBindingPattern(parameter.name) ||
+      ts.isArrayBindingPattern(parameter.name),
+  );
+  const parameters = supportedMethodParameters.map(
+    (parameter, index) => {
+      const name = getParameterFixtureName(ts, parameter, index);
       const inferredFixture = renderParameterFixture(
         ts,
         checker,
@@ -1099,7 +1109,7 @@ function analyzeMethod({
         inferredFixture ?? (optional ? 'undefined' : null);
       const simple =
         fixture !== null && isSimpleFixture(fixture);
-      const variableName = simple
+      const variableName = simple || parameter.dotDotDotToken
         ? null
         : uniqueParameterName(
             name,
@@ -1110,11 +1120,13 @@ function analyzeMethod({
       return {
         index,
         name,
+        rest: Boolean(parameter.dotDotDotToken),
         optional,
         fixture,
         variableName,
       };
-    });
+    },
+  );
 
   const parameterMap = new Map(
     parameters.map((parameter) => [
@@ -1133,6 +1145,39 @@ function analyzeMethod({
         ),
     ]),
   );
+  supportedMethodParameters.forEach((parameter, index) => {
+    if (
+      !ts.isObjectBindingPattern(parameter.name) &&
+      !ts.isArrayBindingPattern(parameter.name)
+    ) {
+      return;
+    }
+
+    const metadata = parameters[index];
+    const source =
+      metadata.variableName ||
+      metadata.fixture ||
+      fallbackMethodParameter(
+        className,
+        {
+          name: methodName,
+          kind: memberKind,
+          static: isStatic,
+          rest: metadata.rest,
+        },
+        metadata.index,
+        metadata.name,
+      );
+
+    collectBindingAliases(
+      ts,
+      parameter.name,
+      source,
+      parameterMap,
+      sourceFile,
+    );
+  });
+
   const collectionDependencies = new Set(
     (constructorParameters || [])
       .filter(
@@ -3210,6 +3255,11 @@ function renderCreationSetup(
           parameter.name,
         );
 
+      if (parameter.rest) {
+        lines.push(`  const ${parameter.name} = ${fixture}`);
+        continue;
+      }
+
       if (isSimpleFixture(fixture)) {
         lines.push(`  const ${parameter.name} = ${fixture}`);
       } else {
@@ -3325,7 +3375,9 @@ function renderCreationSetup(
 
 function renderCreationExpression(className, creation) {
   const argumentsList = creation.parameters
-    .map((parameter) => parameter.name)
+    .map((parameter) =>
+      parameter.rest ? '...' + parameter.name : parameter.name,
+    )
     .join(', ');
 
   if (creation.kind === 'factory') {
@@ -3350,11 +3402,14 @@ function renderCreationExpressionWithOverride(
   overrideFixture,
 ) {
   const argumentsList = creation.parameters
-    .map((parameter) =>
-      parameter.index === overrideIndex
-        ? overrideFixture
-        : parameter.name,
-    )
+    .map((parameter) => {
+      const value =
+        parameter.index === overrideIndex
+          ? overrideFixture
+          : parameter.name;
+
+      return parameter.rest ? '...' + value : value;
+    })
     .join(', ');
 
   if (creation.kind === 'factory') {
@@ -3447,6 +3502,14 @@ function renderMethodParameterSetup(className, method) {
   const lines = [];
 
   for (const parameter of method.parameters) {
+    if (parameter.rest) {
+      const fixture =
+        parameter.fixture ??
+        '[] /* TODO: provide ' + parameter.name + ' */';
+      lines.push(`  const ${parameter.name} = ${fixture}`);
+      continue;
+    }
+
     if (!parameter.variableName) continue;
 
     const fixture =
@@ -3471,6 +3534,13 @@ function renderMethodParameterSetup(className, method) {
 }
 
 function renderMethodArgument(className, method, parameter) {
+  if (parameter.rest) {
+    const value =
+      parameter.variableName ||
+      parameter.name;
+    return '...' + value;
+  }
+
   if (parameter.variableName) return parameter.variableName;
   if (parameter.fixture !== null) return parameter.fixture;
 

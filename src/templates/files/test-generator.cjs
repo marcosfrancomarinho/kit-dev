@@ -1120,7 +1120,11 @@ function renderKnownExpression(
     if (rest.length === 0) {
       const property = publicPropertyFixtures?.get(root);
 
-      if (property?.fixture !== null && property?.fixture !== undefined) {
+      if (
+        property?.initialized &&
+        property.fixture !== null &&
+        property.fixture !== undefined
+      ) {
         return property.fixture;
       }
     }

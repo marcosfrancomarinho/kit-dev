@@ -99,7 +99,7 @@ npm run fmt -- src/application/create-user.ts
 ```
 
 
-The `fmt` command is lightweight and does not add an external formatting library. It only processes JavaScript and TypeScript files in `src/` and `test/`, fixing indentation, expanding compact or minified code, separating independent statements that share one line, reducing excessive horizontal whitespace, safely normalizing spaces around assignments, object properties, type annotations, operators, commas, and arrow functions, adding semicolons to recognized statements, and converting double-quoted strings to single quotes. It also compacts short multiline calls and expands medium or large arrays, objects, argument lists, function parameters, constructor parameters, destructuring lists, and named import/export lists when needed for readability. The formatter preserves comments, string and template-string contents, regexes, JSX attributes, trailing-comma multiline lists, and `for` statement semicolons. It also removes import bindings confirmed as unused and removes an import declaration entirely when none of its bindings are used.
+The `fmt` command is a lightweight formatter for JavaScript and TypeScript files in `src/` and `test/`. It fixes indentation, organizes compact or minified code, normalizes spacing, adds semicolons when needed, adjusts lists and calls, and removes unused imports. Comments, strings, templates, regexes, JSX, and other sensitive syntax are preserved.
 
 ## Automatic tests
 

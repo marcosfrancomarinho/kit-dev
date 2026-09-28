@@ -1243,7 +1243,7 @@ function analyzeMethod({
         if (property?.fixture !== null && property?.fixture !== undefined) {
           expectedReturn = property.fixture;
 
-          if (!property.initialized) {
+          if (!property.initialized && property.writableFromTest) {
             instanceSetup.push(
               `sut.${path[0]} = ${property.fixture}`,
             );
@@ -1303,13 +1303,18 @@ function collectPublicPropertyFixtures(
     if (
       !ts.isPropertyDeclaration(member) ||
       !ts.isIdentifier(member.name) ||
-      hasModifier(ts, member, ts.SyntaxKind.PrivateKeyword) ||
-      hasModifier(ts, member, ts.SyntaxKind.ProtectedKeyword) ||
-      hasModifier(ts, member, ts.SyntaxKind.StaticKeyword) ||
-      hasModifier(ts, member, ts.SyntaxKind.ReadonlyKeyword)
+      hasModifier(ts, member, ts.SyntaxKind.StaticKeyword)
     ) {
       continue;
     }
+
+    const initialized = Boolean(member.initializer);
+    const writableFromTest =
+      !hasModifier(ts, member, ts.SyntaxKind.PrivateKeyword) &&
+      !hasModifier(ts, member, ts.SyntaxKind.ProtectedKeyword) &&
+      !hasModifier(ts, member, ts.SyntaxKind.ReadonlyKeyword);
+
+    if (!initialized && !writableFromTest) continue;
 
     const name = member.name.text;
     const initializer = renderInitializerFixture(
@@ -1347,7 +1352,8 @@ function collectPublicPropertyFixtures(
 
     fixtures.set(name, {
       fixture,
-      initialized: Boolean(member.initializer),
+      initialized,
+      writableFromTest,
     });
   }
 

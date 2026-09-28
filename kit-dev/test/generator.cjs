@@ -279,6 +279,15 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
 
   const methods = classNode.members
     .filter((member) => isPublicMethod(ts, member))
+    .filter(
+      (member) =>
+        !(
+          factory &&
+          ts.isMethodDeclaration(member) &&
+          hasModifier(ts, member, ts.SyntaxKind.StaticKeyword) &&
+          member.name.text === factory.methodName
+        ),
+    )
     .map((method) =>
       analyzeMethod({
         ts,
@@ -293,6 +302,16 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
         publicPropertyFixtures,
         sourceAliases: creation.sourceAliases,
         fixtureContext,
+        memberKind: ts.isGetAccessorDeclaration(method)
+          ? 'getter'
+          : ts.isSetAccessorDeclaration(method)
+            ? 'setter'
+            : 'method',
+        isStatic: hasModifier(
+          ts,
+          method,
+          ts.SyntaxKind.StaticKeyword,
+        ),
       }),
     );
 
@@ -892,6 +911,8 @@ function analyzeMethod({
   publicPropertyFixtures,
   sourceAliases,
   fixtureContext,
+  memberKind = 'method',
+  isStatic = false,
 }) {
   const methodName = method.name.text;
   const parameters = method.parameters
@@ -1114,6 +1135,8 @@ function analyzeMethod({
 
   return {
     name: methodName,
+    kind: memberKind,
+    static: isStatic,
     async: Boolean(
       method.modifiers?.some(
         (modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword,
@@ -1123,6 +1146,10 @@ function analyzeMethod({
     calls: [...calls.values()],
     expectedReturn,
     instanceSetup,
+    negativeCases:
+      memberKind === 'method' || memberKind === 'setter'
+        ? detectSimpleFactoryThrowCases(ts, method, sourceFile)
+        : [],
   };
 }
 
@@ -3096,7 +3123,12 @@ function sampleString(name) {
 }
 
 function isPublicMethod(ts, member) {
-  if (!ts.isMethodDeclaration(member) || !ts.isIdentifier(member.name)) {
+  const supported =
+    ts.isMethodDeclaration(member) ||
+    ts.isGetAccessorDeclaration(member) ||
+    ts.isSetAccessorDeclaration(member);
+
+  if (!supported || !member.name || !ts.isIdentifier(member.name)) {
     return false;
   }
 
@@ -3104,8 +3136,7 @@ function isPublicMethod(ts, member) {
   return !modifiers.some(
     (modifier) =>
       modifier.kind === ts.SyntaxKind.PrivateKeyword ||
-      modifier.kind === ts.SyntaxKind.ProtectedKeyword ||
-      modifier.kind === ts.SyntaxKind.StaticKeyword,
+      modifier.kind === ts.SyntaxKind.ProtectedKeyword,
   );
 }
 

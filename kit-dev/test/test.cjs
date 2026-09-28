@@ -227,7 +227,8 @@ function fail(error) {
 
 async function main() {
   const args = process.argv.slice(2);
-  watchMode = args.includes('--watch');
+  watchMode =
+    args.includes('--watch') || process.env.npm_config_watch === 'true';
   const target = args.find((argument) => argument !== '--watch');
 
   if (target) {

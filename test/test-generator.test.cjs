@@ -2433,7 +2433,7 @@ export class Account {
     );
     assert.match(
       generated,
-      /it\("normalize", \(\) => \{\s*Account\.normalize\("value"\)/,
+      /it\("normalize", \(\) => \{\s*const result = Account\.normalize\("value"\)/,
     );
 
     const output = join(projectPath, 'generated-accessors.test.cjs');

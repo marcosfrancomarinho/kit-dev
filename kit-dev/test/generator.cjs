@@ -183,6 +183,120 @@ function renderFixtureImports(
   return lines;
 }
 
+function getBaseClassDeclaration(ts, checker, classNode) {
+  const extendsClause = classNode.heritageClauses?.find(
+    (clause) => clause.token === ts.SyntaxKind.ExtendsKeyword,
+  );
+  const baseType = extendsClause?.types?.[0];
+
+  if (!baseType) return null;
+
+  try {
+    let symbol = checker.getSymbolAtLocation(baseType.expression);
+
+    if (
+      symbol &&
+      symbol.flags & ts.SymbolFlags.Alias &&
+      checker.getAliasedSymbol
+    ) {
+      symbol = checker.getAliasedSymbol(symbol);
+    }
+
+    return symbol?.declarations?.find(ts.isClassDeclaration) || null;
+  } catch {
+    return null;
+  }
+}
+
+function collectClassHierarchy(ts, checker, classNode) {
+  const hierarchy = [];
+  const visited = new Set();
+  let current = classNode;
+
+  while (current && !visited.has(current)) {
+    visited.add(current);
+    hierarchy.push(current);
+    current = getBaseClassDeclaration(ts, checker, current);
+  }
+
+  return hierarchy;
+}
+
+function findEffectiveConstructor(ts, hierarchy) {
+  for (const classNode of hierarchy) {
+    const constructorNode = classNode.members.find(
+      ts.isConstructorDeclaration,
+    );
+
+    if (constructorNode) {
+      return {
+        node: constructorNode,
+        sourceFile: constructorNode.getSourceFile(),
+      };
+    }
+  }
+
+  return {
+    node: null,
+    sourceFile: hierarchy[0].getSourceFile(),
+  };
+}
+
+function collectHierarchyMembers(ts, hierarchy) {
+  const result = [];
+  const seen = new Set();
+
+  for (const classNode of hierarchy) {
+    for (const member of classNode.members) {
+      if (!isPublicMethod(ts, member)) continue;
+
+      const kind = ts.isGetAccessorDeclaration(member)
+        ? 'getter'
+        : ts.isSetAccessorDeclaration(member)
+          ? 'setter'
+          : 'method';
+      const isStatic = hasModifier(
+        ts,
+        member,
+        ts.SyntaxKind.StaticKeyword,
+      );
+      const key =
+        kind + ':' + (isStatic ? 'static:' : '') + member.name.text;
+
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(member);
+    }
+  }
+
+  return result;
+}
+
+function collectHierarchyPublicPropertyFixtures(
+  ts,
+  checker,
+  hierarchy,
+  fixtureContext,
+) {
+  const fixtures = new Map();
+
+  for (const classNode of [...hierarchy].reverse()) {
+    const current = collectPublicPropertyFixtures(
+      ts,
+      checker,
+      classNode,
+      classNode.getSourceFile(),
+      fixtureContext,
+    );
+
+    for (const [name, fixture] of current) {
+      fixtures.set(name, fixture);
+    }
+  }
+
+  return fixtures;
+}
+
 function analyzeClass(ts, sourceFile, checker, fixtureContext) {
   const classes = sourceFile.statements.filter(ts.isClassDeclaration);
   const classNode =
@@ -197,26 +311,29 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
   if (!classNode || !classNode.name) return null;
 
   const className = classNode.name.text;
-  const constructorNode = classNode.members.find(ts.isConstructorDeclaration);
+  const hierarchy = collectClassHierarchy(ts, checker, classNode);
+  const effectiveConstructor = findEffectiveConstructor(ts, hierarchy);
+  const constructorNode = effectiveConstructor.node;
+  const constructorSourceFile = effectiveConstructor.sourceFile;
   const constructorParameters = analyzeParameters(
     ts,
     checker,
     constructorNode?.parameters || [],
-    sourceFile,
+    constructorSourceFile,
     fixtureContext,
   );
   const propertySources = collectConstructorPropertySources(
     ts,
     constructorNode,
-    sourceFile,
+    constructorSourceFile,
   );
-  const publicPropertyFixtures = collectPublicPropertyFixtures(
-    ts,
-    checker,
-    classNode,
-    sourceFile,
-    fixtureContext,
-  );
+  const publicPropertyFixtures =
+    collectHierarchyPublicPropertyFixtures(
+      ts,
+      checker,
+      hierarchy,
+      fixtureContext,
+    );
   const factory = findStaticFactory(
     ts,
     checker,
@@ -277,8 +394,7 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
     ...creation.parameters.map((parameter) => parameter.name),
   ]);
 
-  const methods = classNode.members
-    .filter((member) => isPublicMethod(ts, member))
+  const methods = collectHierarchyMembers(ts, hierarchy)
     .filter(
       (member) =>
         !(
@@ -292,7 +408,7 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
       analyzeMethod({
         ts,
         checker,
-        sourceFile,
+        sourceFile: method.getSourceFile(),
         method,
         className,
         dependencyNames,

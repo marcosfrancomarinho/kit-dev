@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const {
   chmod,
   mkdtemp,
@@ -353,6 +354,71 @@ describe('project file viewer', () => {
       await readFile(file, 'utf8'),
       /formatted-before-open/,
     );
+  });
+
+
+  it('prints help without scanning files or starting Micro', () => {
+    const script = join(
+      __dirname,
+      '..',
+      'src',
+      'templates',
+      'files',
+      'view.cjs',
+    );
+    const result = spawnSync(
+      process.execPath,
+      [script, '--help'],
+      {
+        cwd: join(__dirname, '..'),
+        encoding: 'utf8',
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Kit Dev View/);
+    assert.match(result.stdout, /yarn v \[file-or-name\]/);
+    assert.match(result.stdout, /yarn view \[file-or-name\]/);
+    assert.match(result.stdout, /Ctrl\+S  Save/);
+    assert.match(result.stdout, /help defaultkeys/);
+    assert.doesNotMatch(result.stdout, /Downloading/);
+  });
+
+  it('keeps the generated project wiring for the view template', async () => {
+    const root = join(__dirname, '..');
+    const [scaffolder, paths] = await Promise.all([
+      readFile(
+        join(
+          root,
+          'src',
+          'infrastructure',
+          'project',
+          'node-project-scaffolder.ts',
+        ),
+        'utf8',
+      ),
+      readFile(
+        join(
+          root,
+          'src',
+          'infrastructure',
+          'project',
+          'project-paths.ts',
+        ),
+        'utf8',
+      ),
+    ]);
+
+    assert.match(
+      scaffolder,
+      /copyTemplate\(paths, 'view\.cjs', join\(paths\.view\(\), 'view\.cjs'\)/,
+    );
+    assert.match(paths, /view\(\): string/);
+    assert.match(
+      paths,
+      /return join\(this\.kitDev\(\), 'view'\)/,
+    );
+    assert.match(paths, /this\.view\(\)/);
   });
 
 });

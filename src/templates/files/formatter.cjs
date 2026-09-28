@@ -1758,6 +1758,28 @@ function compactCallBoundaries(
   return applySafeReplacements(source, replacements);
 }
 
+function binaryExpressionRoot(node) {
+  let current = node;
+
+  while (
+    current.parent &&
+    ts.isBinaryExpression(current.parent)
+  ) {
+    current = current.parent;
+  }
+
+  return current;
+}
+
+function compactNodeLength(source, node) {
+  return source
+    .slice(node.getStart(), node.getEnd())
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .join(' ')
+    .length;
+}
+
 function compactBinaryExpressions(
   source,
   fileName = 'source.ts',
@@ -1774,27 +1796,24 @@ function compactBinaryExpressions(
 
   function visit(node) {
     if (ts.isBinaryExpression(node)) {
+      const root = binaryExpressionRoot(node);
+      const rootText = source.slice(
+        root.getStart(sourceFile),
+        root.getEnd(),
+      );
       const start = node.left.getEnd();
       const end = node.right.getStart(sourceFile);
       const gap = source.slice(start, end);
 
       if (
         hasLineBreak(gap) &&
-        !containsComment(gap)
+        !containsComment(rootText) &&
+        compactNodeLength(source, root) <= maxLineLength
       ) {
         const operator = node.operatorToken.getText(sourceFile);
         const value = ' ' + operator + ' ';
 
-        if (
-          lineLengthWithReplacement(
-            source,
-            start,
-            end,
-            value,
-          ) <= maxLineLength
-        ) {
-          replacements.push({ start, end, value });
-        }
+        replacements.push({ start, end, value });
       }
     }
 
@@ -1831,16 +1850,25 @@ function compactInitializerBreaks(
       const end = node.initializer.getStart(sourceFile);
       const gap = source.slice(start, end);
 
+      const initializerText = source.slice(
+        node.initializer.getStart(sourceFile),
+        node.initializer.getEnd(),
+      );
+
       if (
         hasLineBreak(gap) &&
         !containsComment(gap) &&
+        !containsComment(initializerText) &&
         gap.includes('=') &&
-        lineLengthWithReplacement(
-          source,
-          start,
-          end,
-          ' = ',
-        ) <= maxLineLength
+        compactNodeLength(source, node.initializer) +
+          source.slice(
+            Math.max(
+              source.lastIndexOf('\n', start - 1),
+              source.lastIndexOf('\r', start - 1),
+            ) + 1,
+            start,
+          ).trim().length +
+          3 <= maxLineLength
       ) {
         replacements.push({
           start,
@@ -2306,9 +2334,18 @@ function indentSource(source) {
       return line;
     }
 
-    const lineDepth = Math.max(0, depthBefore - leadingDedent);
+    let lineDepth = Math.max(0, depthBefore - leadingDedent);
+    const trimmedText = text.trimStart();
 
-    return indentUnit.repeat(lineDepth) + text;
+    if (
+      (trimmedText.startsWith('.') ||
+        trimmedText.startsWith('?.')) &&
+      lineDepth === depthBefore
+    ) {
+      lineDepth += 1;
+    }
+
+    return indentUnit.repeat(lineDepth) + trimmedText;
   });
 
   let result = formatted.join(newline);

@@ -526,6 +526,7 @@ var NodeProjectScaffolder = class {
       this.copyTemplate(paths, "dependency-injection.d.ts", (0, import_node_path3.join)(paths.di(), "container.d.ts"), "\u{1F9E9} DI types prepared"),
       this.copyTemplate(paths, "di-transformer.cjs", (0, import_node_path3.join)(paths.di(), "transformer.cjs"), "\u{1F9E9} DI transformer prepared"),
       this.copyTemplate(paths, "dev.cjs", (0, import_node_path3.join)(paths.build(), "dev.cjs"), "\u26A1 esbuild development runner prepared"),
+      this.copyTemplate(paths, "type.cjs", (0, import_node_path3.join)(paths.build(), "type.cjs"), "\u{1F50E} TypeScript checker prepared"),
       this.copyTemplate(paths, "providers.ts", (0, import_node_path3.join)(paths.di(), "providers.ts"), "\u{1F9E9} DI providers template prepared"),
       this.copyTemplate(paths, "runner.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test.cjs"), "\u{1F9EA} Native test runner prepared"),
       this.copyTemplate(paths, "test-generator.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "generator.cjs"), "\u{1F9EA} Automatic test generator prepared"),
@@ -595,13 +596,16 @@ var TerminalAdapter = class {
   ` + this.palette.paint(this.palette.bold, `cd ${projectName}`) + `
 
 \u{1F680} Available commands:
-  ` + this.formatCommand(runCommand, "dev", "Start development server") + `
-  ` + this.formatCommand(runCommand, "test", "Run tests in watch mode") + `
+  ` + this.formatCommand(runCommand, "dev", "Run application once") + `
+  ` + this.formatCommand(runCommand, "dev --watch", "Run application in watch mode") + `
+  ` + this.formatCommand(runCommand, "test", "Run tests once") + `
+  ` + this.formatCommand(runCommand, "test --watch", "Run tests in watch mode") + `
   ` + this.formatCommand(runCommand, "fmt", "Format src/ and test/ code") + `
   ` + this.formatCommand(runCommand, "v", "Find and open a file with Micro") + `
   ` + this.formatCommand(runCommand, "build", "Build the project") + `
   ` + this.formatCommand(runCommand, "start", "Run bundled output") + `
-  ` + this.formatCommand(runCommand, "type", "Check TypeScript types") + `
+  ` + this.formatCommand(runCommand, "type", "Check TypeScript types once") + `
+  ` + this.formatCommand(runCommand, "type --watch", "Check TypeScript types in watch mode") + `
   ` + this.formatCommand(runCommand, "di", "Add optional dependency injection") + `
 `
     );
@@ -649,7 +653,7 @@ var ProjectTemplateCatalog = class {
           start: "node --enable-source-maps dist/bundle.cjs",
           dev: "node kit-dev/build/dev.cjs",
           build: "node kit-dev/build/esbuild.config.cjs",
-          type: "tsc --watch --noEmit",
+          type: "node kit-dev/build/type.cjs",
           test: "node kit-dev/test/test.cjs",
           fmt: "node kit-dev/format/fmt.cjs",
           view: "node kit-dev/view/view.cjs",

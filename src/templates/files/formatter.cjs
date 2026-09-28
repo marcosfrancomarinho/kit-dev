@@ -910,13 +910,323 @@ function compactShortCalls(source, fileName = 'source.ts', maxLineLength = 100) 
   return formatDelimitedLists(source, fileName, maxLineLength);
 }
 
+function scannerLanguageVariant(fileName) {
+  return /\.(?:jsx|tsx)$/i.test(fileName)
+    ? ts.LanguageVariant.JSX
+    : ts.LanguageVariant.Standard;
+}
+
+function collapseHorizontalWhitespace(source, fileName = 'source.ts') {
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    scannerLanguageVariant(fileName),
+    source,
+  );
+  const replacements = [];
+
+  while (scanner.scan() !== ts.SyntaxKind.EndOfFileToken) {
+    if (scanner.getToken() !== ts.SyntaxKind.WhitespaceTrivia) continue;
+
+    const start = scanner.getTokenPos();
+    const end = scanner.getTextPos();
+    const text = source.slice(start, end);
+
+    if (
+      !text.includes('\n') &&
+      !text.includes('\r') &&
+      text !== ' '
+    ) {
+      replacements.push({ start, end, value: ' ' });
+    }
+  }
+
+  let result = source;
+
+  for (const change of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+  }
+
+  return result;
+}
+
+function safeSameLineGap(source, start, end) {
+  if (start > end) return null;
+
+  const gap = source.slice(start, end);
+
+  if (
+    gap.includes('\n') ||
+    gap.includes('\r') ||
+    containsComment(gap)
+  ) {
+    return null;
+  }
+
+  return gap;
+}
+
+function addSpacingReplacement(replacements, source, start, end, value) {
+  const gap = safeSameLineGap(source, start, end);
+
+  if (gap === null || gap === value) return;
+
+  replacements.push({ start, end, value });
+}
+
+function normalizeAstSpacing(source, fileName = 'source.ts') {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    getScriptKind(fileName),
+  );
+  const replacements = [];
+
+  function normalizeTypeSpacing(node) {
+    if (!node.name || !node.type) return;
+
+    const start = node.name.getEnd();
+    const end = node.type.getStart(sourceFile);
+    const gap = safeSameLineGap(source, start, end);
+
+    if (gap === null || !gap.includes(':')) return;
+
+    const compact = gap.replace(/\s+/g, '');
+    const value = compact.endsWith(':')
+      ? compact + ' '
+      : compact;
+
+    addSpacingReplacement(
+      replacements,
+      source,
+      start,
+      end,
+      value,
+    );
+  }
+
+  function normalizeInitializerSpacing(node) {
+    if (!node.initializer) return;
+
+    const left = node.type || node.name;
+    if (!left) return;
+
+    const start = left.getEnd();
+    const end = node.initializer.getStart(sourceFile);
+    const gap = safeSameLineGap(source, start, end);
+
+    if (gap === null || !gap.includes('=')) return;
+
+    addSpacingReplacement(
+      replacements,
+      source,
+      start,
+      end,
+      ' = ',
+    );
+  }
+
+  function visit(node) {
+    if (ts.isBinaryExpression(node)) {
+      const start = node.left.getEnd();
+      const end = node.right.getStart(sourceFile);
+      const operator = node.operatorToken.getText(sourceFile);
+
+      addSpacingReplacement(
+        replacements,
+        source,
+        start,
+        end,
+        ' ' + operator + ' ',
+      );
+    }
+
+    if (ts.isPropertyAssignment(node)) {
+      const start = node.name.getEnd();
+      const end = node.initializer.getStart(sourceFile);
+      const gap = safeSameLineGap(source, start, end);
+
+      if (gap !== null && gap.includes(':')) {
+        addSpacingReplacement(
+          replacements,
+          source,
+          start,
+          end,
+          ': ',
+        );
+      }
+    }
+
+    if (ts.isShorthandPropertyAssignment(node) && node.objectAssignmentInitializer) {
+      addSpacingReplacement(
+        replacements,
+        source,
+        node.name.getEnd(),
+        node.objectAssignmentInitializer.getStart(sourceFile),
+        ' = ',
+      );
+    }
+
+    if (
+      ts.isVariableDeclaration(node) ||
+      ts.isParameter(node) ||
+      ts.isPropertyDeclaration(node) ||
+      ts.isPropertySignature(node)
+    ) {
+      normalizeTypeSpacing(node);
+    }
+
+    if (
+      ts.isVariableDeclaration(node) ||
+      ts.isParameter(node) ||
+      ts.isPropertyDeclaration(node)
+    ) {
+      normalizeInitializerSpacing(node);
+    }
+
+    if (ts.isArrowFunction(node)) {
+      addSpacingReplacement(
+        replacements,
+        source,
+        node.equalsGreaterThanToken.getStart(sourceFile),
+        node.equalsGreaterThanToken.getEnd(),
+        '=>',
+      );
+
+      const beforeStart =
+        node.parameters.length > 0
+          ? node.parameters.end
+          : node.equalsGreaterThanToken.getStart(sourceFile);
+      const arrowStart = node.equalsGreaterThanToken.getStart(sourceFile);
+
+      if (beforeStart < arrowStart) {
+        addSpacingReplacement(
+          replacements,
+          source,
+          beforeStart,
+          arrowStart,
+          ' ',
+        );
+      }
+
+      addSpacingReplacement(
+        replacements,
+        source,
+        node.equalsGreaterThanToken.getEnd(),
+        node.body.getStart(sourceFile),
+        ' ',
+      );
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  let result = source;
+  const ordered = replacements
+    .sort((a, b) => b.start - a.start || b.end - a.end);
+  let lastStart = Infinity;
+
+  for (const change of ordered) {
+    if (change.end > lastStart) continue;
+
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+    lastStart = change.start;
+  }
+
+  return result;
+}
+
+function normalizeCommaSpacing(source, fileName = 'source.ts') {
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    scannerLanguageVariant(fileName),
+    source,
+  );
+  const tokens = [];
+
+  while (scanner.scan() !== ts.SyntaxKind.EndOfFileToken) {
+    const kind = scanner.getToken();
+
+    if (
+      kind === ts.SyntaxKind.WhitespaceTrivia ||
+      kind === ts.SyntaxKind.NewLineTrivia
+    ) {
+      continue;
+    }
+
+    tokens.push({
+      kind,
+      start: scanner.getTokenPos(),
+      end: scanner.getTextPos(),
+    });
+  }
+
+  const replacements = [];
+
+  for (let index = 0; index < tokens.length - 1; index += 1) {
+    const current = tokens[index];
+    const next = tokens[index + 1];
+
+    if (current.kind !== ts.SyntaxKind.CommaToken) continue;
+
+    const gap = safeSameLineGap(source, current.end, next.start);
+
+    if (gap === null) continue;
+
+    if (
+      next.kind === ts.SyntaxKind.SingleLineCommentTrivia ||
+      next.kind === ts.SyntaxKind.MultiLineCommentTrivia
+    ) {
+      continue;
+    }
+
+    addSpacingReplacement(
+      replacements,
+      source,
+      current.end,
+      next.start,
+      ' ',
+    );
+  }
+
+  let result = source;
+
+  for (const change of replacements.sort((a, b) => b.start - a.start)) {
+    result =
+      result.slice(0, change.start) +
+      change.value +
+      result.slice(change.end);
+  }
+
+  return result;
+}
+
+function normalizeSpacing(source, fileName = 'source.ts') {
+  const collapsed = collapseHorizontalWhitespace(source, fileName);
+  const astSpaced = normalizeAstSpacing(collapsed, fileName);
+
+  return normalizeCommaSpacing(astSpaced, fileName);
+}
+
 function formatSource(source, fileName = 'source.ts') {
   const withoutUnusedImports = removeUnusedImports(source, fileName);
   const quoted = useSingleQuotes(withoutUnusedImports, fileName);
   const withSemicolons = addSemicolons(quoted, fileName);
   const expanded = expandCompactBlocks(withSemicolons, fileName);
   const split = splitSameLineStatements(expanded, fileName);
-  const listed = formatDelimitedLists(split, fileName);
+  const spaced = normalizeSpacing(split, fileName);
+  const listed = formatDelimitedLists(spaced, fileName);
 
   return indentSource(listed);
 }
@@ -1244,6 +1554,7 @@ module.exports = {
   formatDelimitedLists,
   formatSource,
   indentSource,
+  normalizeSpacing,
   removeUnusedImports,
   resolveTarget,
   splitSameLineStatements,

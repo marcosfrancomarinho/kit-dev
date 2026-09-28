@@ -153,7 +153,9 @@ async function shutdown() {
 }
 
 async function run() {
-  const watchMode = process.argv.slice(2).includes('--watch');
+  const watchMode =
+    process.argv.slice(2).includes('--watch') ||
+    process.env.npm_config_watch === 'true';
 
   if (watchMode) {
     await runWatch();

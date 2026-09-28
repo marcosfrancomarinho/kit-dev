@@ -29,7 +29,7 @@ Instead of configuring the project from scratch, you start with:
 - optional dependency injection;
 - npm, Yarn and pnpm support.
 
-The goal is simple: spend less time configuring the project and more time writing application code.
+Kit Dev is designed to stay minimalist: simple, fast, and with few external dependencies. It does not force a specific architecture or application type. Instead, it provides a lightweight base that can be used for APIs, services, CLIs, web applications, internal tools, learning projects, prototypes, and other small-to-medium TypeScript projects. The goal is to reduce configuration and repetitive work without turning the project into a heavy framework.
 
 ## Quick start
 

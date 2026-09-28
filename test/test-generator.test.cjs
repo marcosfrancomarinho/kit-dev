@@ -2941,3 +2941,178 @@ export class Service {
     );
   },
 );
+
+
+test(
+  'cobre parametros rest destructuring em metodo e overload de construtor',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-rest-method-binding-overload-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'collector.ts'),
+      `
+interface Input {
+  user: {
+    name: string
+  }
+}
+
+export class Collector {
+  private readonly prefix: string
+  private readonly values: number[]
+
+  constructor(prefix: string, ...values: number[])
+  constructor(prefix: string, ...values: number[]) {
+    this.prefix = prefix
+    this.values = values
+  }
+
+  pick({ user: { name } }: Input): string {
+    return name
+  }
+
+  collect(...ids: string[]): void {
+    void ids
+  }
+
+  getPrefix(): string {
+    return this.prefix
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/collector.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(generated, /const prefix = "prefix"/);
+    assert.match(generated, /const values = \[1\]/);
+    assert.match(
+      generated,
+      /const sut = new Collector\(prefix, \.\.\.values\)/,
+    );
+    assert.match(
+      generated,
+      /const input: Parameters<Collector\['pick'\]>\[0\] = \{ user: \{ name: "Marcos" \} \}/,
+    );
+    assert.match(
+      generated,
+      /const result = sut\.pick\(input\)/,
+    );
+    assert.match(
+      generated,
+      /assert\.equal\(result, input\.user\.name\)/,
+    );
+    assert.match(generated, /const ids = \["test-id"\]/);
+    assert.match(generated, /sut\.collect\(\.\.\.ids\)/);
+
+    const output = join(projectPath, 'generated-rest.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);
+
+test(
+  'usa construtor herdado quando subclasse nao declara construtor',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-inherited-constructor-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'base.ts'),
+      `
+export class Base {
+  constructor(private readonly name: string) {}
+
+  getName(): string {
+    return this.name
+  }
+}
+`,
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'child.ts'),
+      `
+import { Base } from './base.js'
+
+export class Child extends Base {}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/child.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(generated, /const name = "Marcos"/);
+    assert.match(generated, /new Child\(name\)/);
+    assert.match(generated, /it\("getName",/);
+
+    const output = join(projectPath, 'generated-child.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);

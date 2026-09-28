@@ -192,7 +192,7 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   ]);
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'build'))).sort(),
-    ['dev.cjs', 'esbuild.config.cjs'],
+    ['dev.cjs', 'esbuild.config.cjs', 'type.cjs'],
   );
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'test'))).sort(),
@@ -277,7 +277,7 @@ test('executa o modo dev com esbuild antes da DI', async (context) => {
   ]);
 
   let stderr = '';
-  devProcess = spawn(process.execPath, ['kit-dev/build/dev.cjs'], {
+  devProcess = spawn(process.execPath, ['kit-dev/build/dev.cjs', '--watch'], {
     cwd: projectPath,
     env: {
       ...process.env,

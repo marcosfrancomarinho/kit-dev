@@ -21,10 +21,10 @@
 
 Instead of configuring the project from scratch, you start with:
 
-- development mode with automatic rebuild and restart;
+- development command that runs once by default, with optional watch mode;
 - production build;
 - TypeScript checking;
-- tests in watch mode;
+- tests that run once by default, with optional watch mode;
 - automatic test generation from classes;
 - quick file search and editing with Micro through `view` / `v`;
 - optional dependency injection;
@@ -66,8 +66,10 @@ pnpm dev
 
 | Command | What it does |
 |---|---|
-| `dev` | Runs the application and watches for changes |
-| `test` | Runs tests in watch mode |
+| `dev` | Builds and runs the application once |
+| `dev -- --watch` | Keeps the application running and restarts it on changes |
+| `test` | Runs the tests once |
+| `test -- --watch` | Keeps tests running and reruns them on changes |
 | `test <file>` | Generates or updates a test for a class |
 | `fmt [file]` | Formats all of `src/` and `test/` or only one provided file |
 | `view [file]` / `v [file]` | Finds a project file, formats supported source files, and opens it in Micro |
@@ -80,7 +82,9 @@ Examples with npm:
 
 ```bash
 npm run dev
+npm run dev -- --watch
 npm test
+npm test -- --watch
 npm test -- create-user
 npm run fmt
 npm run v -- product
@@ -144,12 +148,18 @@ For Micro's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit
 
 ## Automatic tests
 
-Every generated project already includes a test runner.
+Every generated project already includes a test runner. By default, tests run once. Use `--watch` only when you want continuous reruns.
 
-Run:
+Run once:
 
 ```bash
 npm test
+```
+
+Watch for changes:
+
+```bash
+npm test -- --watch
 ```
 
 To generate a test from a class:

@@ -2137,3 +2137,151 @@ export class Example {
   assert.match(execution.stdout, /# pass 2/);
   assert.match(execution.stdout, /# todo 0/);
 });
+
+
+test(
+  'gera fixture para construtor com object binding pattern',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-object-binding-pattern-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'domain', 'entities'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'entities', 'veiculo.ts'),
+      `
+export interface Input {
+  marca: string
+  ano: number
+}
+
+export class Veiculo {
+  private marca: string
+  private ano: number
+
+  constructor({ marca, ano }: Input) {
+    this.ano = ano
+    this.marca = marca
+  }
+
+  getMarca(): string {
+    return this.marca
+  }
+
+  getAno(): number {
+    return this.ano
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest(
+      'src/domain/entities/veiculo.ts',
+      projectPath,
+    );
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /const input: ConstructorParameters<typeof Veiculo>\[0\] = \{ marca: "marca", ano: 1 \}/,
+    );
+    assert.match(generated, /const sut = new Veiculo\(input\)/);
+    assert.doesNotMatch(generated, /new Veiculo\(\)/);
+    assert.match(
+      generated,
+      /assert\.equal\(result, input\.marca\)/,
+    );
+    assert.match(
+      generated,
+      /assert\.equal\(result, input\.ano\)/,
+    );
+  },
+);
+
+test(
+  'gera fixture para construtor com array binding pattern',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-array-binding-pattern-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'range.ts'),
+      `
+export class Range {
+  private start: number
+  private end: number
+
+  constructor([start, end]: [number, number]) {
+    this.start = start
+    this.end = end
+  }
+
+  getStart(): number {
+    return this.start
+  }
+
+  getEnd(): number {
+    return this.end
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/range.ts', projectPath);
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /const input: ConstructorParameters<typeof Range>\[0\] = \[1, 1\]/,
+    );
+    assert.match(generated, /const sut = new Range\(input\)/);
+    assert.match(
+      generated,
+      /assert\.equal\(result, input\[0\]\)/,
+    );
+    assert.match(
+      generated,
+      /assert\.equal\(result, input\[1\]\)/,
+    );
+  },
+);

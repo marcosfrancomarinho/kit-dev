@@ -26,6 +26,7 @@ Em vez de configurar tudo do zero, você já começa com:
 - verificação de tipos;
 - testes em modo watch;
 - geração automática de testes a partir de classes;
+- busca e edição rápida de arquivos com Micro pelos comandos `view` / `v`;
 - injeção de dependência opcional;
 - suporte a npm, Yarn e pnpm.
 
@@ -69,6 +70,7 @@ pnpm dev
 | `test` | Executa os testes em modo watch |
 | `test <arquivo>` | Gera ou atualiza o teste de uma classe |
 | `fmt [arquivo]` | Formata `src/` e `test/` por completo ou somente um arquivo informado |
+| `view [arquivo]` / `v [arquivo]` | Localiza um arquivo do projeto, formata código suportado e abre no Micro |
 | `build` | Verifica os tipos e gera o bundle de produção |
 | `start` | Executa o bundle gerado |
 | `type` | Acompanha erros de TypeScript |
@@ -81,6 +83,7 @@ npm run dev
 npm test
 npm test -- create-user
 npm run fmt
+npm run v -- product
 npm run build
 npm start
 ```
@@ -100,6 +103,43 @@ npm run fmt -- src/application/create-user.ts
 
 
 O `fmt` é um formatador leve para JavaScript e TypeScript em `src/` e `test/`. Ele corrige indentação, organiza código compacto ou minificado, normaliza espaços, adiciona ponto e vírgula quando necessário, ajusta listas e chamadas e remove imports não usados. Comentários, strings, templates, regex, JSX e estruturas sensíveis são preservados.
+
+## Visualizar e editar arquivos
+
+O Kit Dev pode localizar e abrir arquivos do projeto diretamente pelo terminal usando o Micro:
+
+```bash
+yarn v product
+```
+
+Também é possível usar o comando completo ou informar o caminho exato:
+
+```bash
+yarn view product.ts
+yarn v src/domain/entities/product.ts
+```
+
+Se apenas um arquivo corresponder, ele é aberto diretamente. Se houver vários, o Kit Dev mostra um seletor interativo. Arquivos JavaScript e TypeScript dentro de `src/` ou `test/` passam pelo `fmt` antes de abrir.
+
+O Micro não é incluído dentro do pacote npm. O Kit Dev primeiro procura um `micro` já disponível no `PATH`; se não encontrar, baixa somente o binário oficial correspondente ao sistema operacional e à arquitetura atuais, valida o SHA-256 e guarda em cache na pasta do usuário:
+
+```text
+Linux/macOS: ~/.kit-dev/bin/micro
+Windows:     %USERPROFILE%\.kit-dev\bin\micro.exe
+```
+
+O mesmo binário em cache é reutilizado por todos os projetos Kit Dev da máquina. O download automático contempla os builds oficiais do Micro mapeados pelo Kit Dev para Windows, Linux, macOS, FreeBSD, NetBSD, OpenBSD, Solaris e illumos quando a combinação de plataforma e runtime Node.js estiver disponível.
+
+Atalhos mostrados antes de abrir o Micro:
+
+```text
+Ctrl+S  Salvar
+Ctrl+Q  Sair
+Ctrl+F  Buscar
+Ctrl+E  Comando / Ajuda
+```
+
+Para consultar os atalhos padrão do Micro, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do view está disponível com `yarn v --help`.
 
 ## Testes automáticos
 
@@ -477,8 +517,9 @@ minha-api/
 ├── kit-dev/
 │   ├── build/
 │   ├── di/
-│   ├── fmt/
-│   └── test/
+│   ├── format/
+│   ├── test/
+│   └── view/
 ├── src/
 │   └── main.ts
 ├── test/

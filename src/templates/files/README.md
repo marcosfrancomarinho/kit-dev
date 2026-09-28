@@ -26,6 +26,7 @@ Instead of configuring the project from scratch, you start with:
 - TypeScript checking;
 - tests in watch mode;
 - automatic test generation from classes;
+- quick file search and editing with Micro through `view` / `v`;
 - optional dependency injection;
 - npm, Yarn and pnpm support.
 
@@ -69,6 +70,7 @@ pnpm dev
 | `test` | Runs tests in watch mode |
 | `test <file>` | Generates or updates a test for a class |
 | `fmt [file]` | Formats all of `src/` and `test/` or only one provided file |
+| `view [file]` / `v [file]` | Finds a project file, formats supported source files, and opens it in Micro |
 | `build` | Checks types and creates the production bundle |
 | `start` | Runs the generated bundle |
 | `type` | Watches TypeScript errors |
@@ -81,6 +83,7 @@ npm run dev
 npm test
 npm test -- create-user
 npm run fmt
+npm run v -- product
 npm run build
 npm start
 ```
@@ -100,6 +103,43 @@ npm run fmt -- src/application/create-user.ts
 
 
 The `fmt` command is a lightweight formatter for JavaScript and TypeScript files in `src/` and `test/`. It fixes indentation, organizes compact or minified code, normalizes spacing, adds semicolons when needed, adjusts lists and calls, and removes unused imports. Comments, strings, templates, regexes, JSX, and other sensitive syntax are preserved.
+
+## View and edit files
+
+Kit Dev can find and open project files directly in the terminal with Micro:
+
+```bash
+yarn v product
+```
+
+You can also use the full command or provide an exact path:
+
+```bash
+yarn view product.ts
+yarn v src/domain/entities/product.ts
+```
+
+If one file matches, it opens immediately. If several files match, Kit Dev shows an interactive selector. JavaScript and TypeScript files inside `src/` or `test/` are formatted with `fmt` before opening.
+
+Micro is not bundled into the npm package. Kit Dev first uses an existing `micro` from `PATH`; otherwise it downloads only the official binary for the current operating system and architecture, validates its SHA-256 checksum, and caches it in the user's home directory:
+
+```text
+Linux/macOS: ~/.kit-dev/bin/micro
+Windows:     %USERPROFILE%\.kit-dev\bin\micro.exe
+```
+
+The cached binary is reused by every Kit Dev project on the machine. Automatic download supports the official Micro builds mapped by Kit Dev for Windows, Linux, macOS, FreeBSD, NetBSD, OpenBSD, Solaris and illumos where the current Node.js runtime/platform combination is available.
+
+Useful shortcuts shown before Micro opens:
+
+```text
+Ctrl+S  Save
+Ctrl+Q  Quit
+Ctrl+F  Find
+Ctrl+E  Command / Help
+```
+
+For Micro's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev view help is available with `yarn v --help`.
 
 ## Automatic tests
 
@@ -477,8 +517,9 @@ my-api/
 ├── kit-dev/
 │   ├── build/
 │   ├── di/
-│   ├── fmt/
-│   └── test/
+│   ├── format/
+│   ├── test/
+│   └── view/
 ├── src/
 │   └── main.ts
 ├── test/

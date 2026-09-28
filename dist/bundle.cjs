@@ -430,6 +430,9 @@ var ProjectPaths = class {
   format() {
     return (0, import_node_path2.join)(this.kitDev(), "format");
   }
+  view() {
+    return (0, import_node_path2.join)(this.kitDev(), "view");
+  }
   test() {
     return (0, import_node_path2.join)(this.projectPath, "test");
   }
@@ -460,6 +463,7 @@ var ProjectPaths = class {
       this.di(),
       this.kitDevTest(),
       this.format(),
+      this.view(),
       this.test()
     ];
   }
@@ -525,7 +529,8 @@ var NodeProjectScaffolder = class {
       this.copyTemplate(paths, "providers.ts", (0, import_node_path3.join)(paths.di(), "providers.ts"), "\u{1F9E9} DI providers template prepared"),
       this.copyTemplate(paths, "runner.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test.cjs"), "\u{1F9EA} Native test runner prepared"),
       this.copyTemplate(paths, "test-generator.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "generator.cjs"), "\u{1F9EA} Automatic test generator prepared"),
-      this.copyTemplate(paths, "formatter.cjs", (0, import_node_path3.join)(paths.format(), "fmt.cjs"), "\u2728 Source formatter prepared")
+      this.copyTemplate(paths, "formatter.cjs", (0, import_node_path3.join)(paths.format(), "fmt.cjs"), "\u2728 Source formatter prepared"),
+      this.copyTemplate(paths, "view.cjs", (0, import_node_path3.join)(paths.view(), "view.cjs"), "\u{1F441} Project file viewer prepared")
     ]);
   }
   async createDirectory(directory) {
@@ -593,6 +598,7 @@ var TerminalAdapter = class {
   ` + this.formatCommand(runCommand, "dev", "Start development server") + `
   ` + this.formatCommand(runCommand, "test", "Run tests in watch mode") + `
   ` + this.formatCommand(runCommand, "fmt", "Format src/ and test/ code") + `
+  ` + this.formatCommand(runCommand, "v", "Find and open a file with Micro") + `
   ` + this.formatCommand(runCommand, "build", "Build the project") + `
   ` + this.formatCommand(runCommand, "start", "Run bundled output") + `
   ` + this.formatCommand(runCommand, "type", "Check TypeScript types") + `
@@ -646,6 +652,8 @@ var ProjectTemplateCatalog = class {
           type: "tsc --watch --noEmit",
           test: "node kit-dev/test/test.cjs",
           fmt: "node kit-dev/format/fmt.cjs",
+          view: "node kit-dev/view/view.cjs",
+          v: "node kit-dev/view/view.cjs",
           di: "node kit-dev/di/install.cjs"
         },
         dependencies: {},

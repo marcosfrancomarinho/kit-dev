@@ -28,6 +28,10 @@ export class ProjectPaths {
     return join(this.kitDev(), 'format');
   }
 
+  view(): string {
+    return join(this.kitDev(), 'view');
+  }
+
   test(): string {
     return join(this.projectPath, 'test');
   }
@@ -64,6 +68,7 @@ export class ProjectPaths {
       this.di(),
       this.kitDevTest(),
       this.format(),
+      this.view(),
       this.test(),
     ];
   }

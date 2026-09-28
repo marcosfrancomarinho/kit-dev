@@ -2137,3 +2137,1058 @@ export class Example {
   assert.match(execution.stdout, /# pass 2/);
   assert.match(execution.stdout, /# todo 0/);
 });
+
+
+test(
+  'gera fixture para construtor com object binding pattern',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-object-binding-pattern-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'domain', 'entities'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'entities', 'veiculo.ts'),
+      `
+export interface Input {
+  marca: string
+  ano: number
+}
+
+export class Veiculo {
+  private marca: string
+  private ano: number
+
+  constructor({ marca, ano }: Input) {
+    this.ano = ano
+    this.marca = marca
+  }
+
+  getMarca(): string {
+    return this.marca
+  }
+
+  getAno(): number {
+    return this.ano
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest(
+      'src/domain/entities/veiculo.ts',
+      projectPath,
+    );
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /const input: ConstructorParameters<typeof Veiculo>\[0\] = \{ marca: "marca", ano: 1 \}/,
+    );
+    assert.match(generated, /const sut = new Veiculo\(input\)/);
+    assert.doesNotMatch(generated, /new Veiculo\(\)/);
+    assert.match(
+      generated,
+      /assert\.equal\(result, input\.marca\)/,
+    );
+    assert.match(
+      generated,
+      /assert\.equal\(result, input\.ano\)/,
+    );
+  },
+);
+
+test(
+  'gera fixture para construtor com array binding pattern',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-array-binding-pattern-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'range.ts'),
+      `
+export class Range {
+  private start: number
+  private end: number
+
+  constructor([start, end]: [number, number]) {
+    this.start = start
+    this.end = end
+  }
+
+  getStart(): number {
+    return this.start
+  }
+
+  getEnd(): number {
+    return this.end
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/range.ts', projectPath);
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      generated,
+      /const input: ConstructorParameters<typeof Range>\[0\] = \[1, 1\]/,
+    );
+    assert.match(generated, /const sut = new Range\(input\)/);
+    assert.match(
+      generated,
+      /assert\.equal\(result, input\[0\]\)/,
+    );
+    assert.match(
+      generated,
+      /assert\.equal\(result, input\[1\]\)/,
+    );
+  },
+);
+
+
+test(
+  'inicializa propriedades publicas sem construtor antes de testar getters',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-public-properties-getters-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src', 'domain', 'entities'), {
+      recursive: true,
+    });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'domain', 'entities', 'veiculo.ts'),
+      `
+export interface Input {
+  marca: string
+  ano: number
+}
+
+export class Veiculo {
+  public marca!: string
+  public ano!: number
+
+  public getMarca(): string {
+    return this.marca
+  }
+
+  public getAno(): number {
+    return this.ano
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest(
+      'src/domain/entities/veiculo.ts',
+      projectPath,
+    );
+    const generated = await readFile(
+      result.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(generated, /const sut = new Veiculo\(\)/);
+    assert.match(generated, /sut\.marca = "marca"/);
+    assert.match(generated, /sut\.ano = 1/);
+    assert.match(
+      generated,
+      /assert\.equal\(result, "marca"\)/,
+    );
+    assert.match(
+      generated,
+      /assert\.equal\(result, 1\)/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /TODO: add assertions for the business behavior/,
+    );
+  },
+);
+
+
+test(
+  'gera testes para getter setter e metodo static sem tratar factory como metodo comum',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-accessors-static-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'account.ts'),
+      `
+export class Account {
+  private _name = 'Marcos'
+
+  get name(): string {
+    return this._name
+  }
+
+  set name(value: string) {
+    if (value === '') {
+      throw new Error('invalid name')
+    }
+
+    this._name = value
+  }
+
+  static normalize(value: string): string {
+    return value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/account.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(generated, /it\("get name",/);
+    assert.match(generated, /const result = sut\.name/);
+    assert.match(generated, /it\("set name",/);
+    assert.match(generated, /sut\.name = "value"/);
+    assert.match(
+      generated,
+      /it\("name rejects invalid value",/,
+    );
+    assert.match(
+      generated,
+      /assert\.throws\(\(\) => \{/,
+    );
+    assert.match(generated, /sut\.name = ""/);
+    assert.match(generated, /it\("normalize",/);
+    assert.match(
+      generated,
+      /Account\.normalize\("value"\)/,
+    );
+    assert.match(
+      generated,
+      /it\("normalize", \(\) => \{\s*const result = Account\.normalize\("value"\)/,
+    );
+
+    const output = join(projectPath, 'generated-accessors.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);
+
+test(
+  'gera assert throws para guarda simples em metodo de instancia',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-method-guard-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'wallet.ts'),
+      `
+export class Wallet {
+  withdraw(amount: number): void {
+    if (amount < 0) {
+      throw new Error('invalid amount')
+    }
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/wallet.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(
+      generated,
+      /it\("withdraw rejects invalid amount",/,
+    );
+    assert.match(
+      generated,
+      /assert\.throws\(\(\) => sut\.withdraw\(-1\)\)/,
+    );
+  },
+);
+
+
+test(
+  'cobre heranca de construtor metodos herdados override overload e destructuring aninhado',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-inheritance-overloads-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'base.ts'),
+      `
+export class Base {
+  constructor(private readonly id: string) {}
+
+  getId(): string {
+    return this.id
+  }
+
+  describe(value: string): string
+  describe(value: number): string
+  describe(value: string | number): string {
+    return String(value)
+  }
+}
+`,
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'entity.ts'),
+      `
+import { Base } from './base.js'
+
+interface Input {
+  user: {
+    address: {
+      city: string
+    }
+  }
+}
+
+export class Entity extends Base {
+  private city: string
+
+  constructor(id: string, { user: { address: { city } } }: Input) {
+    super(id)
+    this.city = city
+  }
+
+  override getId(): string {
+    return super.getId()
+  }
+
+  getCity(): string {
+    return this.city
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/entity.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(generated, /const id = "test-id"/);
+    assert.match(
+      generated,
+      /const input2: ConstructorParameters<typeof Entity>\[1\]/,
+    );
+    assert.match(generated, /new Entity\(id, input2\)/);
+    assert.match(
+      generated,
+      /assert\.equal\(result, input2\.user\.address\.city\)/,
+    );
+
+    const output = join(projectPath, 'generated-inheritance.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);
+
+test(
+  'gera fixtures para utility types record partial pick omit e literal unions',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-utility-types-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'utility.ts'),
+      `
+interface User {
+  name: string
+  age: number
+  email: string
+}
+
+export class UtilityExample {
+  execute(
+    partial: Partial<User>,
+    picked: Pick<User, 'name'>,
+    omitted: Omit<User, 'email'>,
+    record: Record<string, number>,
+    role: 'admin' | 'user',
+  ): void {
+    void partial
+    void picked
+    void omitted
+    void record
+    void role
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/utility.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(generated, /sut\.execute\(/);
+
+    const output = join(projectPath, 'generated-utility.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);
+
+
+test(
+  'gera guardas de construtor e recusa classe abstrata com mensagem clara',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-constructor-guard-abstract-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'age.ts'),
+      `
+export class Age {
+  constructor(private readonly value: number) {
+    if (value < 0) {
+      throw new Error('invalid age')
+    }
+  }
+
+  getValue(): number {
+    return this.value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const ageResult = await generateTest('src/age.ts', projectPath);
+    const ageGenerated = await readFile(
+      ageResult.destinationPath,
+      'utf-8',
+    );
+
+    assert.match(
+      ageGenerated,
+      /it\("constructor rejects invalid value",/,
+    );
+    assert.match(
+      ageGenerated,
+      /assert\.throws\(\(\) => new Age\(-1\)\)/,
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'base.ts'),
+      `
+export abstract class Base {
+  abstract execute(): void
+}
+`,
+      'utf-8',
+    );
+
+    await assert.rejects(
+      () => generateTest('src/base.ts', projectPath),
+      /is abstract and cannot be instantiated as a test subject/,
+    );
+  },
+);
+
+test(
+  'infere getter baseado em private field inicializado sem acessar campo privado no teste',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-private-field-getter-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'token.ts'),
+      `
+export class Token {
+  #value = 'token'
+
+  get value(): string {
+    return this.#value
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/token.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(generated, /const result = sut\.value/);
+    assert.match(generated, /assert\.equal\(result, "token"\)/);
+    assert.doesNotMatch(generated, /sut\.#value/);
+  },
+);
+
+
+test(
+  'infere retorno direto de parametro e mutacao publica sem inventar regra de negocio',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-safe-return-state-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'profile.ts'),
+      `
+export class Profile {
+  public name = 'before'
+
+  identity(value: string): string {
+    return value
+  }
+
+  rename(name: string): void {
+    this.name = name
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/profile.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(
+      generated,
+      /const result = sut\.identity\("value"\)/,
+    );
+    assert.match(
+      generated,
+      /assert\.equal\(result, "value"\)/,
+    );
+    assert.match(generated, /sut\.rename\("Marcos"\)/);
+    assert.match(
+      generated,
+      /assert\.equal\(sut\.name, "Marcos"\)/,
+    );
+  },
+);
+
+test(
+  'nao exige chamada de dependencia dentro de branch condicional',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-conditional-call-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'service.ts'),
+      `
+interface Repository {
+  save(): void
+}
+
+export class Service {
+  constructor(private readonly repository: Repository) {}
+
+  execute(enabled: boolean): void {
+    if (!enabled) {
+      this.repository.save()
+    }
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/service.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(
+      generated,
+      /TODO: conditional call repository\.save depends on runtime branch/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /repositorySaveMock\.mock\.callCount\(\), 1/,
+    );
+
+    const output = join(projectPath, 'generated-conditional.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);
+
+
+test(
+  'cobre parametros rest destructuring em metodo e overload de construtor',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-rest-method-binding-overload-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+
+    await writeFile(
+      join(projectPath, 'src', 'collector.ts'),
+      `
+interface Input {
+  user: {
+    name: string
+  }
+}
+
+export class Collector {
+  private readonly prefix: string
+  private readonly values: number[]
+
+  constructor(prefix: string, ...values: number[])
+  constructor(prefix: string, ...values: number[]) {
+    this.prefix = prefix
+    this.values = values
+  }
+
+  pick({ user: { name } }: Input): string {
+    return name
+  }
+
+  collect(...ids: string[]): void {
+    void ids
+  }
+
+  getPrefix(): string {
+    return this.prefix
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/collector.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(generated, /const prefix = "prefix"/);
+    assert.match(generated, /const values = \[1\]/);
+    assert.match(
+      generated,
+      /const sut = new Collector\(prefix, \.\.\.values\)/,
+    );
+    assert.match(
+      generated,
+      /const input: Parameters<Collector\['pick'\]>\[0\] = \{ user: \{ name: "Marcos" \} \}/,
+    );
+    assert.match(
+      generated,
+      /const result = sut\.pick\(input\)/,
+    );
+    assert.match(
+      generated,
+      /assert\.equal\(result, input\.user\.name\)/,
+    );
+    assert.match(generated, /const ids = \["test-id"\]/);
+    assert.match(generated, /sut\.collect\(\.\.\.ids\)/);
+
+    const output = join(projectPath, 'generated-rest.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);
+
+test(
+  'usa construtor herdado quando subclasse nao declara construtor',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-inherited-constructor-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'base.ts'),
+      `
+export class Base {
+  constructor(private readonly name: string) {}
+
+  getName(): string {
+    return this.name
+  }
+}
+`,
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'child.ts'),
+      `
+import { Base } from './base.js'
+
+export class Child extends Base {}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/child.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(generated, /const name = "Marcos"/);
+    assert.match(generated, /new Child\(name\)/);
+    assert.match(generated, /it\("getName",/);
+
+    const output = join(projectPath, 'generated-child.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);
+
+
+test(
+  'infere retorno calculado apenas quando expressao e deterministica e conhecida',
+  async (context) => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'kit-dev-computed-return-'),
+    );
+    context.after(() =>
+      rm(projectPath, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      }),
+    );
+
+    await mkdir(join(projectPath, 'src'), { recursive: true });
+    await writeFile(
+      join(projectPath, 'package.json'),
+      JSON.stringify({ type: 'module' }),
+      'utf-8',
+    );
+    await writeFile(
+      join(projectPath, 'src', 'product.ts'),
+      `
+export class Product {
+  constructor(
+    private readonly price: number,
+    private readonly quantity: number,
+  ) {}
+
+  total(): number {
+    return this.price * this.quantity
+  }
+
+  isExpensive(limit: number): boolean {
+    return this.price > limit
+  }
+}
+`,
+      'utf-8',
+    );
+
+    const result = await generateTest('src/product.ts', projectPath);
+    const generated = await readFile(result.destinationPath, 'utf-8');
+
+    assert.match(
+      generated,
+      /assert\.equal\(result, \(price \* quantity\)\)/,
+    );
+    assert.match(
+      generated,
+      /assert\.equal\(result, \(price > 1\)\)/,
+    );
+
+    const output = join(projectPath, 'generated-computed.test.cjs');
+    await require('esbuild').build({
+      entryPoints: [result.destinationPath],
+      outfile: output,
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+    });
+    const execution = require('node:child_process').spawnSync(
+      process.execPath,
+      ['--test', output],
+      { encoding: 'utf-8' },
+    );
+    assert.equal(
+      execution.status,
+      0,
+      execution.stdout + execution.stderr,
+    );
+  },
+);

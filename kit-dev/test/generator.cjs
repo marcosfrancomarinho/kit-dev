@@ -35,6 +35,14 @@ async function generateTest(target, projectRoot = process.cwd()) {
     );
   }
 
+  if (metadata.abstract) {
+    throw new Error(
+      metadata.className +
+        ' is abstract and cannot be instantiated as a test subject. ' +
+        'Generate the test from a concrete implementation instead.',
+    );
+  }
+
   if (metadata.creation.kind === 'unavailable') {
     throw new Error(
       metadata.className +
@@ -183,6 +191,133 @@ function renderFixtureImports(
   return lines;
 }
 
+function getBaseClassDeclaration(ts, checker, classNode) {
+  const extendsClause = classNode.heritageClauses?.find(
+    (clause) => clause.token === ts.SyntaxKind.ExtendsKeyword,
+  );
+  const baseType = extendsClause?.types?.[0];
+
+  if (!baseType) return null;
+
+  try {
+    let symbol = checker.getSymbolAtLocation(baseType.expression);
+
+    if (
+      symbol &&
+      symbol.flags & ts.SymbolFlags.Alias &&
+      checker.getAliasedSymbol
+    ) {
+      symbol = checker.getAliasedSymbol(symbol);
+    }
+
+    return symbol?.declarations?.find(ts.isClassDeclaration) || null;
+  } catch {
+    return null;
+  }
+}
+
+function collectClassHierarchy(ts, checker, classNode) {
+  const hierarchy = [];
+  const visited = new Set();
+  let current = classNode;
+
+  while (current && !visited.has(current)) {
+    visited.add(current);
+    hierarchy.push(current);
+    current = getBaseClassDeclaration(ts, checker, current);
+  }
+
+  return hierarchy;
+}
+
+function findEffectiveConstructor(ts, hierarchy) {
+  for (const classNode of hierarchy) {
+    const constructors = classNode.members.filter(
+      ts.isConstructorDeclaration,
+    );
+    const constructorNode =
+      constructors.find((item) => item.body) ||
+      constructors[0] ||
+      null;
+
+    if (constructorNode) {
+      return {
+        node: constructorNode,
+        sourceFile: constructorNode.getSourceFile(),
+      };
+    }
+  }
+
+  return {
+    node: null,
+    sourceFile: hierarchy[0].getSourceFile(),
+  };
+}
+
+function collectHierarchyMembers(ts, hierarchy) {
+  const result = [];
+  const indexes = new Map();
+
+  for (const classNode of hierarchy) {
+    for (const member of classNode.members) {
+      if (!isPublicMethod(ts, member)) continue;
+
+      const kind = ts.isGetAccessorDeclaration(member)
+        ? 'getter'
+        : ts.isSetAccessorDeclaration(member)
+          ? 'setter'
+          : 'method';
+      const isStatic = hasModifier(
+        ts,
+        member,
+        ts.SyntaxKind.StaticKeyword,
+      );
+      const key =
+        kind + ':' + (isStatic ? 'static:' : '') + member.name.text;
+
+      if (!indexes.has(key)) {
+        indexes.set(key, result.length);
+        result.push(member);
+        continue;
+      }
+
+      const index = indexes.get(key);
+      const previous = result[index];
+
+      if (!previous.body && member.body) {
+        result[index] = member;
+      }
+    }
+  }
+
+  return result;
+}
+
+function collectHierarchyPublicPropertyFixtures(
+  ts,
+  checker,
+  hierarchy,
+  fixtureContext,
+) {
+  const fixtures = new Map();
+
+  for (const classNode of [...hierarchy].reverse()) {
+    const current = collectPublicPropertyFixtures(
+      ts,
+      checker,
+      classNode,
+      classNode.getSourceFile(),
+      fixtureContext,
+    );
+
+    for (const [name, fixture] of current) {
+      fixtures.set(name, fixture);
+    }
+  }
+
+  return fixtures;
+}
+
 function analyzeClass(ts, sourceFile, checker, fixtureContext) {
   const classes = sourceFile.statements.filter(ts.isClassDeclaration);
   const classNode =
@@ -197,19 +332,34 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
   if (!classNode || !classNode.name) return null;
 
   const className = classNode.name.text;
-  const constructorNode = classNode.members.find(ts.isConstructorDeclaration);
+  const abstract = hasModifier(
+    ts,
+    classNode,
+    ts.SyntaxKind.AbstractKeyword,
+  );
+  const hierarchy = collectClassHierarchy(ts, checker, classNode);
+  const effectiveConstructor = findEffectiveConstructor(ts, hierarchy);
+  const constructorNode = effectiveConstructor.node;
+  const constructorSourceFile = effectiveConstructor.sourceFile;
   const constructorParameters = analyzeParameters(
     ts,
     checker,
     constructorNode?.parameters || [],
-    sourceFile,
+    constructorSourceFile,
     fixtureContext,
   );
   const propertySources = collectConstructorPropertySources(
     ts,
     constructorNode,
-    sourceFile,
+    constructorSourceFile,
   );
+  const publicPropertyFixtures =
+    collectHierarchyPublicPropertyFixtures(
+      ts,
+      checker,
+      hierarchy,
+      fixtureContext,
+    );
   const factory = findStaticFactory(
     ts,
     checker,
@@ -239,7 +389,13 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
           methodName: null,
           async: false,
           parameters: constructorParameters,
-          negativeCases: [],
+          negativeCases: constructorNode
+            ? detectSimpleFactoryThrowCases(
+                ts,
+                constructorNode,
+                constructorSourceFile,
+              )
+            : [],
           sourceAliases: new Map(
             constructorParameters.map((parameter) => [
               parameter.name,
@@ -270,30 +426,65 @@ function analyzeClass(ts, sourceFile, checker, fixtureContext) {
     ...creation.parameters.map((parameter) => parameter.name),
   ]);
 
-  const methods = classNode.members
-    .filter((member) => isPublicMethod(ts, member))
+  const methods = collectHierarchyMembers(ts, hierarchy)
+    .filter(
+      (member) =>
+        !(
+          factory &&
+          ts.isMethodDeclaration(member) &&
+          hasModifier(ts, member, ts.SyntaxKind.StaticKeyword) &&
+          member.name.text === factory.methodName
+        ),
+    )
     .map((method) =>
       analyzeMethod({
         ts,
         checker,
-        sourceFile,
+        sourceFile: method.getSourceFile(),
         method,
         className,
         dependencyNames,
         constructorParameters,
         constructorNames: knownNames,
         propertySources,
+        publicPropertyFixtures,
         sourceAliases: creation.sourceAliases,
         fixtureContext,
+        memberKind: ts.isGetAccessorDeclaration(method)
+          ? 'getter'
+          : ts.isSetAccessorDeclaration(method)
+            ? 'setter'
+            : 'method',
+        isStatic: hasModifier(
+          ts,
+          method,
+          ts.SyntaxKind.StaticKeyword,
+        ),
       }),
     );
 
   return {
     className,
+    abstract,
     constructorParameters,
     creation,
     methods,
   };
+}
+
+function getParameterFixtureName(ts, parameter, index) {
+  if (ts.isIdentifier(parameter.name)) {
+    return parameter.name.text;
+  }
+
+  if (
+    ts.isObjectBindingPattern(parameter.name) ||
+    ts.isArrayBindingPattern(parameter.name)
+  ) {
+    return index === 0 ? 'input' : `input${index + 1}`;
+  }
+
+  return `argument${index + 1}`;
 }
 
 function analyzeParameters(
@@ -304,9 +495,14 @@ function analyzeParameters(
   fixtureContext,
 ) {
   return parameters
-    .filter((parameter) => ts.isIdentifier(parameter.name))
+    .filter(
+      (parameter) =>
+        ts.isIdentifier(parameter.name) ||
+        ts.isObjectBindingPattern(parameter.name) ||
+        ts.isArrayBindingPattern(parameter.name),
+    )
     .map((parameter, index) => {
-      const name = parameter.name.text;
+      const name = getParameterFixtureName(ts, parameter, index);
       const fixture = renderParameterFixture(
         ts,
         checker,
@@ -336,6 +532,7 @@ function analyzeParameters(
       return {
         index,
         name,
+        rest: Boolean(parameter.dotDotDotToken),
         type: parameter.type
           ? parameter.type.getText(sourceFile)
           : checker.typeToString(
@@ -851,6 +1048,225 @@ function hasModifier(ts, node, kind) {
   );
 }
 
+function isConditionalExecution(ts, node, boundary) {
+  let current = node.parent;
+
+  while (current && current !== boundary) {
+    if (
+      ts.isIfStatement(current) ||
+      ts.isConditionalExpression(current) ||
+      ts.isSwitchStatement(current) ||
+      ts.isCaseClause?.(current) ||
+      ts.isDefaultClause?.(current)
+    ) {
+      return true;
+    }
+
+    current = current.parent;
+  }
+
+  return false;
+}
+
+function renderKnownExpression(
+  ts,
+  node,
+  parameterMap,
+  propertySources,
+  publicPropertyFixtures,
+  sourceAliases,
+  sourceFile,
+) {
+  const direct = renderSafeExpression(
+    ts,
+    node,
+    parameterMap,
+    sourceFile,
+  );
+
+  if (direct !== null) return direct;
+
+  if (ts.isParenthesizedExpression(node)) {
+    const inner = renderKnownExpression(
+      ts,
+      node.expression,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+
+    return inner === null ? null : '(' + inner + ')';
+  }
+
+  const thisPath = getThisPropertyPath(ts, node);
+
+  if (thisPath?.length) {
+    const [root, ...rest] = thisPath;
+    const source = propertySources?.get(root);
+
+    if (source) {
+      const translated = translateSourceExpression(
+        rest.length > 0
+          ? source + '.' + rest.join('.')
+          : source,
+        sourceAliases,
+      );
+
+      if (translated) return translated;
+    }
+
+    if (rest.length === 0) {
+      const property = publicPropertyFixtures?.get(root);
+
+      if (
+        property?.initialized &&
+        property.fixture !== null &&
+        property.fixture !== undefined
+      ) {
+        return property.fixture;
+      }
+    }
+  }
+
+  if (ts.isBinaryExpression(node)) {
+    const allowedOperators = new Set([
+      ts.SyntaxKind.PlusToken,
+      ts.SyntaxKind.MinusToken,
+      ts.SyntaxKind.AsteriskToken,
+      ts.SyntaxKind.SlashToken,
+      ts.SyntaxKind.PercentToken,
+      ts.SyntaxKind.AsteriskAsteriskToken,
+      ts.SyntaxKind.LessThanToken,
+      ts.SyntaxKind.LessThanEqualsToken,
+      ts.SyntaxKind.GreaterThanToken,
+      ts.SyntaxKind.GreaterThanEqualsToken,
+      ts.SyntaxKind.EqualsEqualsToken,
+      ts.SyntaxKind.EqualsEqualsEqualsToken,
+      ts.SyntaxKind.ExclamationEqualsToken,
+      ts.SyntaxKind.ExclamationEqualsEqualsToken,
+      ts.SyntaxKind.AmpersandAmpersandToken,
+      ts.SyntaxKind.BarBarToken,
+      ts.SyntaxKind.QuestionQuestionToken,
+      ts.SyntaxKind.AmpersandToken,
+      ts.SyntaxKind.BarToken,
+      ts.SyntaxKind.CaretToken,
+      ts.SyntaxKind.LessThanLessThanToken,
+      ts.SyntaxKind.GreaterThanGreaterThanToken,
+      ts.SyntaxKind.GreaterThanGreaterThanGreaterThanToken,
+    ]);
+
+    if (!allowedOperators.has(node.operatorToken.kind)) return null;
+
+    const left = renderKnownExpression(
+      ts,
+      node.left,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+    const right = renderKnownExpression(
+      ts,
+      node.right,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+
+    if (left === null || right === null) return null;
+
+    return (
+      '(' +
+      left +
+      ' ' +
+      node.operatorToken.getText(sourceFile) +
+      ' ' +
+      right +
+      ')'
+    );
+  }
+
+  if (ts.isPrefixUnaryExpression(node)) {
+    const allowedPrefix = new Set([
+      ts.SyntaxKind.ExclamationToken,
+      ts.SyntaxKind.PlusToken,
+      ts.SyntaxKind.MinusToken,
+      ts.SyntaxKind.TildeToken,
+    ]);
+
+    if (!allowedPrefix.has(node.operator)) return null;
+
+    const operand = renderKnownExpression(
+      ts,
+      node.operand,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+
+    if (operand === null) return null;
+
+    return node.getText(sourceFile).slice(0, 1) + operand;
+  }
+
+  if (ts.isConditionalExpression(node)) {
+    const condition = renderKnownExpression(
+      ts,
+      node.condition,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+    const whenTrue = renderKnownExpression(
+      ts,
+      node.whenTrue,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+    const whenFalse = renderKnownExpression(
+      ts,
+      node.whenFalse,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+
+    if (
+      condition === null ||
+      whenTrue === null ||
+      whenFalse === null
+    ) {
+      return null;
+    }
+
+    return (
+      '(' +
+      condition +
+      ' ? ' +
+      whenTrue +
+      ' : ' +
+      whenFalse +
+      ')'
+    );
+  }
+
+  return null;
+}
+
 function analyzeMethod({
   ts,
   checker,
@@ -861,14 +1277,22 @@ function analyzeMethod({
   constructorParameters,
   constructorNames,
   propertySources,
+  publicPropertyFixtures,
   sourceAliases,
   fixtureContext,
+  memberKind = 'method',
+  isStatic = false,
 }) {
   const methodName = method.name.text;
-  const parameters = method.parameters
-    .filter((parameter) => ts.isIdentifier(parameter.name))
-    .map((parameter, index) => {
-      const name = parameter.name.text;
+  const supportedMethodParameters = method.parameters.filter(
+    (parameter) =>
+      ts.isIdentifier(parameter.name) ||
+      ts.isObjectBindingPattern(parameter.name) ||
+      ts.isArrayBindingPattern(parameter.name),
+  );
+  const parameters = supportedMethodParameters.map(
+    (parameter, index) => {
+      const name = getParameterFixtureName(ts, parameter, index);
       const inferredFixture = renderParameterFixture(
         ts,
         checker,
@@ -884,7 +1308,7 @@ function analyzeMethod({
         inferredFixture ?? (optional ? 'undefined' : null);
       const simple =
         fixture !== null && isSimpleFixture(fixture);
-      const variableName = simple
+      const variableName = simple || parameter.dotDotDotToken
         ? null
         : uniqueParameterName(
             name,
@@ -895,11 +1319,13 @@ function analyzeMethod({
       return {
         index,
         name,
+        rest: Boolean(parameter.dotDotDotToken),
         optional,
         fixture,
         variableName,
       };
-    });
+    },
+  );
 
   const parameterMap = new Map(
     parameters.map((parameter) => [
@@ -908,12 +1334,49 @@ function analyzeMethod({
         parameter.fixture ||
         fallbackMethodParameter(
           className,
-          methodName,
+          {
+            name: methodName,
+            kind: memberKind,
+            static: isStatic,
+          },
           parameter.index,
           parameter.name,
         ),
     ]),
   );
+  supportedMethodParameters.forEach((parameter, index) => {
+    if (
+      !ts.isObjectBindingPattern(parameter.name) &&
+      !ts.isArrayBindingPattern(parameter.name)
+    ) {
+      return;
+    }
+
+    const metadata = parameters[index];
+    const source =
+      metadata.variableName ||
+      metadata.fixture ||
+      fallbackMethodParameter(
+        className,
+        {
+          name: methodName,
+          kind: memberKind,
+          static: isStatic,
+          rest: metadata.rest,
+        },
+        metadata.index,
+        metadata.name,
+      );
+
+    collectBindingAliases(
+      ts,
+      parameter.name,
+      source,
+      parameterMap,
+      sourceFile,
+    );
+  });
+
   const collectionDependencies = new Set(
     (constructorParameters || [])
       .filter(
@@ -943,6 +1406,7 @@ function analyzeMethod({
       returnsPromise: false,
       returnFixture: 'undefined',
       expectedArguments: null,
+      conditional: false,
     };
 
     const returnInfo = getCallReturnInfo(
@@ -963,6 +1427,9 @@ function analyzeMethod({
       parameterMap,
       sourceFile,
     );
+    current.conditional =
+      current.conditional ||
+      isConditionalExecution(ts, node, method.body);
     calls.set(key, current);
   }
 
@@ -1049,8 +1516,97 @@ function analyzeMethod({
 
   if (method.body) visit(method.body);
 
+  const detectedReturn = detectExpectedReturn(
+    ts,
+    method,
+    propertySources,
+    sourceFile,
+  );
+  let expectedReturn = translateSourceExpression(
+    detectedReturn,
+    sourceAliases,
+  );
+  const instanceSetup = [];
+  const stateAssertions = [];
+
+  if (
+    !expectedReturn &&
+    method.body?.statements.length === 1 &&
+    ts.isReturnStatement(method.body.statements[0]) &&
+    method.body.statements[0].expression
+  ) {
+    expectedReturn = renderKnownExpression(
+      ts,
+      method.body.statements[0].expression,
+      parameterMap,
+      propertySources,
+      publicPropertyFixtures,
+      sourceAliases,
+      sourceFile,
+    );
+  }
+
+  if (!expectedReturn && method.body?.statements.length === 1) {
+    const statement = method.body.statements[0];
+
+    if (ts.isReturnStatement(statement) && statement.expression) {
+      const path = getThisPropertyPath(ts, statement.expression);
+
+      if (path?.length === 1) {
+        const property = publicPropertyFixtures?.get(path[0]);
+
+        if (property?.fixture !== null && property?.fixture !== undefined) {
+          expectedReturn = property.fixture;
+
+          if (!property.initialized && property.writableFromTest) {
+            instanceSetup.push(
+              `sut.${path[0]} = ${property.fixture}`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  if (method.body && !isStatic) {
+    for (const statement of method.body.statements) {
+      if (
+        !ts.isExpressionStatement(statement) ||
+        !ts.isBinaryExpression(statement.expression) ||
+        statement.expression.operatorToken.kind !==
+          ts.SyntaxKind.EqualsToken ||
+        !ts.isPropertyAccessExpression(statement.expression.left) ||
+        statement.expression.left.expression.kind !==
+          ts.SyntaxKind.ThisKeyword
+      ) {
+        continue;
+      }
+
+      const propertyName = statement.expression.left.name.text;
+      const property = publicPropertyFixtures?.get(propertyName);
+
+      if (!property?.writableFromTest) continue;
+
+      const expected = renderSafeExpression(
+        ts,
+        statement.expression.right,
+        parameterMap,
+        sourceFile,
+      );
+
+      if (expected !== null) {
+        stateAssertions.push({
+          property: propertyName,
+          expected,
+        });
+      }
+    }
+  }
+
   return {
     name: methodName,
+    kind: memberKind,
+    static: isStatic,
     async: Boolean(
       method.modifiers?.some(
         (modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword,
@@ -1058,36 +1614,170 @@ function analyzeMethod({
     ),
     parameters,
     calls: [...calls.values()],
-    expectedReturn: translateSourceExpression(
-      detectExpectedReturn(
-        ts,
-        method,
-        propertySources,
-        sourceFile,
-      ),
-      sourceAliases,
-    ),
+    expectedReturn,
+    instanceSetup,
+    stateAssertions,
+    negativeCases:
+      memberKind === 'method' || memberKind === 'setter'
+        ? detectSimpleFactoryThrowCases(ts, method, sourceFile)
+        : [],
   };
 }
 
 function translateSourceExpression(source, aliases) {
   if (!source || !aliases) return source;
 
-  const parts = source.split('.');
+  for (const [prefix, alias] of aliases) {
+    if (source === prefix) return alias;
 
-  for (let length = parts.length; length > 0; length -= 1) {
-    const prefix = parts.slice(0, length).join('.');
-    const alias = aliases.get(prefix);
-
-    if (!alias) continue;
-
-    const rest = parts.slice(length);
-    return rest.length > 0
-      ? alias + '.' + rest.join('.')
-      : alias;
+    if (
+      source.startsWith(prefix + '.') ||
+      source.startsWith(prefix + '[')
+    ) {
+      return alias + source.slice(prefix.length);
+    }
   }
 
   return aliases.size > 0 ? null : source;
+}
+
+function collectPublicPropertyFixtures(
+  ts,
+  checker,
+  classNode,
+  sourceFile,
+  fixtureContext,
+) {
+  const fixtures = new Map();
+
+  for (const member of classNode.members) {
+    if (
+      !ts.isPropertyDeclaration(member) ||
+      !(
+        ts.isIdentifier(member.name) ||
+        ts.isPrivateIdentifier?.(member.name)
+      ) ||
+      hasModifier(ts, member, ts.SyntaxKind.StaticKeyword)
+    ) {
+      continue;
+    }
+
+    const initialized = Boolean(member.initializer);
+    const writableFromTest =
+      !hasModifier(ts, member, ts.SyntaxKind.PrivateKeyword) &&
+      !hasModifier(ts, member, ts.SyntaxKind.ProtectedKeyword) &&
+      !hasModifier(ts, member, ts.SyntaxKind.ReadonlyKeyword);
+
+    if (!initialized && !writableFromTest) continue;
+
+    const name = member.name.text;
+    const initializer = renderInitializerFixture(
+      ts,
+      member.initializer,
+      sourceFile,
+    );
+
+    let fixture = initializer;
+
+    if (fixture === null) {
+      try {
+        const type = member.type
+          ? checker.getTypeFromTypeNode(member.type)
+          : checker.getTypeAtLocation(member);
+
+        fixture = renderTypeFixture(
+          ts,
+          checker,
+          type,
+          name,
+          sourceFile,
+          0,
+          { fixtureContext, preferNull: false },
+        );
+      } catch {
+        fixture = member.type
+          ? renderTypeTextFixture(
+              member.type.getText(sourceFile),
+              name,
+            )
+          : null;
+      }
+    }
+
+    fixtures.set(name, {
+      fixture,
+      initialized,
+      writableFromTest,
+    });
+  }
+
+  return fixtures;
+}
+
+function collectBindingAliases(
+  ts,
+  bindingName,
+  source,
+  aliases,
+  sourceFile,
+) {
+  if (ts.isIdentifier(bindingName)) {
+    aliases.set(bindingName.text, source);
+    return;
+  }
+
+  if (ts.isObjectBindingPattern(bindingName)) {
+    for (const element of bindingName.elements) {
+      if (element.dotDotDotToken) continue;
+
+      let propertySource = null;
+
+      if (element.propertyName) {
+        if (ts.isIdentifier(element.propertyName)) {
+          propertySource = source + '.' + element.propertyName.text;
+        } else if (
+          ts.isStringLiteral(element.propertyName) ||
+          ts.isNumericLiteral(element.propertyName)
+        ) {
+          propertySource =
+            source + '[' + JSON.stringify(element.propertyName.text) + ']';
+        } else {
+          propertySource =
+            source + '[' + element.propertyName.getText(sourceFile) + ']';
+        }
+      } else if (ts.isIdentifier(element.name)) {
+        propertySource = source + '.' + element.name.text;
+      }
+
+      if (propertySource) {
+        collectBindingAliases(
+          ts,
+          element.name,
+          propertySource,
+          aliases,
+          sourceFile,
+        );
+      }
+    }
+
+    return;
+  }
+
+  if (ts.isArrayBindingPattern(bindingName)) {
+    bindingName.elements.forEach((element, index) => {
+      if (ts.isOmittedExpression(element) || element.dotDotDotToken) {
+        return;
+      }
+
+      collectBindingAliases(
+        ts,
+        element.name,
+        source + '[' + index + ']',
+        aliases,
+        sourceFile,
+      );
+    });
+  }
 }
 
 function collectConstructorPropertySources(
@@ -1099,27 +1789,42 @@ function collectConstructorPropertySources(
 
   if (!constructorNode) return sources;
 
-  const parameterNames = new Set();
+  const parameterAliases = new Map();
 
-  for (const parameter of constructorNode.parameters) {
-    if (!ts.isIdentifier(parameter.name)) continue;
+  constructorNode.parameters.forEach((parameter, index) => {
+    if (ts.isIdentifier(parameter.name)) {
+      parameterAliases.set(parameter.name.text, parameter.name.text);
 
-    parameterNames.add(parameter.name.text);
+      const modifiers = parameter.modifiers || [];
+      const isParameterProperty = modifiers.some((modifier) =>
+        [
+          ts.SyntaxKind.PublicKeyword,
+          ts.SyntaxKind.PrivateKeyword,
+          ts.SyntaxKind.ProtectedKeyword,
+          ts.SyntaxKind.ReadonlyKeyword,
+        ].includes(modifier.kind),
+      );
 
-    const modifiers = parameter.modifiers || [];
-    const isParameterProperty = modifiers.some((modifier) =>
-      [
-        ts.SyntaxKind.PublicKeyword,
-        ts.SyntaxKind.PrivateKeyword,
-        ts.SyntaxKind.ProtectedKeyword,
-        ts.SyntaxKind.ReadonlyKeyword,
-      ].includes(modifier.kind),
-    );
+      if (isParameterProperty) {
+        sources.set(parameter.name.text, parameter.name.text);
+      }
 
-    if (isParameterProperty) {
-      sources.set(parameter.name.text, parameter.name.text);
+      return;
     }
-  }
+
+    if (
+      ts.isObjectBindingPattern(parameter.name) ||
+      ts.isArrayBindingPattern(parameter.name)
+    ) {
+      collectBindingAliases(
+        ts,
+        parameter.name,
+        getParameterFixtureName(ts, parameter, index),
+        parameterAliases,
+        sourceFile,
+      );
+    }
+  });
 
   function visit(node) {
     if (
@@ -1131,7 +1836,7 @@ function collectConstructorPropertySources(
       const source = renderParameterSourceExpression(
         ts,
         node.right,
-        parameterNames,
+        parameterAliases,
         sourceFile,
       );
 
@@ -1151,7 +1856,7 @@ function collectConstructorPropertySources(
 function renderParameterSourceExpression(
   ts,
   node,
-  parameterNames,
+  parameterAliases,
   sourceFile,
 ) {
   let current = node;
@@ -1165,9 +1870,11 @@ function renderParameterSourceExpression(
 
   if (
     ts.isIdentifier(current) &&
-    parameterNames.has(current.text)
+    parameterAliases.has(current.text)
   ) {
-    return node.getText(sourceFile);
+    const rendered = node.getText(sourceFile);
+    const root = current.getText(sourceFile);
+    return parameterAliases.get(current.text) + rendered.slice(root.length);
   }
 
   return null;
@@ -2363,6 +3070,49 @@ function renderSafeExpression(
   return null;
 }
 
+function renderMemberInvocation(
+  className,
+  method,
+  argumentsList,
+  target = 'sut',
+) {
+  if (method.kind === 'getter') {
+    return (method.static ? className : target) + '.' + method.name;
+  }
+
+  if (method.kind === 'setter') {
+    return (
+      (method.static ? className : target) +
+      '.' +
+      method.name +
+      ' = ' +
+      (argumentsList[0] || 'undefined')
+    );
+  }
+
+  return (
+    (method.static ? className : target) +
+    '.' +
+    method.name +
+    '(' +
+    argumentsList.join(', ') +
+    ')'
+  );
+}
+
+function renderMethodArguments(
+  className,
+  method,
+  overrideIndex = -1,
+  overrideFixture = null,
+) {
+  return method.parameters.map((parameter, index) =>
+    index === overrideIndex
+      ? overrideFixture
+      : renderMethodArgument(className, method, parameter),
+  );
+}
+
 function renderTest({
   className,
   creation,
@@ -2388,15 +3138,12 @@ function renderTest({
     '',
   ].join('\n');
 
-  if (
-    creation.kind === 'factory' &&
-    creation.negativeCases?.length > 0
-  ) {
+  if (creation.negativeCases?.length > 0) {
     for (const negativeCase of creation.negativeCases) {
       const callback = creation.async ? 'async ()' : '()';
 
       lines.push(
-        `it(${JSON.stringify(creation.methodName + ' rejects invalid ' + negativeCase.parameterName)}, ${callback} => {`,
+        `it(${JSON.stringify((creation.methodName || 'constructor') + ' rejects invalid ' + negativeCase.parameterName)}, ${callback} => {`,
         ...renderCreationSetup(
           className,
           creation,
@@ -2471,15 +3218,106 @@ function renderTest({
         ? '(t)'
         : '()';
 
-    lines.push(`it(${JSON.stringify(method.name)}, ${callback} => {`);
+    if (method.negativeCases?.length > 0) {
+      for (const negativeCase of method.negativeCases) {
+        lines.push(
+          `it(${JSON.stringify(method.name + ' rejects invalid ' + negativeCase.parameterName)}, ${method.async ? 'async ()' : '()'} => {`,
+        );
+
+        if (!method.static) {
+          lines.push(
+            ...renderCreationSetup(
+              className,
+              creation,
+              [],
+            ),
+          );
+        }
+
+        const methodParameterLines = renderMethodParameterSetup(
+          className,
+          method,
+        );
+
+        if (
+          (!method.static && creation.parameters.length > 0) ||
+          methodParameterLines.length > 0
+        ) {
+          lines.push('');
+        }
+
+        lines.push(...methodParameterLines);
+
+        if (!method.static) {
+          if (
+            creation.parameters.length > 0 ||
+            methodParameterLines.length > 0
+          ) {
+            lines.push('');
+          }
+
+          lines.push(
+            `  const sut = ${renderCreationExpression(
+              className,
+              creation,
+            )}`,
+          );
+        }
+
+        const invalidArguments = renderMethodArguments(
+          className,
+          method,
+          negativeCase.index,
+          negativeCase.fixture,
+        );
+        const invalidInvocation = renderMemberInvocation(
+          className,
+          method,
+          invalidArguments,
+        );
+
+        if (method.async) {
+          lines.push(
+            '',
+            `  await assert.rejects(() => ${invalidInvocation})`,
+          );
+        } else if (method.kind === 'setter') {
+          lines.push(
+            '',
+            '  assert.throws(() => {',
+            `    ${invalidInvocation}`,
+            '  })',
+          );
+        } else {
+          lines.push(
+            '',
+            `  assert.throws(() => ${invalidInvocation})`,
+          );
+        }
+
+        lines.push('})', '');
+      }
+    }
 
     lines.push(
-      ...renderCreationSetup(
-        className,
-        creation,
-        method.calls,
-      ),
+      `it(${JSON.stringify(
+        method.kind === 'getter'
+          ? 'get ' + method.name
+          : method.kind === 'setter'
+            ? 'set ' + method.name
+            : method.name,
+      )}, ${callback} => {`,
     );
+
+    if (!method.static) {
+      lines.push(
+        ...renderCreationSetup(
+          className,
+          creation,
+          method.calls,
+        ),
+      );
+    }
 
     const methodParameterLines = renderMethodParameterSetup(
       className,
@@ -2487,7 +3325,7 @@ function renderTest({
     );
 
     if (
-      creation.parameters.length > 0 &&
+      (!method.static && creation.parameters.length > 0) &&
       methodParameterLines.length > 0
     ) {
       lines.push('');
@@ -2496,29 +3334,42 @@ function renderTest({
     lines.push(...methodParameterLines);
 
     if (
-      creation.parameters.length > 0 ||
+      (!method.static && creation.parameters.length > 0) ||
       methodParameterLines.length > 0
     ) {
       lines.push('');
     }
 
-    lines.push(
-      `  const sut = ${renderCreationExpression(
-        className,
-        creation,
-      )}`,
-      '',
-    );
+    if (!method.static) {
+      lines.push(
+        `  const sut = ${renderCreationExpression(
+          className,
+          creation,
+        )}`,
+      );
 
-    const argumentsList = method.parameters
-      .map((parameter) =>
-        renderMethodArgument(className, method, parameter),
-      )
-      .join(', ');
-    const invocation = `sut.${method.name}(${argumentsList})`;
+      if (method.instanceSetup?.length > 0) {
+        lines.push(
+          '',
+          ...method.instanceSetup.map((setup) => `  ${setup}`),
+        );
+      }
+
+      lines.push('');
+    }
+
+    const argumentsList = renderMethodArguments(
+      className,
+      method,
+    );
+    const invocation = renderMemberInvocation(
+      className,
+      method,
+      argumentsList,
+    );
     const awaitKeyword = method.async ? 'await ' : '';
 
-    if (method.expectedReturn) {
+    if (method.expectedReturn && method.kind !== 'setter') {
       lines.push(
         `  const result = ${awaitKeyword}${invocation}`,
         '',
@@ -2527,10 +3378,23 @@ function renderTest({
     } else {
       lines.push(`  ${awaitKeyword}${invocation}`);
 
-      if (method.calls.length === 0) {
+      if (
+        method.calls.length === 0 &&
+        method.stateAssertions.length === 0
+      ) {
         lines.push(
           '',
           '  // TODO: add assertions for the business behavior.',
+        );
+      }
+    }
+
+    if (method.stateAssertions.length > 0) {
+      lines.push('');
+
+      for (const state of method.stateAssertions) {
+        lines.push(
+          `  assert.equal(sut.${state.property}, ${state.expected})`,
         );
       }
     }
@@ -2539,6 +3403,13 @@ function renderTest({
       lines.push('');
 
       for (const call of method.calls) {
+        if (call.conditional) {
+          lines.push(
+            `  // TODO: conditional call ${call.dependency}.${call.method} depends on runtime branch.`,
+          );
+          continue;
+        }
+
         const access = call.collection
           ? (call.mockTarget || call.dependency) +
             '.' +
@@ -2585,6 +3456,11 @@ function renderCreationSetup(
           parameter.index,
           parameter.name,
         );
+
+      if (parameter.rest) {
+        lines.push(`  const ${parameter.name} = ${fixture}`);
+        continue;
+      }
 
       if (isSimpleFixture(fixture)) {
         lines.push(`  const ${parameter.name} = ${fixture}`);
@@ -2701,7 +3577,9 @@ function renderCreationSetup(
 
 function renderCreationExpression(className, creation) {
   const argumentsList = creation.parameters
-    .map((parameter) => parameter.name)
+    .map((parameter) =>
+      parameter.rest ? '...' + parameter.name : parameter.name,
+    )
     .join(', ');
 
   if (creation.kind === 'factory') {
@@ -2726,21 +3604,29 @@ function renderCreationExpressionWithOverride(
   overrideFixture,
 ) {
   const argumentsList = creation.parameters
-    .map((parameter) =>
-      parameter.index === overrideIndex
-        ? overrideFixture
-        : parameter.name,
-    )
+    .map((parameter) => {
+      const value =
+        parameter.index === overrideIndex
+          ? overrideFixture
+          : parameter.name;
+
+      return parameter.rest ? '...' + value : value;
+    })
     .join(', ');
 
-  return (
-    className +
-    '.' +
-    creation.methodName +
-    '(' +
-    argumentsList +
-    ')'
-  );
+  if (creation.kind === 'factory') {
+    return (
+      (creation.async ? 'await ' : '') +
+      className +
+      '.' +
+      creation.methodName +
+      '(' +
+      argumentsList +
+      ')'
+    );
+  }
+
+  return 'new ' + className + '(' + argumentsList + ')';
 }
 
 function creationParameterType(
@@ -2784,23 +3670,65 @@ function fallbackCreationParameter(
   );
 }
 
+function methodParameterType(className, method, index) {
+  if (method.kind === 'setter') {
+    return method.static
+      ? "(typeof " + className + ")['" + method.name + "']"
+      : className + "['" + method.name + "']";
+  }
+
+  if (method.static) {
+    return (
+      'Parameters<typeof ' +
+      className +
+      '.' +
+      method.name +
+      '>[' +
+      index +
+      ']'
+    );
+  }
+
+  return (
+    'Parameters<' +
+    className +
+    "['" +
+    method.name +
+    "']>[" +
+    index +
+    ']'
+  );
+}
+
 function renderMethodParameterSetup(className, method) {
   const lines = [];
 
   for (const parameter of method.parameters) {
+    if (parameter.rest) {
+      const fixture =
+        parameter.fixture ??
+        '[] /* TODO: provide ' + parameter.name + ' */';
+      lines.push(`  const ${parameter.name} = ${fixture}`);
+      continue;
+    }
+
     if (!parameter.variableName) continue;
 
     const fixture =
       parameter.fixture ??
       fallbackMethodParameter(
         className,
-        method.name,
+        method,
         parameter.index,
         parameter.name,
       );
 
     lines.push(
-      `  const ${parameter.variableName}: Parameters<${className}['${method.name}']>[${parameter.index}] = ${fixture}`,
+      `  const ${parameter.variableName}: ${methodParameterType(
+        className,
+        method,
+        parameter.index,
+      )} = ${fixture}`,
     );
   }
 
@@ -2808,16 +3736,24 @@ function renderMethodParameterSetup(className, method) {
 }
 
 function renderMethodArgument(className, method, parameter) {
+  if (parameter.rest) {
+    const value =
+      parameter.variableName ||
+      parameter.name;
+    return '...' + value;
+  }
+
   if (parameter.variableName) return parameter.variableName;
   if (parameter.fixture !== null) return parameter.fixture;
 
   return fallbackMethodParameter(
     className,
-    method.name,
+    method,
     parameter.index,
     parameter.name,
   );
 }
+
 
 function fallbackConstructorParameter(
   className,
@@ -2837,18 +3773,14 @@ function fallbackConstructorParameter(
 
 function fallbackMethodParameter(
   className,
-  methodName,
+  method,
   index,
   name,
 ) {
   return (
-    '{} as Parameters<' +
-    className +
-    "['" +
-    methodName +
-    "']>[" +
-    index +
-    '] /* TODO: provide ' +
+    '{} as ' +
+    methodParameterType(className, method, index) +
+    ' /* TODO: provide ' +
     name +
     ' */'
   );
@@ -2888,7 +3820,12 @@ function sampleString(name) {
 }
 
 function isPublicMethod(ts, member) {
-  if (!ts.isMethodDeclaration(member) || !ts.isIdentifier(member.name)) {
+  const supported =
+    ts.isMethodDeclaration(member) ||
+    ts.isGetAccessorDeclaration(member) ||
+    ts.isSetAccessorDeclaration(member);
+
+  if (!supported || !member.name || !ts.isIdentifier(member.name)) {
     return false;
   }
 
@@ -2896,8 +3833,7 @@ function isPublicMethod(ts, member) {
   return !modifiers.some(
     (modifier) =>
       modifier.kind === ts.SyntaxKind.PrivateKeyword ||
-      modifier.kind === ts.SyntaxKind.ProtectedKeyword ||
-      modifier.kind === ts.SyntaxKind.StaticKeyword,
+      modifier.kind === ts.SyntaxKind.ProtectedKeyword,
   );
 }
 

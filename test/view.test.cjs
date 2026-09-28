@@ -386,7 +386,9 @@ describe('project file viewer', () => {
     assert.match(result.stdout, /Kit Dev View/);
     assert.match(result.stdout, /yarn v \[file-or-name\]/);
     assert.match(result.stdout, /yarn view \[file-or-name\]/);
-    assert.match(result.stdout, /Ctrl\+S  Save/);
+    assert.match(result.stdout, /Ctrl\+S\s+Save/);
+    assert.match(result.stdout, /Ctrl\+E → quit\s+Safe quit/);
+    assert.doesNotMatch(result.stdout, /Ctrl\+Q/);
     assert.match(result.stdout, /help defaultkeys/);
     assert.doesNotMatch(result.stdout, /Downloading/);
   });

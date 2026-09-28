@@ -1129,18 +1129,15 @@ function analyzeMethod({
 function translateSourceExpression(source, aliases) {
   if (!source || !aliases) return source;
 
-  const parts = source.split('.');
+  for (const [prefix, alias] of aliases) {
+    if (source === prefix) return alias;
 
-  for (let length = parts.length; length > 0; length -= 1) {
-    const prefix = parts.slice(0, length).join('.');
-    const alias = aliases.get(prefix);
-
-    if (!alias) continue;
-
-    const rest = parts.slice(length);
-    return rest.length > 0
-      ? alias + '.' + rest.join('.')
-      : alias;
+    if (
+      source.startsWith(prefix + '.') ||
+      source.startsWith(prefix + '[')
+    ) {
+      return alias + source.slice(prefix.length);
+    }
   }
 
   return aliases.size > 0 ? null : source;

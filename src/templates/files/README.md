@@ -67,9 +67,9 @@ pnpm dev
 | Command | What it does |
 |---|---|
 | `dev` | Builds and runs the application once |
-| `dev -- --watch` | Keeps the application running and restarts it on changes |
+| `dev --watch` | Keeps the application running and restarts it on changes |
 | `test` | Runs the tests once |
-| `test -- --watch` | Keeps tests running and reruns them on changes |
+| `test --watch` | Keeps tests running and reruns them on changes |
 | `test <file>` | Generates or updates a test for a class |
 | `fmt [file]` | Formats all of `src/` and `test/` or only one provided file |
 | `view [file]` / `v [file]` | Finds a project file, formats supported source files, and opens it in Micro |
@@ -82,9 +82,9 @@ Examples with npm:
 
 ```bash
 npm run dev
-npm run dev -- --watch
+npm run dev --watch
 npm test
-npm test -- --watch
+npm test --watch
 npm test -- create-user
 npm run fmt
 npm run v -- product
@@ -159,7 +159,7 @@ npm test
 Watch for changes:
 
 ```bash
-npm test -- --watch
+npm test --watch
 ```
 
 To generate a test from a class:

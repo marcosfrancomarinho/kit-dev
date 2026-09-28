@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
-const { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } = require('node:fs/promises');
+const { copyFile, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { dirname, join } = require('node:path');
 const { test } = require('node:test');
@@ -8,7 +8,7 @@ const { test } = require('node:test');
 const template = join(__dirname, '..', 'src/templates/files/type.cjs');
 
 async function fixture(t) {
-  const root = await mkdtemp(join(tmpdir(), 'kit dev type '));
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'kit dev type ')));
   t.after(() => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
   await mkdir(join(root, 'kit-dev/build'), { recursive: true });
   await mkdir(join(root, 'node_modules'), { recursive: true });

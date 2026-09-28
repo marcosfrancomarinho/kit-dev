@@ -133,13 +133,13 @@ O mesmo binário em cache é reutilizado por todos os projetos Kit Dev da máqui
 Atalhos mostrados antes de abrir o Micro:
 
 ```text
-Ctrl+S  Salvar
-Ctrl+Q  Sair
-Ctrl+F  Buscar
-Ctrl+E  Comando / Ajuda
+Ctrl+S        Salvar
+Ctrl+F        Buscar
+Ctrl+E        Comando / Ajuda
+Ctrl+E → quit Saída segura
 ```
 
-Para consultar os atalhos padrão do Micro, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do view está disponível com `yarn v --help`.
+Para sair com segurança em diferentes terminais, pressione `Ctrl+E`, digite `quit` e pressione Enter. Alguns emuladores de terminal podem capturar `Ctrl+Q` antes de o Micro receber o atalho, por isso o Kit Dev não recomenda esse comando. Para consultar os atalhos padrão do Micro, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do view está disponível com `yarn v --help`.
 
 ## Testes automáticos
 

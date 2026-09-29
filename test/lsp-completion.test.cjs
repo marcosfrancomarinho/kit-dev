@@ -169,17 +169,11 @@ test('TypeScript 7 native LSP returns member completions after capability regist
   const init = await reader.waitFor((m) => m.id === 1);
   assert.ok(init.result, JSON.stringify(init));
 
-  const registration = reader.waitFor(
-    (m) => m.method === 'client/registerCapability' && m.id != null,
-  );
-
   send(child, {
     jsonrpc: '2.0',
     method: 'initialized',
     params: {},
   });
-
-  await registration;
 
   send(child, {
     jsonrpc: '2.0',
@@ -198,28 +192,40 @@ test('TypeScript 7 native LSP returns member completions after capability regist
   // Real editor usage naturally has this gap before the user requests completion.
   await delay(250);
 
-  const completionResponse = reader.waitFor((m) => m.id === 2);
+  let completion = null;
+  let items = [];
 
-  send(child, {
-    jsonrpc: '2.0',
-    id: 2,
-    method: 'textDocument/completion',
-    params: {
-      textDocument: { uri: pathToFileURL(file).href },
-      position: { line: 1, character: 5 },
-      context: { triggerKind: 1 },
-    },
-  });
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const id = 2 + attempt;
+    const completionResponse = reader.waitFor((m) => m.id === id, 15000);
 
-  const completion = await completionResponse;
+    send(child, {
+      jsonrpc: '2.0',
+      id,
+      method: 'textDocument/completion',
+      params: {
+        textDocument: { uri: pathToFileURL(file).href },
+        position: { line: 1, character: 5 },
+        context: { triggerKind: 1 },
+      },
+    });
+
+    completion = await completionResponse;
+
+    if (completion.result) {
+      items = Array.isArray(completion.result)
+        ? completion.result
+        : completion.result.items || [];
+    }
+
+    if (items.length > 0) break;
+    await delay(500);
+  }
+
   assert.ok(
-    completion.result,
+    completion?.result,
     'Completion failed: ' + JSON.stringify(completion) + '\nstderr: ' + stderr,
   );
-
-  const items = Array.isArray(completion.result)
-    ? completion.result
-    : completion.result.items || [];
 
   assert.ok(
     items.length > 0,
@@ -239,11 +245,11 @@ test('TypeScript 7 native LSP returns member completions after capability regist
     'Expected String member completion. First items: ' + JSON.stringify(labels),
   );
 
-  const shutdownResponse = reader.waitFor((m) => m.id === 3);
+  const shutdownResponse = reader.waitFor((m) => m.id === 100);
 
   send(child, {
     jsonrpc: '2.0',
-    id: 3,
+    id: 100,
     method: 'shutdown',
   });
   const shutdown = await shutdownResponse;

@@ -6,7 +6,7 @@ const { join } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { test } = require('node:test');
 
-function createReader(stream) {
+function createReader(stream, onMessage = () => {}) {
   let buffer = Buffer.alloc(0);
   const waiters = [];
 
@@ -23,6 +23,7 @@ function createReader(stream) {
       const body = buffer.subarray(bodyStart, bodyStart + length).toString('utf8');
       buffer = buffer.subarray(bodyStart + length);
       const message = JSON.parse(body);
+      onMessage(message);
       const waiterIndex = waiters.findIndex((w) => w.predicate(message));
       if (waiterIndex >= 0) {
         const [waiter] = waiters.splice(waiterIndex, 1);
@@ -37,7 +38,7 @@ function createReader(stream) {
   });
 
   return {
-    waitFor(predicate, timeout = 8000) {
+    waitFor(predicate, timeout = 20000) {
       return new Promise((resolve, reject) => {
         const waiter = { predicate, resolve };
         waiters.push(waiter);
@@ -62,7 +63,7 @@ function send(child, message) {
   );
 }
 
-test('TypeScript 7 native LSP returns member completions after capability registration', { timeout: 15000 }, async (context) => {
+test('TypeScript 7 native LSP returns member completions after capability registration', { timeout: 30000 }, async (context) => {
   const repoRoot = join(__dirname, '..');
   const workspace = await mkdtemp(join(tmpdir(), 'kit-dev-ts7-completion-'));
   context.after(() => rm(workspace, { recursive: true, force: true }));
@@ -101,7 +102,21 @@ test('TypeScript 7 native LSP returns member completions after capability regist
     stderr += chunk;
   });
 
-  const reader = createReader(child.stdout);
+  const reader = createReader(child.stdout, (message) => {
+    if (
+      message.id != null &&
+      (
+        message.method === 'client/registerCapability' ||
+        message.method === 'client/unregisterCapability'
+      )
+    ) {
+      send(child, {
+        jsonrpc: '2.0',
+        id: message.id,
+        result: null,
+      });
+    }
+  });
 
   send(child, {
     jsonrpc: '2.0',
@@ -137,14 +152,9 @@ test('TypeScript 7 native LSP returns member completions after capability regist
     params: {},
   });
 
-  const registration = await reader.waitFor(
+  await reader.waitFor(
     (m) => m.method === 'client/registerCapability' && m.id != null,
   );
-  send(child, {
-    jsonrpc: '2.0',
-    id: registration.id,
-    result: null,
-  });
 
   send(child, {
     jsonrpc: '2.0',

@@ -147,7 +147,7 @@ Ctrl+Q  Quit
 Ctrl+F  Find
 Ctrl+B  Terminal / Shell mode
 Ctrl+E  Command / Help
-Tab / Ctrl+Space  LSP autocomplete
+Tab  LSP autocomplete
 Alt+K  LSP hover
 Alt+D  Go to definition
 ```

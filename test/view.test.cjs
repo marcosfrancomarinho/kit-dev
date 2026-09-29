@@ -456,18 +456,16 @@ describe('project file viewer', () => {
     assert.match(config, /settings\.autostart\.javascript/);
   });
 
-  it('adds automatic mlsp completion only for member access', () => {
+  it('keeps the TypeScript 7 compatibility patch without automatic completion hooks', () => {
     const patched = kitDevMlspMain('-- upstream mlsp main\n');
 
-    assert.match(patched, /KIT_DEV_AUTO_COMPLETION/);
-    assert.match(patched, /function onRune\(bp, r\)/);
-    assert.match(patched, /r == "\."/);
-    assert.doesNotMatch(patched, /util\.IsWordChar\(r\)/);
-    assert.match(patched, /bp\.Buf\.HasSuggestions/);
-    assert.match(patched, /completionAction\(bp\)/);
+    assert.match(patched, /KIT_DEV_TYPESCRIPT7_COMPAT/);
     assert.match(patched, /client\/registerCapability/);
     assert.match(patched, /client\/unregisterCapability/);
     assert.match(patched, /responseResult\(request\.id, json\.null\)/);
+    assert.doesNotMatch(patched, /function onRune\(bp, r\)/);
+    assert.doesNotMatch(patched, /completionAction\(bp\)/);
+    assert.doesNotMatch(patched, /kitDevShouldAutocomplete/);
 
     assert.equal(kitDevMlspMain(patched), patched);
   });
@@ -484,13 +482,10 @@ describe('project file viewer', () => {
     assert.equal(twice, once);
   });
 
-  it('uses mlsp completion, hover and navigation bindings', () => {
+  it('keeps autocomplete Tab-only and preserves hover/navigation bindings', () => {
     const bindings = mlspBindings();
 
-    assert.equal(
-      bindings.CtrlSpace,
-      'command:lsp autocomplete',
-    );
+    assert.equal(bindings.CtrlSpace, undefined);
     assert.equal(bindings['Alt-k'], 'command:lsp hover');
     assert.equal(
       bindings['Alt-d'],
@@ -564,11 +559,8 @@ describe('project file viewer', () => {
     );
     assert.doesNotMatch(config, /\bnpx\b/);
     assert.match(config, /settings\.tabAutocomplete = true/);
-    assert.match(marker, /^[a-f0-9]{40}:typescript7-native-v4-dot-completion\n$/);
-    assert.equal(
-      bindings.CtrlSpace,
-      'command:lsp autocomplete',
-    );
+    assert.match(marker, /^[a-f0-9]{40}:typescript7-native-v5-tab-only\n$/);
+    assert.equal(bindings.CtrlSpace, undefined);
     assert.doesNotMatch(
       result,
       /[\\/]\.config[\\/]micro(?:[\\/]|$)/,

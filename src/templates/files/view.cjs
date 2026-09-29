@@ -27,7 +27,7 @@ const projectRoot = process.cwd();
 const MICRO_VERSION = '2.0.15';
 const MLSP_COMMIT = '91261a0926c9e95d059cf5854a0c2e8d4e7d4051';
 const MLSP_FILES = ['main.lua', 'json.lua', 'config.lua'];
-const MLSP_CONFIG_VERSION = 'typescript7-native-v4-dot-completion';
+const MLSP_CONFIG_VERSION = 'typescript7-native-v5-tab-only';
 const ignoredDirectories = new Set([
   '.git',
   'node_modules',
@@ -375,7 +375,6 @@ function microConfigDirectory(home = homedir()) {
 
 function mlspBindings() {
   return {
-    CtrlSpace: 'command:lsp autocomplete',
     'Alt-k': 'command:lsp hover',
     'Alt-d': 'command:lsp goto-definition',
     'Alt-r': 'command:lsp find-references',
@@ -442,7 +441,7 @@ function kitDevMlspConfig(baseConfig, runtime = languageServerRuntime()) {
 
 
 function kitDevMlspMain(baseMain) {
-  const marker = '-- KIT_DEV_AUTO_COMPLETION';
+  const marker = '-- KIT_DEV_TYPESCRIPT7_COMPAT';
 
   if (baseMain.includes(marker)) return baseMain;
 
@@ -450,10 +449,6 @@ function kitDevMlspMain(baseMain) {
     baseMain.trimEnd(),
     '',
     marker,
-    'local function kitDevShouldAutocomplete(r)',
-    '    return r == "."',
-    'end',
-    '',
     'local kitDevOriginalHandleRequest = LSPClient.handleRequest',
     'function LSPClient:handleRequest(request)',
     '    if request.method == "client/registerCapability" or request.method == "client/unregisterCapability" then',
@@ -461,22 +456,6 @@ function kitDevMlspMain(baseMain) {
     '        return',
     '    end',
     '    return kitDevOriginalHandleRequest(self, request)',
-    'end',
-    '',
-    'function onRune(bp, r)',
-    '    if next(activeConnections) == nil then return true end',
-    '    if bp.Buf.HasSuggestions then return true end',
-    '',
-    '    local filetype = bp.Buf:FileType()',
-    '    local client = findClient(filetype, "completionProvider", "completion")',
-    '    if client == nil or not client:supportsFiletype(filetype) then',
-    '        return true',
-    '    end',
-    '',
-    '    if not kitDevShouldAutocomplete(r) then return true end',
-    '',
-    '    completionAction(bp)',
-    '    return true',
     'end',
     '',
   ].join('\n');
@@ -609,7 +588,7 @@ function renderMicroTips() {
     '  Ctrl+Q  Quit',
     '  Ctrl+F  Find',
     '  Ctrl+E  Command / Help',
-    '  Tab / Ctrl+Space  LSP autocomplete',
+    '  Tab  LSP autocomplete',
     '  Alt+K  LSP hover',
     '  Alt+D  Go to definition',
     '',

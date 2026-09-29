@@ -1455,7 +1455,7 @@ describe('source formatter', () => {
       'export class User {',
       'constructor(',
       'private name: string,',
-      'private password: string,',
+      'private password: string',
       ') {}',
       '',
       'public getName(): string {',

@@ -137,7 +137,7 @@ Windows:     %USERPROFILE%\.kit-dev\bin\micro.exe
 
 The cached binary is reused by every Kit Dev project on the machine. Automatic download supports the official Micro builds mapped by Kit Dev for Windows, Linux, macOS, FreeBSD, NetBSD, OpenBSD, Solaris and illumos where the current Node.js runtime/platform combination is available.
 
-Generated projects install `typescript-language-server@5.3.0` as a development dependency. On the first `view` / `v` use, Kit Dev installs Micro's official `lsp` plugin into an isolated `~/.kit-dev/micro` configuration and connects it to the project's local language server. This enables TypeScript/JavaScript diagnostics, hover/definition support, intelligent completion with `Tab`/`Ctrl+Space`, and automatic suggestions on triggers such as `.` without changing the user's normal `~/.config/micro` settings.
+Generated projects install `typescript-language-server@5.3.0` as a development dependency. On the first `view` / `v` use, Kit Dev downloads a pinned revision of the `mlsp` Micro plugin into the isolated `~/.kit-dev/micro` configuration and connects it to the project's local TypeScript language server. The legacy `lsp` plugin is removed from this isolated configuration to avoid two LSP clients running together. `mlsp` autostarts for TypeScript/JavaScript and provides completion, diagnostics, hover, definitions and references without changing the user's normal `~/.config/micro` settings.
 
 Useful shortcuts shown before Micro opens:
 
@@ -147,7 +147,9 @@ Ctrl+Q  Quit
 Ctrl+F  Find
 Ctrl+B  Terminal / Shell mode
 Ctrl+E  Command / Help
-Tab / Ctrl+Space  LSP autocomplete\n.  Automatic member suggestions
+Tab / Ctrl+Space  LSP autocomplete
+Alt+K  LSP hover
+Alt+D  Go to definition
 ```
 
 For Micro's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev view help is available with `yarn v --help`.

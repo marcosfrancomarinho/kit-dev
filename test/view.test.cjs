@@ -14,10 +14,11 @@ const { describe, it } = require('node:test');
 
 const {
   ensureMicro,
-  ensureMicroLsp,
+  ensureMicroMlsp,
   findViewCandidates,
   formatBeforeOpen,
-  lspSettings,
+  kitDevMlspConfig,
+  mlspBindings,
   microAsset,
   microConfigDirectory,
   openWithMicro,
@@ -431,108 +432,187 @@ describe('project file viewer', () => {
   });
 
 
-  it('keeps the Micro LSP configuration isolated under .kit-dev', async (context) => {
-    const home = await mkdtemp(join(tmpdir(), 'kit-dev-lsp-home-'));
+
+  it('builds mlsp TypeScript config with local language server and autostart', () => {
+    const config = kitDevMlspConfig('-- upstream mlsp config\n');
+
+    assert.match(config, /KIT_DEV_MLSP_CONFIG/);
+    assert.match(config, /cmd = "npx"/);
+    assert.match(
+      config,
+      /"typescript-language-server", "--stdio"/,
+    );
+    assert.match(config, /settings\.tabAutocomplete = true/);
+    assert.match(
+      config,
+      /settings\.autostart\.typescript/,
+    );
+    assert.match(
+      config,
+      /settings\.autostart\.javascript/,
+    );
+    assert.match(
+      config,
+      /settings\.showDiagnostics\.error = true/,
+    );
+  });
+
+  it('does not duplicate the Kit Dev mlsp config marker', () => {
+    const once = kitDevMlspConfig('-- upstream\n');
+    const twice = kitDevMlspConfig(once);
+
+    assert.equal(twice, once);
+  });
+
+  it('uses mlsp completion, hover and navigation bindings', () => {
+    const bindings = mlspBindings();
+
+    assert.equal(
+      bindings.CtrlSpace,
+      'command:lsp autocomplete',
+    );
+    assert.equal(bindings['Alt-k'], 'command:lsp hover');
+    assert.equal(
+      bindings['Alt-d'],
+      'command:lsp goto-definition',
+    );
+    assert.equal(
+      bindings['Alt-r'],
+      'command:lsp find-references',
+    );
+    assert.equal(bindings.Tab, undefined);
+  });
+
+  it('installs pinned mlsp into the isolated Kit Dev Micro config and removes legacy lsp', async (context) => {
+    const home = await mkdtemp(join(tmpdir(), 'kit-dev-mlsp-home-'));
     context.after(() =>
       rm(home, { recursive: true, force: true }),
     );
 
-    const calls = [];
     const configDirectory = microConfigDirectory(home);
+    const legacy = join(configDirectory, 'plug', 'lsp');
+    await mkdir(legacy, { recursive: true });
+    await writeFile(join(legacy, 'main.lua'), 'legacy', 'utf8');
 
-    const result = await ensureMicroLsp('micro', {
+    const requested = [];
+    const result = await ensureMicroMlsp({
       home,
-      spawn(command, args) {
-        calls.push({ command, args });
-        require('node:fs').mkdirSync(
-          join(configDirectory, 'plug', 'lsp'),
-          { recursive: true },
-        );
-        return { status: 0, error: null };
+      async fetch(url) {
+        requested.push(url);
+        const name = url.split('/').pop();
+        const body =
+          name === 'config.lua'
+            ? '-- upstream mlsp config\n'
+            : '-- ' + name + '\n';
+        return {
+          ok: true,
+          status: 200,
+          async text() {
+            return body;
+          },
+        };
       },
     });
 
     assert.equal(result, join(home, '.kit-dev', 'micro'));
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].command, 'micro');
-    assert.deepEqual(calls[0].args.slice(-3), [
-      '-plugin',
-      'install',
-      'lsp',
-    ]);
-
-    const settings = JSON.parse(
-      await readFile(join(result, 'settings.json'), 'utf8'),
+    assert.equal(requested.length, 3);
+    assert.equal(
+      require('node:fs').existsSync(legacy),
+      false,
     );
 
-    assert.equal(settings['lsp.tabcompletion'], true);
-    assert.equal(settings['lsp.formatOnSave'], false);
-    assert.equal(settings['lsp.ignoreTriggerCharacters'], 'signature');
-    assert.match(
-      settings['lsp.server'],
-      /typescript=npx --no-install typescript-language-server --stdio/,
-    );
-    assert.match(
-      settings['lsp.server'],
-      /javascript=npx --no-install typescript-language-server --stdio/,
+    const plugin = join(result, 'plug', 'mlsp');
+    const config = await readFile(join(plugin, 'config.lua'), 'utf8');
+    const marker = await readFile(
+      join(plugin, '.kit-dev-version'),
+      'utf8',
     );
     const bindings = JSON.parse(
       await readFile(join(result, 'bindings.json'), 'utf8'),
     );
-    assert.equal(bindings.Tab, 'command:lspcompletion');
-    assert.equal(bindings.CtrlSpace, 'command:lspcompletion');
-    assert.doesNotMatch(result, /[\\/]\.config[\\/]micro(?:[\\/]|$)/);
+
+    assert.match(config, /typescript-language-server/);
+    assert.match(config, /settings\.tabAutocomplete = true/);
+    assert.match(marker, /^[a-f0-9]{40}\n$/);
+    assert.equal(
+      bindings.CtrlSpace,
+      'command:lsp autocomplete',
+    );
+    assert.doesNotMatch(
+      result,
+      /[\\/]\.config[\\/]micro(?:[\\/]|$)/,
+    );
   });
 
-  it('does not reinstall the LSP plugin when it is already cached', async (context) => {
-    const home = await mkdtemp(join(tmpdir(), 'kit-dev-lsp-cache-'));
+  it('reuses pinned mlsp without downloading it on every view', async (context) => {
+    const home = await mkdtemp(join(tmpdir(), 'kit-dev-mlsp-cache-'));
     context.after(() =>
       rm(home, { recursive: true, force: true }),
     );
 
-    const configDirectory = microConfigDirectory(home);
-    await mkdir(join(configDirectory, 'plug', 'lsp'), {
-      recursive: true,
-    });
+    let downloads = 0;
+    const fakeFetch = async (url) => {
+      downloads += 1;
+      const name = url.split('/').pop();
+      return {
+        ok: true,
+        status: 200,
+        async text() {
+          return name === 'config.lua'
+            ? '-- upstream mlsp config\n'
+            : '-- plugin\n';
+        },
+      };
+    };
+
+    await ensureMicroMlsp({ home, fetch: fakeFetch });
+    assert.equal(downloads, 3);
+
+    downloads = 0;
+    await ensureMicroMlsp({ home, fetch: fakeFetch });
+    assert.equal(downloads, 0);
+  });
+
+  it('cleans a partial mlsp installation when a pinned file download fails', async (context) => {
+    const home = await mkdtemp(join(tmpdir(), 'kit-dev-mlsp-fail-'));
+    context.after(() =>
+      rm(home, { recursive: true, force: true }),
+    );
 
     let calls = 0;
-    await ensureMicroLsp('micro', {
-      home,
-      spawn() {
-        calls += 1;
-        return { status: 0, error: null };
-      },
-    });
-
-    assert.equal(calls, 0);
-  });
-
-  it('fails safely when Micro reports success but the LSP plugin was not installed', async (context) => {
-    const home = await mkdtemp(join(tmpdir(), 'kit-dev-lsp-fail-'));
-    context.after(() =>
-      rm(home, { recursive: true, force: true }),
-    );
-
     await assert.rejects(
       () =>
-        ensureMicroLsp('micro', {
+        ensureMicroMlsp({
           home,
-          spawn() {
-            return { status: 0, error: null };
+          async fetch() {
+            calls += 1;
+            if (calls === 2) {
+              return {
+                ok: false,
+                status: 503,
+                async text() {
+                  return '';
+                },
+              };
+            }
+
+            return {
+              ok: true,
+              status: 200,
+              async text() {
+                return '-- plugin\n';
+              },
+            };
           },
         }),
-      /Could not install the Micro LSP plugin/,
+      /mlsp download failed/,
     );
-  });
 
-  it('uses a local TypeScript language server with tab completion enabled', () => {
-    const settings = lspSettings();
-
-    assert.equal(settings['lsp.tabcompletion'], true);
-    assert.equal(settings['lsp.ignoreTriggerCharacters'], 'signature');
-    assert.match(
-      settings['lsp.server'],
-      /^typescript=npx --no-install typescript-language-server --stdio/,
+    assert.equal(
+      require('node:fs').existsSync(
+        join(home, '.kit-dev', 'micro', 'plug', 'mlsp'),
+      ),
+      false,
     );
   });
 

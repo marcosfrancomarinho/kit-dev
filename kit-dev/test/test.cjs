@@ -89,7 +89,15 @@ async function runTests() {
 
   const { NODE_TEST_CONTEXT: _nodeTestContext, ...env } = process.env;
 
-  const child = spawn(process.execPath, ['--test', ...files], {
+  const testArgs = ['--test'];
+
+  if (process.env.CI) {
+    testArgs.push('--test-concurrency=1');
+  }
+
+  testArgs.push(...files);
+
+  const child = spawn(process.execPath, testArgs, {
     cwd: projectRoot,
     env,
     stdio: 'inherit',

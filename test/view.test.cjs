@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { spawnSync } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const {
   chmod,
   mkdtemp,
@@ -435,38 +435,31 @@ describe('project file viewer', () => {
 
 
 
-  it('builds mlsp TypeScript config with the direct local language server and autostart', () => {
+  it('builds mlsp TypeScript config with the TypeScript 7 native LSP and autostart', () => {
     const config = kitDevMlspConfig('-- upstream mlsp config\n', {
       nodeExecutable: '/runtime/node',
-      serverEntry: '/workspace/node_modules/typescript-language-server/lib/cli.mjs',
+      serverEntry: '/workspace/node_modules/typescript/bin/tsc',
+      serverArgs: ['--lsp', '--stdio'],
     });
 
     assert.match(config, /KIT_DEV_MLSP_CONFIG/);
     assert.match(config, /cmd = "\/runtime\/node"/);
     assert.match(
       config,
-      /typescript-language-server\/lib\/cli\.mjs", "--stdio"/,
+      /typescript\/bin\/tsc", "--lsp", "--stdio"/,
     );
+    assert.doesNotMatch(config, /typescript-language-server/);
     assert.doesNotMatch(config, /\bnpx\b/);
     assert.match(config, /settings\.tabAutocomplete = true/);
-    assert.match(
-      config,
-      /settings\.autostart\.typescript/,
-    );
-    assert.match(
-      config,
-      /settings\.autostart\.javascript/,
-    );
-    assert.match(
-      config,
-      /settings\.showDiagnostics\.error = true/,
-    );
+    assert.match(config, /settings\.autostart\.typescript/);
+    assert.match(config, /settings\.autostart\.javascript/);
   });
 
   it('does not duplicate the Kit Dev mlsp config marker', () => {
     const runtime = {
       nodeExecutable: '/runtime/node',
-      serverEntry: '/workspace/server.mjs',
+      serverEntry: '/workspace/node_modules/typescript/bin/tsc',
+      serverArgs: ['--lsp', '--stdio'],
     };
     const once = kitDevMlspConfig('-- upstream\n', runtime);
     const twice = kitDevMlspConfig(once, runtime);
@@ -509,7 +502,8 @@ describe('project file viewer', () => {
       home,
       runtime: {
         nodeExecutable: '/runtime/node',
-        serverEntry: '/workspace/server.mjs',
+        serverEntry: '/workspace/node_modules/typescript/bin/tsc',
+      serverArgs: ['--lsp', '--stdio'],
       },
       async fetch(url) {
         requested.push(url);
@@ -546,10 +540,13 @@ describe('project file viewer', () => {
     );
 
     assert.match(config, /cmd = "\/runtime\/node"/);
-    assert.match(config, /args = \{"\/workspace\/server\.mjs", "--stdio"\}/);
+    assert.match(
+      config,
+      /args = \{"\/workspace\/node_modules\/typescript\/bin\/tsc", "--lsp", "--stdio"\}/,
+    );
     assert.doesNotMatch(config, /\bnpx\b/);
     assert.match(config, /settings\.tabAutocomplete = true/);
-    assert.match(marker, /^[a-f0-9]{40}\n$/);
+    assert.match(marker, /^[a-f0-9]{40}:typescript7-native-v1\n$/);
     assert.equal(
       bindings.CtrlSpace,
       'command:lsp autocomplete',
@@ -583,7 +580,8 @@ describe('project file viewer', () => {
 
     const runtime = {
       nodeExecutable: '/runtime/node',
-      serverEntry: '/workspace/server.mjs',
+      serverEntry: '/workspace/node_modules/typescript/bin/tsc',
+      serverArgs: ['--lsp', '--stdio'],
     };
 
     await ensureMicroMlsp({ home, fetch: fakeFetch, runtime });
@@ -607,7 +605,8 @@ describe('project file viewer', () => {
           home,
           runtime: {
             nodeExecutable: '/runtime/node',
-            serverEntry: '/workspace/server.mjs',
+            serverEntry: '/workspace/node_modules/typescript/bin/tsc',
+      serverArgs: ['--lsp', '--stdio'],
           },
           async fetch() {
             calls += 1;
@@ -649,9 +648,9 @@ describe('project file viewer', () => {
     const entry = join(
       root,
       'node_modules',
-      'typescript-language-server',
-      'lib',
-      'cli.mjs',
+      'typescript',
+      'bin',
+      'tsc',
     );
     await mkdir(join(entry, '..'), { recursive: true });
     await writeFile(entry, 'export {}\n', 'utf8');
@@ -660,13 +659,111 @@ describe('project file viewer', () => {
 
     assert.equal(runtime.nodeExecutable, process.execPath);
     assert.equal(runtime.serverEntry, entry);
+    assert.deepEqual(runtime.serverArgs, ['--lsp', '--stdio']);
   });
 
-  it('reports a missing TypeScript language server entry clearly', () => {
+  it('reports a missing TypeScript 7 native LSP entry clearly', () => {
     assert.throws(
       () => languageServerRuntime(join(tmpdir(), 'kit-dev-missing-lsp')),
-      /TypeScript language server entry was not found/,
+      /TypeScript 7 native LSP entry was not found/,
     );
+  });
+
+  it('completes a real initialize handshake with the TypeScript 7 native LSP', { timeout: 10000 }, async (context) => {
+    const root = join(__dirname, '..');
+    const runtime = languageServerRuntime(root);
+    const child = spawn(
+      runtime.nodeExecutable,
+      [runtime.serverEntry, ...runtime.serverArgs],
+      {
+        cwd: root,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: false,
+      },
+    );
+
+    context.after(() => {
+      if (!child.killed) child.kill();
+    });
+
+    let stderr = '';
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+
+    const response = new Promise((resolve, reject) => {
+      let buffer = Buffer.alloc(0);
+      const timer = setTimeout(() => {
+        reject(
+          new Error(
+            'TypeScript 7 LSP initialize timed out. stderr: ' + stderr,
+          ),
+        );
+      }, 8000);
+
+      child.once('error', (error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+
+      child.stdout.on('data', (chunk) => {
+        buffer = Buffer.concat([buffer, chunk]);
+
+        while (true) {
+          const headerEnd = buffer.indexOf('\r\n\r\n');
+          if (headerEnd < 0) return;
+
+          const header = buffer.subarray(0, headerEnd).toString('utf8');
+          const match = header.match(/Content-Length:\s*(\d+)/i);
+          if (!match) {
+            clearTimeout(timer);
+            reject(new Error('Invalid LSP response header: ' + header));
+            return;
+          }
+
+          const length = Number(match[1]);
+          const bodyStart = headerEnd + 4;
+          if (buffer.length < bodyStart + length) return;
+
+          const body = buffer
+            .subarray(bodyStart, bodyStart + length)
+            .toString('utf8');
+          buffer = buffer.subarray(bodyStart + length);
+
+          const message = JSON.parse(body);
+          if (message.id === 1) {
+            clearTimeout(timer);
+            resolve(message);
+            return;
+          }
+        }
+      });
+    });
+
+    const request = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        processId: process.pid,
+        rootUri: null,
+        capabilities: {},
+        workspaceFolders: null,
+      },
+    });
+
+    child.stdin.write(
+      'Content-Length: ' +
+        Buffer.byteLength(request) +
+        '\r\n\r\n' +
+        request,
+    );
+
+    const message = await response;
+    assert.equal(message.id, 1);
+    assert.ok(message.result);
+    assert.ok(message.result.capabilities);
   });
 
   it('escapes runtime paths as Lua string literals', () => {

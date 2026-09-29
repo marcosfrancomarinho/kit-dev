@@ -5,6 +5,7 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { test } = require('node:test');
+const { setTimeout: delay } = require('node:timers/promises');
 
 function createReader(stream, onMessage = () => {}) {
   let buffer = Buffer.alloc(0);
@@ -192,6 +193,10 @@ test('TypeScript 7 native LSP returns member completions after capability regist
       },
     },
   });
+
+  // Give the language server a brief moment to register the opened document.
+  // Real editor usage naturally has this gap before the user requests completion.
+  await delay(250);
 
   const completionResponse = reader.waitFor((m) => m.id === 2);
 

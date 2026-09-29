@@ -197,4 +197,33 @@ test('TypeScript 7 native LSP returns member completions after capability regist
     items.some((item) => item.label === 'charAt'),
     'Expected String member completion. First items: ' + JSON.stringify(labels),
   );
+
+  send(child, {
+    jsonrpc: '2.0',
+    id: 3,
+    method: 'shutdown',
+    params: null,
+  });
+  const shutdown = await reader.waitFor((m) => m.id === 3);
+  assert.equal(shutdown.error, undefined);
+
+  const exited = new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('TypeScript 7 LSP did not exit cleanly')),
+      5000,
+    );
+    child.once('exit', (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
+
+  send(child, {
+    jsonrpc: '2.0',
+    method: 'exit',
+    params: null,
+  });
+
+  const exitCode = await exited;
+  assert.equal(exitCode, 0);
 });

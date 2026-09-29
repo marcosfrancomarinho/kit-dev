@@ -10,6 +10,8 @@ export class NodePackageManagerDetector implements PackageManagerDetector {
 
     if (userAgent.startsWith('pnpm')) return 'pnpm';
     if (userAgent.startsWith('yarn')) return 'yarn';
+    if (execPath.includes('pnpm')) return 'pnpm';
+    if (execPath.includes('yarn')) return 'yarn';
     if (execPath.includes('npm-cli.js') || execPath.includes('npx')) {
       return 'npm';
     }

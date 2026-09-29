@@ -141,7 +141,7 @@ Ctrl+B  Terminal / modo shell
 Ctrl+E  Comando / Ajuda
 ```
 
-Para consultar os atalhos padrão do editor, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do view está disponível com `yarn v --help`.
+Para consultar os atalhos padrão do editor, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do edit está disponível com `yarn e --help`.
 
 ## Testes automáticos
 

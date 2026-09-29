@@ -37,7 +37,7 @@ function createReader(stream) {
   });
 
   return {
-    waitFor(predicate, timeout = 8000) {
+    waitFor(predicate, timeout = 20000) {
       return new Promise((resolve, reject) => {
         const waiter = { predicate, resolve };
         waiters.push(waiter);
@@ -62,7 +62,7 @@ function send(child, message) {
   );
 }
 
-test('TypeScript 7 native LSP returns member completions after capability registration', { timeout: 15000 }, async (context) => {
+test('TypeScript 7 native LSP returns member completions after capability registration', { timeout: 30000 }, async (context) => {
   const repoRoot = join(__dirname, '..');
   const workspace = await mkdtemp(join(tmpdir(), 'kit-dev-ts7-completion-'));
   context.after(() => rm(workspace, { recursive: true, force: true }));

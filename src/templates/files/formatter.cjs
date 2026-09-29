@@ -2104,21 +2104,102 @@ function normalizeBlockSpacing(source, fileName = 'source.ts') {
   return result;
 }
 
+function tokenSignature(source, fileName = 'source.ts') {
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    scannerLanguageVariant(fileName),
+    source,
+  );
+  const tokens = [];
+
+  while (scanner.scan() !== ts.SyntaxKind.EndOfFileToken) {
+    const kind = scanner.getToken();
+
+    if (
+      kind === ts.SyntaxKind.WhitespaceTrivia ||
+      kind === ts.SyntaxKind.NewLineTrivia ||
+      kind === ts.SyntaxKind.SingleLineCommentTrivia ||
+      kind === ts.SyntaxKind.MultiLineCommentTrivia
+    ) {
+      continue;
+    }
+
+    tokens.push(kind + ':' + scanner.getTokenText());
+  }
+
+  return tokens.join('\n');
+}
+
+function tokenSafeTransform(source, fileName, transform) {
+  const transformed = transform(source);
+
+  if (tokenSignature(source, fileName) !== tokenSignature(transformed, fileName)) {
+    return source;
+  }
+
+  return transformed;
+}
+
 function formatSource(source, fileName = 'source.ts') {
   const withoutUnusedImports = removeUnusedImports(source, fileName);
   const quoted = useSingleQuotes(withoutUnusedImports, fileName);
   const withSemicolons = addSemicolons(quoted, fileName);
-  const expanded = expandCompactBlocks(withSemicolons, fileName);
-  const expandedContainers = expandCompactContainers(expanded, fileName);
-  const splitStatements = splitSameLineStatements(expandedContainers, fileName);
-  const splitMembers = splitSameLineMembers(splitStatements, fileName);
-  const spaced = normalizeSpacing(splitMembers, fileName);
-  const compacted = compactSafeMultilineExpressions(spaced, fileName);
-  const containerSpaced = normalizeContainerBraceSpacing(compacted, fileName);
-  const blockSpaced = normalizeBlockSpacing(containerSpaced, fileName);
-  const listed = formatDelimitedLists(blockSpaced, fileName);
 
-  return indentSource(listed);
+  let result = withSemicolons;
+
+  result = tokenSafeTransform(
+    result,
+    fileName,
+    (value) => expandCompactBlocks(value, fileName),
+  );
+  result = tokenSafeTransform(
+    result,
+    fileName,
+    (value) => expandCompactContainers(value, fileName),
+  );
+  result = tokenSafeTransform(
+    result,
+    fileName,
+    (value) => splitSameLineStatements(value, fileName),
+  );
+  result = tokenSafeTransform(
+    result,
+    fileName,
+    (value) => splitSameLineMembers(value, fileName),
+  );
+  result = tokenSafeTransform(
+    result,
+    fileName,
+    (value) => normalizeSpacing(value, fileName),
+  );
+  result = tokenSafeTransform(
+    result,
+    fileName,
+    (value) => compactSafeMultilineExpressions(value, fileName),
+  );
+  result = tokenSafeTransform(
+    result,
+    fileName,
+    (value) => normalizeContainerBraceSpacing(value, fileName),
+  );
+  result = tokenSafeTransform(
+    result,
+    fileName,
+    (value) => normalizeBlockSpacing(value, fileName),
+  );
+  result = tokenSafeTransform(
+    result,
+    fileName,
+    (value) => formatDelimitedLists(value, fileName),
+  );
+  result = tokenSafeTransform(
+    result,
+    fileName,
+    (value) => indentSource(value),
+  );
+
+  return result;
 }
 
 function matchingOpener(char) {
@@ -2460,5 +2541,7 @@ module.exports = {
   resolveTarget,
   splitSameLineMembers,
   splitSameLineStatements,
+  tokenSignature,
+  tokenSafeTransform,
   useSingleQuotes,
 };

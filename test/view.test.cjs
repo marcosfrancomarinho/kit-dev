@@ -18,6 +18,7 @@ const {
   findViewCandidates,
   formatBeforeOpen,
   kitDevMlspConfig,
+  kitDevMlspMain,
   languageServerRuntime,
   luaString,
   mlspBindings,
@@ -443,6 +444,8 @@ describe('project file viewer', () => {
     });
 
     assert.match(config, /KIT_DEV_MLSP_CONFIG/);
+    assert.match(main, /KIT_DEV_AUTO_COMPLETION/);
+    assert.match(main, /completionAction\(bp\)/);
     assert.match(config, /cmd = "\/runtime\/node"/);
     assert.match(
       config,
@@ -453,6 +456,19 @@ describe('project file viewer', () => {
     assert.match(config, /settings\.tabAutocomplete = true/);
     assert.match(config, /settings\.autostart\.typescript/);
     assert.match(config, /settings\.autostart\.javascript/);
+  });
+
+  it('adds automatic mlsp completion for typed words and member access', () => {
+    const patched = kitDevMlspMain('-- upstream mlsp main\n');
+
+    assert.match(patched, /KIT_DEV_AUTO_COMPLETION/);
+    assert.match(patched, /function onRune\(bp, r\)/);
+    assert.match(patched, /r == "\."/);
+    assert.match(patched, /util\.IsWordChar\(r\)/);
+    assert.match(patched, /bp\.Buf\.HasSuggestions/);
+    assert.match(patched, /completionAction\(bp\)/);
+
+    assert.equal(kitDevMlspMain(patched), patched);
   });
 
   it('does not duplicate the Kit Dev mlsp config marker', () => {
@@ -531,6 +547,7 @@ describe('project file viewer', () => {
 
     const plugin = join(result, 'plug', 'mlsp');
     const config = await readFile(join(plugin, 'config.lua'), 'utf8');
+    const main = await readFile(join(plugin, 'main.lua'), 'utf8');
     const marker = await readFile(
       join(plugin, '.kit-dev-version'),
       'utf8',
@@ -546,7 +563,7 @@ describe('project file viewer', () => {
     );
     assert.doesNotMatch(config, /\bnpx\b/);
     assert.match(config, /settings\.tabAutocomplete = true/);
-    assert.match(marker, /^[a-f0-9]{40}:typescript7-native-v1\n$/);
+    assert.match(marker, /^[a-f0-9]{40}:typescript7-native-v2-auto-complete\n$/);
     assert.equal(
       bindings.CtrlSpace,
       'command:lsp autocomplete',
@@ -764,6 +781,7 @@ describe('project file viewer', () => {
     assert.equal(message.id, 1);
     assert.ok(message.result);
     assert.ok(message.result.capabilities);
+    assert.ok(message.result.capabilities.completionProvider);
   });
 
   it('escapes runtime paths as Lua string literals', () => {

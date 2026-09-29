@@ -597,16 +597,13 @@ var TerminalAdapter = class {
   ` + this.palette.paint(this.palette.bold, `cd ${projectName}`) + `
 
 \u{1F680} Available commands:
-  ` + this.formatCommand(runCommand, "dev", "Run application once") + `
-  ` + this.formatCommand(runCommand, "dev --watch", "Run application in watch mode") + `
-  ` + this.formatCommand(runCommand, "test", "Run tests once") + `
-  ` + this.formatCommand(runCommand, "test --watch", "Run tests in watch mode") + `
+  ` + this.formatCommand(runCommand, "dev [--watch]", "Run application") + `
+  ` + this.formatCommand(runCommand, "test [--watch]", "Run tests") + `
   ` + this.formatCommand(runCommand, "fmt", "Format src/ and test/ code") + `
   ` + this.formatCommand(runCommand, "v", "Find and open a file with Micro") + `
   ` + this.formatCommand(runCommand, "build", "Build the project") + `
   ` + this.formatCommand(runCommand, "start", "Run bundled output") + `
-  ` + this.formatCommand(runCommand, "type", "Check TypeScript types once") + `
-  ` + this.formatCommand(runCommand, "type --watch", "Check TypeScript types in watch mode") + `
+  ` + this.formatCommand(runCommand, "type [--watch]", "Check TypeScript types") + `
   ` + this.formatCommand(runCommand, "di", "Add optional dependency injection") + `
 `
     );

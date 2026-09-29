@@ -8,6 +8,7 @@ const {
   dependencies = {},
   devDependencies = {},
   main,
+  source = main,
 } = require(resolve(projectRoot, 'package.json'));
 
 const buildOptions = {

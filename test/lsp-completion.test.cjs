@@ -152,6 +152,10 @@ test('TypeScript 7 native LSP returns member completions after capability regist
     params: {},
   });
 
+  await reader.waitFor(
+    (m) => m.method === 'client/registerCapability' && m.id != null,
+  );
+
   send(child, {
     jsonrpc: '2.0',
     method: 'textDocument/didOpen',

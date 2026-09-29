@@ -147,7 +147,9 @@ Ctrl+Q  Sair
 Ctrl+F  Buscar
 Ctrl+B  Terminal / modo shell
 Ctrl+E  Comando / Ajuda
-Tab / Ctrl+Space  Autocomplete LSP\nAlt+K  Hover LSP\nAlt+D  Ir para definição
+Tab / Ctrl+Space  Autocomplete LSP
+Alt+K  Hover LSP
+Alt+D  Ir para definição
 ```
 
 Para consultar os atalhos padrão do Micro, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do view está disponível com `yarn v --help`.

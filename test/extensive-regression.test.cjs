@@ -193,37 +193,37 @@ describe('automatic test generation regression matrix', () => {
       name: 'simple entity',
       file: 'user.ts',
       source: "export class User{constructor(public name:string,public age:number){}getName():string{return this.name}}",
-      expected: /describe\\('User'/,
+      expected: "describe('User'",
     },
     {
       name: 'static factory',
       file: 'email.ts',
       source: "export class Email{private constructor(readonly value:string){}static create(value:string){return new Email(value)}getValue(){return this.value}}",
-      expected: /Email\\.create/,
+      expected: 'Email.create',
     },
     {
       name: 'async use case with dependency',
       file: 'create-user.ts',
       source: "export interface UserRepository{save(name:string):Promise<void>}export class CreateUser{constructor(private readonly repository:UserRepository){}async execute(name:string){await this.repository.save(name)}}",
-      expected: /mock\\.fn/,
+      expected: 'mock.fn',
     },
     {
       name: 'primitive constructor values',
       file: 'product.ts',
       source: "export class Product{constructor(readonly name:string,readonly price:number,readonly active:boolean,readonly note:string|null){}summary(){return this.name}}",
-      expected: /new Product/,
+      expected: 'new Product',
     },
     {
       name: 'arrays and objects',
       file: 'catalog.ts',
       source: "type Item={name:string;price:number};export class Catalog{constructor(readonly items:Item[],readonly metadata:{active:boolean;count:number}){}size(){return this.items.length}}",
-      expected: /Catalog/,
+      expected: 'Catalog',
     },
     {
       name: 'date and optional value',
       file: 'event.ts',
       source: "export class Event{constructor(readonly at:Date,readonly description?:string){}timestamp(){return this.at.getTime()}}",
-      expected: /Event/,
+      expected: 'Event',
     },
   ];
 
@@ -236,7 +236,7 @@ describe('automatic test generation regression matrix', () => {
       const result = await generateTest(sourcePath, root);
       const generated = await readFile(result.destinationPath, 'utf8');
 
-      assert.match(generated, item.expected);
+      assert.ok(generated.includes(item.expected), generated);
       assert.match(generated, /node:test/);
       assertParseable(generated, result.destinationPath);
     });

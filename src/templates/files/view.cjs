@@ -436,10 +436,6 @@ function kitDevMlspConfig(baseConfig, runtime = languageServerRuntime()) {
     'settings.autostart.typescript = { languageServer.kitDevTypescript }',
     'settings.defaultLanguageServer.javascript = languageServer.kitDevTypescript',
     'settings.defaultLanguageServer.typescript = languageServer.kitDevTypescript',
-    'settings.showDiagnostics.error = true',
-    'settings.showDiagnostics.warning = true',
-    'settings.showDiagnostics.information = true',
-    'settings.showDiagnostics.hint = true',
     '',
   ].join('\n');
 }

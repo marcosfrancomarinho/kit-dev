@@ -66,31 +66,25 @@ pnpm dev
 
 | Comando | O que faz |
 |---|---|
-| `dev` | Faz o build e executa a aplicação uma vez |
-| `dev --watch` | Mantém a aplicação ativa e reinicia quando houver alterações |
-| `test` | Executa os testes uma vez |
-| `test --watch` | Mantém os testes ativos e executa novamente quando houver alterações |
+| `dev [--watch]` | Faz o build e executa uma vez ou mantém a aplicação ativa em modo watch |
+| `test [--watch]` | Executa os testes uma vez ou mantém ativos em modo watch |
 | `test <arquivo>` | Gera ou atualiza o teste de uma classe |
 | `fmt [arquivo]` | Formata `src/` e `test/` por completo ou somente um arquivo informado |
 | `view [arquivo]` / `v [arquivo]` | Localiza um arquivo do projeto, formata código suportado e abre no Micro |
 | `build` | Verifica os tipos e gera o bundle de produção |
 | `start` | Executa o bundle gerado |
-| `type` | Verifica os tipos TypeScript uma vez |
-| `type --watch` | Mantém a verificação de tipos ativa nas alterações |
+| `type [--watch]` | Verifica os tipos uma vez ou mantém a checagem em modo watch |
 | `di` | Instala a injeção de dependência opcional |
 
 Exemplos com npm:
 
 ```bash
-npm run dev
-npm run dev --watch
-npm test
-npm test --watch
+npm run dev [--watch]
+npm test [--watch]
 npm test -- create-user
 npm run fmt
 npm run v -- product
-npm run type
-npm run type --watch
+npm run type [--watch]
 npm run build
 npm start
 ```
@@ -158,16 +152,10 @@ Para consultar os atalhos padrão do Micro, pressione `Ctrl+E` e execute `help d
 
 Todo projeto gerado já possui um runner de testes. Por padrão, os testes executam uma única vez. Use `--watch` apenas quando quiser reexecução contínua.
 
-Execute uma vez:
+Execute uma vez ou adicione `--watch` para acompanhar alterações:
 
 ```bash
-npm test
-```
-
-Acompanhar alterações:
-
-```bash
-npm test --watch
+npm test [--watch]
 ```
 
 Para gerar um teste a partir de uma classe:

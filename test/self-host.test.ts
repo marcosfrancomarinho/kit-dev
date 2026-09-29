@@ -118,6 +118,31 @@ describe('self-hosted architecture', () => {
     assert.match(messages.join('\n'), /Format src\/ and test\/ code/);
   });
 
+  it('shows watch-capable commands once in a compact form', () => {
+    const terminal = new TerminalAdapter(new TerminalPalette());
+    const messages: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      messages.push(String(message ?? ''));
+    };
+
+    try {
+      terminal.showFinalInstructions('api', 'yarn');
+    } finally {
+      console.log = originalLog;
+    }
+
+    const output = messages.join('\n');
+
+    assert.match(output, /yarn dev \[--watch\]/);
+    assert.match(output, /yarn test \[--watch\]/);
+    assert.match(output, /yarn type \[--watch\]/);
+    assert.doesNotMatch(output, /yarn dev --watch/);
+    assert.doesNotMatch(output, /yarn test --watch/);
+    assert.doesNotMatch(output, /yarn type --watch/);
+  });
+
   it('shows view shortcut in the final command list', () => {
     const terminal = new TerminalAdapter(new TerminalPalette());
     const messages: string[] = [];

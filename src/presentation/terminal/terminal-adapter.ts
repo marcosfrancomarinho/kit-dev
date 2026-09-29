@@ -46,13 +46,9 @@ export class TerminalAdapter implements Terminal {
         '\n\n📂 To get started:\n  ' +
         this.palette.paint(this.palette.bold, `cd ${projectName}`) +
         '\n\n🚀 Available commands:\n  ' +
-        this.formatCommand(runCommand, 'dev', 'Run application once') +
+        this.formatCommand(runCommand, 'dev [--watch]', 'Run application') +
         '\n  ' +
-        this.formatCommand(runCommand, 'dev --watch', 'Run application in watch mode') +
-        '\n  ' +
-        this.formatCommand(runCommand, 'test', 'Run tests once') +
-        '\n  ' +
-        this.formatCommand(runCommand, 'test --watch', 'Run tests in watch mode') +
+        this.formatCommand(runCommand, 'test [--watch]', 'Run tests') +
         '\n  ' +
         this.formatCommand(runCommand, 'fmt', 'Format src/ and test/ code') +
         '\n  ' +
@@ -62,9 +58,7 @@ export class TerminalAdapter implements Terminal {
         '\n  ' +
         this.formatCommand(runCommand, 'start', 'Run bundled output') +
         '\n  ' +
-        this.formatCommand(runCommand, 'type', 'Check TypeScript types once') +
-        '\n  ' +
-        this.formatCommand(runCommand, 'type --watch', 'Check TypeScript types in watch mode') +
+        this.formatCommand(runCommand, 'type [--watch]', 'Check TypeScript types') +
         '\n  ' +
         this.formatCommand(runCommand, 'di', 'Add optional dependency injection') +
         '\n',

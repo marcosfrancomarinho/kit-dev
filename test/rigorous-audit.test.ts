@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { join, resolve, sep } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { describe, it } from 'node:test';
 
 import { NodeVersionPolicy } from '../src/application/policies/node-version-policy.js';
@@ -140,6 +141,17 @@ describe('rigorous application invariants', () => {
       installArgs: ['--allow-build=esbuild', 'add', '-D'],
       runCommand: 'pnpm',
     });
+  });
+
+  it('keeps the published package entrypoint aligned with the bundled CLI', async () => {
+    const pkg = JSON.parse(
+      await readFile(join(process.cwd(), 'package.json'), 'utf8'),
+    );
+
+    assert.equal(pkg.main, 'dist/bundle.cjs');
+    assert.equal(pkg.bin['create-kit-dev'], 'dist/bundle.cjs');
+    assert.ok(pkg.files.includes('dist/bundle.cjs'));
+    assert.ok(pkg.files.includes('src/templates/files'));
   });
 
   it('generates parseable package and tsconfig JSON with all required commands', () => {

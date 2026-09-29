@@ -12,7 +12,7 @@ const {
 
 const buildOptions = {
   absWorkingDir: projectRoot,
-  entryPoints: [main],
+  entryPoints: [source],
   bundle: true,
   outfile: resolve(projectRoot, 'dist', 'bundle.cjs'),
   minifySyntax: true,

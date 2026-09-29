@@ -1,5 +1,8 @@
 const INVALID_NAME_PATTERN = /[<>:"/\\|?*\x00-\x1F]/;
-const RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+const RESERVED_WINDOWS_NAMES =
+  /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+const DOT_PATH_NAMES = /^(?:\.|\.\.)$/;
+const WINDOWS_TRAILING_DOT = /\.$/;
 const MAX_PROJECT_NAME_LENGTH = 255;
 
 export class ProjectName {
@@ -14,7 +17,9 @@ export class ProjectName {
       !normalized ||
       normalized.length > MAX_PROJECT_NAME_LENGTH ||
       INVALID_NAME_PATTERN.test(normalized) ||
-      RESERVED_WINDOWS_NAMES.test(normalized)
+      RESERVED_WINDOWS_NAMES.test(normalized) ||
+      DOT_PATH_NAMES.test(normalized) ||
+      WINDOWS_TRAILING_DOT.test(normalized)
     ) {
       throw new Error('❌ Invalid project name.');
     }

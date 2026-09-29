@@ -8,11 +8,12 @@ const {
   dependencies = {},
   devDependencies = {},
   main,
+  source = main,
 } = require(resolve(projectRoot, 'package.json'));
 
 const buildOptions = {
   absWorkingDir: projectRoot,
-  entryPoints: [main],
+  entryPoints: [source],
   bundle: true,
   outfile: resolve(projectRoot, 'dist', 'bundle.cjs'),
   minifySyntax: true,

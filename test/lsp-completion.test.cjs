@@ -146,15 +146,17 @@ test('TypeScript 7 native LSP returns member completions after capability regist
   const init = await reader.waitFor((m) => m.id === 1);
   assert.ok(init.result, JSON.stringify(init));
 
+  const registration = reader.waitFor(
+    (m) => m.method === 'client/registerCapability' && m.id != null,
+  );
+
   send(child, {
     jsonrpc: '2.0',
     method: 'initialized',
     params: {},
   });
 
-  await reader.waitFor(
-    (m) => m.method === 'client/registerCapability' && m.id != null,
-  );
+  await registration;
 
   send(child, {
     jsonrpc: '2.0',

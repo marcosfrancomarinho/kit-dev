@@ -27,6 +27,7 @@ const projectRoot = process.cwd();
 const MICRO_VERSION = '2.0.15';
 const MLSP_COMMIT = '91261a0926c9e95d059cf5854a0c2e8d4e7d4051';
 const MLSP_FILES = ['main.lua', 'json.lua', 'config.lua'];
+const MLSP_CONFIG_VERSION = 'typescript7-native-v1';
 const ignoredDirectories = new Set([
   '.git',
   'node_modules',
@@ -389,14 +390,14 @@ function languageServerRuntime(root = projectRoot) {
   const serverEntry = join(
     root,
     'node_modules',
-    'typescript-language-server',
-    'lib',
-    'cli.mjs',
+    'typescript',
+    'bin',
+    'tsc',
   );
 
   if (!existsSync(serverEntry)) {
     throw new Error(
-      'TypeScript language server entry was not found at ' +
+      'TypeScript 7 native LSP entry was not found at ' +
         serverEntry +
         '. Reinstall project dependencies.',
     );
@@ -405,6 +406,7 @@ function languageServerRuntime(root = projectRoot) {
   return {
     nodeExecutable: process.execPath,
     serverEntry,
+    serverArgs: ['--lsp', '--stdio'],
   };
 }
 
@@ -420,7 +422,11 @@ function kitDevMlspConfig(baseConfig, runtime = languageServerRuntime()) {
     'languageServer.kitDevTypescript = {',
     '    shortName = "tsserver",',
     '    cmd = ' + luaString(runtime.nodeExecutable) + ',',
-    '    args = {' + luaString(runtime.serverEntry) + ', "--stdio"},',
+    '    args = {' +
+      [runtime.serverEntry, ...(runtime.serverArgs || ['--lsp', '--stdio'])]
+        .map(luaString)
+        .join(', ') +
+      '},',
     '    filetypes = {"javascript", "typescript"},',
     '}',
     'setmetatable(languageServer.kitDevTypescript, defaultLanguageServerOptions)',
@@ -430,10 +436,6 @@ function kitDevMlspConfig(baseConfig, runtime = languageServerRuntime()) {
     'settings.autostart.typescript = { languageServer.kitDevTypescript }',
     'settings.defaultLanguageServer.javascript = languageServer.kitDevTypescript',
     'settings.defaultLanguageServer.typescript = languageServer.kitDevTypescript',
-    'settings.showDiagnostics.error = true',
-    'settings.showDiagnostics.warning = true',
-    'settings.showDiagnostics.information = true',
-    'settings.showDiagnostics.hint = true',
     '',
   ].join('\n');
 }
@@ -449,6 +451,7 @@ async function ensureMicroMlsp(options = {}) {
   const pluginDirectory = join(plugDirectory, 'mlsp');
   const legacyPluginDirectory = join(plugDirectory, 'lsp');
   const versionFile = join(pluginDirectory, '.kit-dev-version');
+  const expectedVersion = MLSP_COMMIT + ':' + MLSP_CONFIG_VERSION;
 
   await mkdir(plugDirectory, { recursive: true });
 
@@ -460,7 +463,7 @@ async function ensureMicroMlsp(options = {}) {
     installedVersion = (await readFile(versionFile, 'utf8')).trim();
   } catch {}
 
-  if (installedVersion !== MLSP_COMMIT) {
+  if (installedVersion !== expectedVersion) {
     await rm(pluginDirectory, { recursive: true, force: true });
     await mkdir(pluginDirectory, { recursive: true });
 
@@ -495,7 +498,7 @@ async function ensureMicroMlsp(options = {}) {
         kitDevMlspConfig(baseConfig, runtime),
         'utf8',
       );
-      await writeFile(versionFile, MLSP_COMMIT + '\n', 'utf8');
+      await writeFile(versionFile, expectedVersion + '\n', 'utf8');
     } catch (error) {
       await rm(pluginDirectory, { recursive: true, force: true });
       throw error;
@@ -667,6 +670,7 @@ if (require.main === module) {
 module.exports = {
   MICRO_VERSION,
   MLSP_COMMIT,
+  MLSP_CONFIG_VERSION,
   MLSP_FILES,
   collectProjectFiles,
   ensureMicro,

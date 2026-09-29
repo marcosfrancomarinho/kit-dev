@@ -137,7 +137,7 @@ Windows:     %USERPROFILE%\.kit-dev\bin\micro.exe
 
 The cached binary is reused by every Kit Dev project on the machine. Automatic download supports the official Micro builds mapped by Kit Dev for Windows, Linux, macOS, FreeBSD, NetBSD, OpenBSD, Solaris and illumos where the current Node.js runtime/platform combination is available.
 
-Generated projects install `typescript-language-server@5.3.0` as a development dependency. On the first `view` / `v` use, Kit Dev downloads a pinned revision of the `mlsp` Micro plugin into the isolated `~/.kit-dev/micro` configuration and connects it directly to the project's local TypeScript language server through the current Node executable, without relying on `npx` inside Micro. The legacy `lsp` plugin is removed from this isolated configuration to avoid two LSP clients running together. `mlsp` autostarts for TypeScript/JavaScript and provides completion, diagnostics, hover, definitions and references without changing the user's normal `~/.config/micro` settings.
+Kit Dev uses the native LSP already provided by `typescript@7.0.2`, so no separate TypeScript language-server package is installed. On the first `view` / `v` use, Kit Dev downloads a pinned revision of the `mlsp` Micro plugin into the isolated `~/.kit-dev/micro` configuration and starts the project's own `node_modules/typescript/bin/tsc --lsp --stdio` directly with Node. The legacy `lsp` plugin is removed from this isolated configuration to avoid two LSP clients running together. `mlsp` autostarts for TypeScript/JavaScript and provides intelligent completion, hover, definitions and references without changing the user's normal `~/.config/micro` settings.
 
 Useful shortcuts shown before Micro opens:
 

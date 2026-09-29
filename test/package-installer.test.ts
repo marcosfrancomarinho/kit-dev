@@ -5,7 +5,7 @@ import type { Terminal } from '../src/application/ports/terminal.js';
 import { NodePackageInstaller } from '../src/infrastructure/package-manager/node-package-installer.js';
 import { PackageManagerRegistry } from '../src/infrastructure/package-manager/package-manager-registry.js';
 
-test('initial dependency install includes the TypeScript language server', async () => {
+test('initial dependency install uses TypeScript 7 native language server support', async () => {
   const calls: Array<{
     command: string;
     args: readonly string[];
@@ -45,8 +45,11 @@ test('initial dependency install includes the TypeScript language server', async
     'install',
     '--save-dev',
   ]);
-  assert.ok(
-    calls[0].args.includes('typescript-language-server@5.3.0'),
-  );
   assert.ok(calls[0].args.includes('typescript@7.0.2'));
+  assert.equal(
+    calls[0].args.some((value) =>
+      value.startsWith('typescript-language-server@'),
+    ),
+    false,
+  );
 });

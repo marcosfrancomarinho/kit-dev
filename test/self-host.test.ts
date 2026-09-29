@@ -161,12 +161,12 @@ describe('self-hosted architecture', () => {
     assert.match(messages.join('\n'), /yarn edit/);
     assert.match(
       messages.join('\n'),
-      /Find and open a file with Micro/,
+      /Find and edit a file with Micro/,
     );
   });
 
 
-  it('generates both view and v scripts with the same viewer command', () => {
+  it('generates both edit and e scripts with the same editor command', () => {
     const templates = new ProjectTemplateCatalog();
     const packageJson = JSON.parse(
       templates.packageJson('api'),

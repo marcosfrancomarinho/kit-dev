@@ -23,7 +23,7 @@ const {
   shouldFormat,
 } = require('../src/templates/files/edit.cjs');
 
-describe('project file editer', () => {
+describe('project file editor', () => {
   it('maps supported platforms to the correct Micro release asset', () => {
     const cases = [
       ['win32', 'ia32', 'micro-2.0.15-win32.zip'],

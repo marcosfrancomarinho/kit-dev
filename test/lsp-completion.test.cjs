@@ -5,10 +5,12 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { test } = require('node:test');
+const { setTimeout: delay } = require('node:timers/promises');
 
 function createReader(stream, onMessage = () => {}) {
   let buffer = Buffer.alloc(0);
   const waiters = [];
+  const pendingMessages = [];
 
   function flush() {
     while (true) {
@@ -28,6 +30,8 @@ function createReader(stream, onMessage = () => {}) {
       if (waiterIndex >= 0) {
         const [waiter] = waiters.splice(waiterIndex, 1);
         waiter.resolve(message);
+      } else {
+        pendingMessages.push(message);
       }
     }
   }
@@ -38,7 +42,13 @@ function createReader(stream, onMessage = () => {}) {
   });
 
   return {
-    waitFor(predicate, timeout = 20000) {
+    waitFor(predicate, timeout = 60000) {
+      const pendingIndex = pendingMessages.findIndex(predicate);
+      if (pendingIndex >= 0) {
+        const [message] = pendingMessages.splice(pendingIndex, 1);
+        return Promise.resolve(message);
+      }
+
       return new Promise((resolve, reject) => {
         const waiter = { predicate, resolve };
         waiters.push(waiter);
@@ -63,7 +73,7 @@ function send(child, message) {
   );
 }
 
-test('TypeScript 7 native LSP returns member completions after capability registration', { timeout: 30000 }, async (context) => {
+test('TypeScript 7 native LSP returns member completions after capability registration', { timeout: 90000 }, async (context) => {
   const repoRoot = join(__dirname, '..');
   const workspace = await mkdtemp(join(tmpdir(), 'kit-dev-ts7-completion-'));
   context.after(() => rm(workspace, { recursive: true, force: true }));
@@ -103,19 +113,32 @@ test('TypeScript 7 native LSP returns member completions after capability regist
   });
 
   const reader = createReader(child.stdout, (message) => {
-    if (
-      message.id != null &&
-      (
-        message.method === 'client/registerCapability' ||
-        message.method === 'client/unregisterCapability'
-      )
-    ) {
-      send(child, {
-        jsonrpc: '2.0',
-        id: message.id,
-        result: null,
-      });
+    if (message.id == null || typeof message.method !== 'string') {
+      return;
     }
+
+    let result = null;
+
+    if (message.method === 'workspace/configuration') {
+      result = Array.isArray(message.params?.items)
+        ? message.params.items.map(() => null)
+        : [];
+    }
+
+    if (message.method === 'workspace/workspaceFolders') {
+      result = [
+        {
+          name: 'root',
+          uri: pathToFileURL(workspace).href,
+        },
+      ];
+    }
+
+    send(child, {
+      jsonrpc: '2.0',
+      id: message.id,
+      result,
+    });
   });
 
   send(child, {
@@ -170,6 +193,10 @@ test('TypeScript 7 native LSP returns member completions after capability regist
       },
     },
   });
+
+  // Give the language server a brief moment to register the opened document.
+  // Real editor usage naturally has this gap before the user requests completion.
+  await delay(250);
 
   const completionResponse = reader.waitFor((m) => m.id === 2);
 

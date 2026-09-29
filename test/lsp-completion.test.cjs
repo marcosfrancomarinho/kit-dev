@@ -112,19 +112,32 @@ test('TypeScript 7 native LSP returns member completions after capability regist
   });
 
   const reader = createReader(child.stdout, (message) => {
-    if (
-      message.id != null &&
-      (
-        message.method === 'client/registerCapability' ||
-        message.method === 'client/unregisterCapability'
-      )
-    ) {
-      send(child, {
-        jsonrpc: '2.0',
-        id: message.id,
-        result: null,
-      });
+    if (message.id == null || typeof message.method !== 'string') {
+      return;
     }
+
+    let result = null;
+
+    if (message.method === 'workspace/configuration') {
+      result = Array.isArray(message.params?.items)
+        ? message.params.items.map(() => null)
+        : [];
+    }
+
+    if (message.method === 'workspace/workspaceFolders') {
+      result = [
+        {
+          name: 'root',
+          uri: pathToFileURL(workspace).href,
+        },
+      ];
+    }
+
+    send(child, {
+      jsonrpc: '2.0',
+      id: message.id,
+      result,
+    });
   });
 
   send(child, {

@@ -4,6 +4,7 @@
   "description": "Fast Node.js + TypeScript project generator with esbuild, native testing, automatic test generation, optional dependency injection, and a zero-config developer workflow.",
   "type": "module",
   "main": "dist/bundle.cjs",
+  "source": "src/main.ts",
   "bin": {
     "create-kit-dev": "dist/bundle.cjs"
   },

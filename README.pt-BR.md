@@ -66,8 +66,7 @@ pnpm dev
 
 | Comando | O que faz |
 |---|---|
-| `dev` | Faz o build e executa a aplicação uma vez |
-| `dev --watch` | Mantém a aplicação ativa e reinicia quando houver alterações |
+| `dev [--watch]` | Faz o build e executa uma vez ou mantém a aplicação ativa em modo watch |
 | `test [--watch]` | Executa os testes uma vez ou mantém ativos em modo watch |
 | `test <arquivo>` | Gera ou atualiza o teste de uma classe |
 | `fmt [arquivo]` | Formata `src/` e `test/` por completo ou somente um arquivo informado |
@@ -153,16 +152,10 @@ Para consultar os atalhos padrão do Micro, pressione `Ctrl+E` e execute `help d
 
 Todo projeto gerado já possui um runner de testes. Por padrão, os testes executam uma única vez. Use `--watch` apenas quando quiser reexecução contínua.
 
-Execute uma vez:
+Execute uma vez ou adicione `--watch` para acompanhar alterações:
 
 ```bash
-npm test
-```
-
-Acompanhar alterações:
-
-```bash
-npm test --watch
+npm test [--watch]
 ```
 
 Para gerar um teste a partir de uma classe:

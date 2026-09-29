@@ -509,6 +509,7 @@ function addSemicolons(source, fileName = 'source.ts') {
 
       if (
         !beforeEnd.endsWith(';') &&
+        !beforeEnd.endsWith(',') &&
         afterEnd !== ','
       ) {
         positions.add(end);

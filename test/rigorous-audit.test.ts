@@ -82,7 +82,14 @@ describe('rigorous application invariants', () => {
   it('rejects malformed Node.js version strings instead of silently accepting them', () => {
     const policy = new NodeVersionPolicy();
 
-    for (const version of ['', 'abc', 'v22.0.0', 'NaN']) {
+    for (const version of [
+      '',
+      'abc',
+      'v22.0.0',
+      '22abc',
+      '22.0.x',
+      'NaN',
+    ]) {
       assert.throws(
         () => policy.assertSupported(version),
         /requires Node\.js 22 or newer/,
@@ -92,6 +99,7 @@ describe('rigorous application invariants', () => {
 
     assert.doesNotThrow(() => policy.assertSupported('22.0.0'));
     assert.doesNotThrow(() => policy.assertSupported('24.99.1'));
+    assert.doesNotThrow(() => policy.assertSupported('24.0.0-rc.1'));
   });
 
   it('detects npm, yarn and pnpm from either user-agent or executable path', () => {

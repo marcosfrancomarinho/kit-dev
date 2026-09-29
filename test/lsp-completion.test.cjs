@@ -202,7 +202,6 @@ test('TypeScript 7 native LSP returns member completions after capability regist
     jsonrpc: '2.0',
     id: 3,
     method: 'shutdown',
-    params: null,
   });
   const shutdown = await reader.waitFor((m) => m.id === 3);
   assert.equal(shutdown.error, undefined);
@@ -221,7 +220,6 @@ test('TypeScript 7 native LSP returns member completions after capability regist
   send(child, {
     jsonrpc: '2.0',
     method: 'exit',
-    params: null,
   });
 
   const exitCode = await exited;

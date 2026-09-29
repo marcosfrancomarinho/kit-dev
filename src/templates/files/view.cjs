@@ -27,7 +27,7 @@ const projectRoot = process.cwd();
 const MICRO_VERSION = '2.0.15';
 const MLSP_COMMIT = '91261a0926c9e95d059cf5854a0c2e8d4e7d4051';
 const MLSP_FILES = ['main.lua', 'json.lua', 'config.lua'];
-const MLSP_CONFIG_VERSION = 'typescript7-native-v1';
+const MLSP_CONFIG_VERSION = 'typescript7-native-v2-auto-complete';
 const ignoredDirectories = new Set([
   '.git',
   'node_modules',
@@ -440,6 +440,39 @@ function kitDevMlspConfig(baseConfig, runtime = languageServerRuntime()) {
   ].join('\n');
 }
 
+
+function kitDevMlspMain(baseMain) {
+  const marker = '-- KIT_DEV_AUTO_COMPLETION';
+
+  if (baseMain.includes(marker)) return baseMain;
+
+  return [
+    baseMain.trimEnd(),
+    '',
+    marker,
+    'local function kitDevShouldAutocomplete(r)',
+    '    return r == "." or util.IsWordChar(r)',
+    'end',
+    '',
+    'function onRune(bp, r)',
+    '    if next(activeConnections) == nil then return true end',
+    '    if bp.Buf.HasSuggestions then return true end',
+    '',
+    '    local filetype = bp.Buf:FileType()',
+    '    local client = findClient(filetype, "completionProvider", "completion")',
+    '    if client == nil or not client:supportsFiletype(filetype) then',
+    '        return true',
+    '    end',
+    '',
+    '    if not kitDevShouldAutocomplete(r) then return true end',
+    '',
+    '    completionAction(bp)',
+    '    return true',
+    'end',
+    '',
+  ].join('\n');
+}
+
 async function ensureMicroMlsp(options = {}) {
   const home = options.home || homedir();
   const fetchImpl = options.fetch || fetch;
@@ -488,6 +521,16 @@ async function ensureMicroMlsp(options = {}) {
         const content = await response.text();
         await writeFile(join(pluginDirectory, file), content, 'utf8');
       }
+
+      const baseMain = await readFile(
+        join(pluginDirectory, 'main.lua'),
+        'utf8',
+      );
+      await writeFile(
+        join(pluginDirectory, 'main.lua'),
+        kitDevMlspMain(baseMain),
+        'utf8',
+      );
 
       const baseConfig = await readFile(
         join(pluginDirectory, 'config.lua'),
@@ -678,6 +721,7 @@ module.exports = {
   findViewCandidates,
   formatBeforeOpen,
   kitDevMlspConfig,
+  kitDevMlspMain,
   languageServerRuntime,
   luaString,
   mlspBindings,

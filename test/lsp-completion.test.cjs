@@ -9,6 +9,7 @@ const { test } = require('node:test');
 function createReader(stream, onMessage = () => {}) {
   let buffer = Buffer.alloc(0);
   const waiters = [];
+  const pendingMessages = [];
 
   function flush() {
     while (true) {
@@ -28,6 +29,8 @@ function createReader(stream, onMessage = () => {}) {
       if (waiterIndex >= 0) {
         const [waiter] = waiters.splice(waiterIndex, 1);
         waiter.resolve(message);
+      } else {
+        pendingMessages.push(message);
       }
     }
   }
@@ -39,6 +42,12 @@ function createReader(stream, onMessage = () => {}) {
 
   return {
     waitFor(predicate, timeout = 20000) {
+      const pendingIndex = pendingMessages.findIndex(predicate);
+      if (pendingIndex >= 0) {
+        const [message] = pendingMessages.splice(pendingIndex, 1);
+        return Promise.resolve(message);
+      }
+
       return new Promise((resolve, reject) => {
         const waiter = { predicate, resolve };
         waiters.push(waiter);

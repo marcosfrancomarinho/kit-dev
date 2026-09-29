@@ -456,13 +456,13 @@ describe('project file viewer', () => {
     assert.match(config, /settings\.autostart\.javascript/);
   });
 
-  it('adds automatic mlsp completion for typed words and member access', () => {
+  it('adds automatic mlsp completion only for member access', () => {
     const patched = kitDevMlspMain('-- upstream mlsp main\n');
 
     assert.match(patched, /KIT_DEV_AUTO_COMPLETION/);
     assert.match(patched, /function onRune\(bp, r\)/);
     assert.match(patched, /r == "\."/);
-    assert.match(patched, /util\.IsWordChar\(r\)/);
+    assert.doesNotMatch(patched, /util\.IsWordChar\(r\)/);
     assert.match(patched, /bp\.Buf\.HasSuggestions/);
     assert.match(patched, /completionAction\(bp\)/);
     assert.match(patched, /client\/registerCapability/);
@@ -564,7 +564,7 @@ describe('project file viewer', () => {
     );
     assert.doesNotMatch(config, /\bnpx\b/);
     assert.match(config, /settings\.tabAutocomplete = true/);
-    assert.match(marker, /^[a-f0-9]{40}:typescript7-native-v3-client-requests\n$/);
+    assert.match(marker, /^[a-f0-9]{40}:typescript7-native-v4-dot-completion\n$/);
     assert.equal(
       bindings.CtrlSpace,
       'command:lsp autocomplete',

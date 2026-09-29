@@ -25,9 +25,6 @@ const readline = require('node:readline');
 
 const projectRoot = process.cwd();
 const MICRO_VERSION = '2.0.15';
-const MLSP_COMMIT = '91261a0926c9e95d059cf5854a0c2e8d4e7d4051';
-const MLSP_FILES = ['main.lua', 'json.lua', 'config.lua'];
-const MLSP_CONFIG_VERSION = 'typescript7-native-v5-tab-only';
 const ignoredDirectories = new Set([
   '.git',
   'node_modules',
@@ -369,191 +366,6 @@ async function ensureMicro(options = {}) {
   return executable;
 }
 
-function microConfigDirectory(home = homedir()) {
-  return join(home, '.kit-dev', 'micro');
-}
-
-function mlspBindings() {
-  return {
-    'Alt-k': 'command:lsp hover',
-    'Alt-d': 'command:lsp goto-definition',
-    'Alt-r': 'command:lsp find-references',
-  };
-}
-
-function luaString(value) {
-  return JSON.stringify(String(value));
-}
-
-function languageServerRuntime(root = projectRoot) {
-  const serverEntry = join(
-    root,
-    'node_modules',
-    'typescript',
-    'bin',
-    'tsc',
-  );
-
-  if (!existsSync(serverEntry)) {
-    throw new Error(
-      'TypeScript 7 native LSP entry was not found at ' +
-        serverEntry +
-        '. Reinstall project dependencies.',
-    );
-  }
-
-  return {
-    nodeExecutable: process.execPath,
-    serverEntry,
-    serverArgs: ['--lsp', '--stdio'],
-  };
-}
-
-function kitDevMlspConfig(baseConfig, runtime = languageServerRuntime()) {
-  const marker = '-- KIT_DEV_MLSP_CONFIG';
-  const markerIndex = baseConfig.indexOf(marker);
-  const upstreamConfig =
-    markerIndex >= 0 ? baseConfig.slice(0, markerIndex) : baseConfig;
-
-  return [
-    upstreamConfig.trimEnd(),
-    '',
-    marker,
-    'languageServer.kitDevTypescript = {',
-    '    shortName = "tsserver",',
-    '    cmd = ' + luaString(runtime.nodeExecutable) + ',',
-    '    args = {' +
-      [runtime.serverEntry, ...(runtime.serverArgs || ['--lsp', '--stdio'])]
-        .map(luaString)
-        .join(', ') +
-      '},',
-    '    filetypes = {"javascript", "typescript"},',
-    '}',
-    'setmetatable(languageServer.kitDevTypescript, defaultLanguageServerOptions)',
-    '',
-    'settings.tabAutocomplete = true',
-    'settings.autostart.javascript = { languageServer.kitDevTypescript }',
-    'settings.autostart.typescript = { languageServer.kitDevTypescript }',
-    'settings.defaultLanguageServer.javascript = languageServer.kitDevTypescript',
-    'settings.defaultLanguageServer.typescript = languageServer.kitDevTypescript',
-    '',
-  ].join('\n');
-}
-
-
-function kitDevMlspMain(baseMain) {
-  const marker = '-- KIT_DEV_TYPESCRIPT7_COMPAT';
-
-  if (baseMain.includes(marker)) return baseMain;
-
-  return [
-    baseMain.trimEnd(),
-    '',
-    marker,
-    'local kitDevOriginalHandleRequest = LSPClient.handleRequest',
-    'function LSPClient:handleRequest(request)',
-    '    if request.method == "client/registerCapability" or request.method == "client/unregisterCapability" then',
-    '        self:responseResult(request.id, json.null)',
-    '        return',
-    '    end',
-    '    return kitDevOriginalHandleRequest(self, request)',
-    'end',
-    '',
-  ].join('\n');
-}
-
-async function ensureMicroMlsp(options = {}) {
-  const home = options.home || homedir();
-  const fetchImpl = options.fetch || fetch;
-  const runtime =
-    options.runtime || languageServerRuntime(options.projectRoot || projectRoot);
-  const configDirectory =
-    options.configDirectory || microConfigDirectory(home);
-  const plugDirectory = join(configDirectory, 'plug');
-  const pluginDirectory = join(plugDirectory, 'mlsp');
-  const legacyPluginDirectory = join(plugDirectory, 'lsp');
-  const versionFile = join(pluginDirectory, '.kit-dev-version');
-  const expectedVersion = MLSP_COMMIT + ':' + MLSP_CONFIG_VERSION;
-
-  await mkdir(plugDirectory, { recursive: true });
-
-  // Remove the old plugin to prevent two LSP clients from loading together.
-  await rm(legacyPluginDirectory, { recursive: true, force: true });
-
-  let installedVersion = '';
-  try {
-    installedVersion = (await readFile(versionFile, 'utf8')).trim();
-  } catch {}
-
-  if (installedVersion !== expectedVersion) {
-    await rm(pluginDirectory, { recursive: true, force: true });
-    await mkdir(pluginDirectory, { recursive: true });
-
-    try {
-      for (const file of MLSP_FILES) {
-        const url =
-          'https://raw.githubusercontent.com/Andriamanitra/mlsp/' +
-          MLSP_COMMIT +
-          '/' +
-          file;
-        const response = await fetchImpl(url);
-
-        if (!response.ok) {
-          throw new Error(
-            'mlsp download failed with HTTP ' +
-              response.status +
-              ': ' +
-              file,
-          );
-        }
-
-        const content = await response.text();
-        await writeFile(join(pluginDirectory, file), content, 'utf8');
-      }
-
-      const baseMain = await readFile(
-        join(pluginDirectory, 'main.lua'),
-        'utf8',
-      );
-      await writeFile(
-        join(pluginDirectory, 'main.lua'),
-        kitDevMlspMain(baseMain),
-        'utf8',
-      );
-
-      const baseConfig = await readFile(
-        join(pluginDirectory, 'config.lua'),
-        'utf8',
-      );
-      await writeFile(
-        join(pluginDirectory, 'config.lua'),
-        kitDevMlspConfig(baseConfig, runtime),
-        'utf8',
-      );
-      await writeFile(versionFile, expectedVersion + '\n', 'utf8');
-    } catch (error) {
-      await rm(pluginDirectory, { recursive: true, force: true });
-      throw error;
-    }
-  }
-
-  const configPath = join(pluginDirectory, 'config.lua');
-  const currentConfig = await readFile(configPath, 'utf8');
-  await writeFile(
-    configPath,
-    kitDevMlspConfig(currentConfig, runtime),
-    'utf8',
-  );
-
-  await writeFile(
-    join(configDirectory, 'bindings.json'),
-    JSON.stringify(mlspBindings(), null, 2) + '\n',
-    'utf8',
-  );
-
-  return configDirectory;
-}
-
 function shouldFormat(file, root = projectRoot) {
   if (!sourcePattern.test(file)) return false;
 
@@ -597,9 +409,6 @@ function renderMicroTips() {
     '  Ctrl+Q  Quit',
     '  Ctrl+F  Find',
     '  Ctrl+E  Command / Help',
-    '  Tab  LSP autocomplete',
-    '  Alt+K  LSP hover',
-    '  Alt+D  Go to definition',
     '',
     'Tip: Ctrl+E → help defaultkeys',
     '',
@@ -610,22 +419,11 @@ function showMicroTips() {
   process.stdout.write(renderMicroTips());
 }
 
-function openWithMicro(
-  editor,
-  file,
-  root = projectRoot,
-  options = {},
-) {
+function openWithMicro(editor, file, root = projectRoot) {
   formatBeforeOpen(file, root);
   showMicroTips();
 
-  const args = [];
-  if (options.configDirectory) {
-    args.push('-config-dir', options.configDirectory);
-  }
-  args.push(file);
-
-  const result = spawnSync(editor, args, {
+  const result = spawnSync(editor, [file], {
     cwd: root,
     stdio: 'inherit',
     shell: false,
@@ -678,25 +476,7 @@ async function main() {
   if (!selected) return;
 
   const editor = await ensureMicro();
-  let configDirectory = null;
-
-  try {
-    configDirectory = await ensureMicroMlsp();
-    console.log(
-      '✓ mlsp configured for TypeScript/JavaScript (autostart in Micro)',
-    );
-  } catch (error) {
-    console.warn(
-      '⚠ mlsp unavailable. Opening Micro without intelligent autocomplete.',
-    );
-    if (process.env.KIT_DEV_DEBUG && error instanceof Error) {
-      console.warn(error.message);
-    }
-  }
-
-  openWithMicro(editor, selected, projectRoot, {
-    configDirectory,
-  });
+  openWithMicro(editor, selected, projectRoot);
 }
 
 if (require.main === module) {
@@ -709,21 +489,11 @@ if (require.main === module) {
 
 module.exports = {
   MICRO_VERSION,
-  MLSP_COMMIT,
-  MLSP_CONFIG_VERSION,
-  MLSP_FILES,
   collectProjectFiles,
   ensureMicro,
-  ensureMicroMlsp,
   findViewCandidates,
   formatBeforeOpen,
-  kitDevMlspConfig,
-  kitDevMlspMain,
-  languageServerRuntime,
-  luaString,
-  mlspBindings,
   microAsset,
-  microConfigDirectory,
   openWithMicro,
   renderMicroTips,
   renderSelection,

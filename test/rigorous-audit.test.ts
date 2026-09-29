@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { join, resolve } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { NodeVersionPolicy } from '../src/application/policies/node-version-policy.js';
@@ -38,14 +38,19 @@ describe('rigorous application invariants', () => {
     }
   });
 
-  it('rejects Windows-unsafe trailing dots and spaces', () => {
-    for (const value of ['project.', 'project..', 'project ']) {
+  it('rejects Windows-unsafe trailing dots and safely normalizes trailing spaces', () => {
+    for (const value of ['project.', 'project..']) {
       assert.throws(
         () => ProjectName.create(value),
         /Invalid project name/,
         value,
       );
     }
+
+    assert.equal(
+      ProjectName.create('project ').toString(),
+      'project',
+    );
   });
 
   it('rejects empty, control-character, path-separator and oversized names', () => {
@@ -70,7 +75,7 @@ describe('rigorous application invariants', () => {
     const path = new NodePathResolver().resolve(cwd, name);
 
     assert.equal(path, join(cwd, 'safe-project'));
-    assert.ok(path.startsWith(cwd + require('node:path').sep));
+    assert.ok(path.startsWith(cwd + sep));
   });
 
   it('rejects malformed Node.js version strings instead of silently accepting them', () => {

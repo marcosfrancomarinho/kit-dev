@@ -109,7 +109,7 @@ describe('extensive formatter regression matrix', () => {
 
     assert.match(result, /'a   b = c:d'/);
     assert.match(result, /keep   spaces/);
-    assert.match(result, /\\/x   y\\//);
+    assert.match(result, /\/x   y\//);
     assertParseable(result, 'literals.ts');
   });
 });

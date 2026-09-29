@@ -18,6 +18,8 @@ const {
   findViewCandidates,
   formatBeforeOpen,
   kitDevMlspConfig,
+  languageServerRuntime,
+  luaString,
   mlspBindings,
   microAsset,
   microConfigDirectory,
@@ -433,15 +435,19 @@ describe('project file viewer', () => {
 
 
 
-  it('builds mlsp TypeScript config with local language server and autostart', () => {
-    const config = kitDevMlspConfig('-- upstream mlsp config\n');
+  it('builds mlsp TypeScript config with the direct local language server and autostart', () => {
+    const config = kitDevMlspConfig('-- upstream mlsp config\n', {
+      nodeExecutable: '/runtime/node',
+      serverEntry: '/workspace/node_modules/typescript-language-server/lib/cli.mjs',
+    });
 
     assert.match(config, /KIT_DEV_MLSP_CONFIG/);
-    assert.match(config, /cmd = "npx"/);
+    assert.match(config, /cmd = "\/runtime\/node"/);
     assert.match(
       config,
-      /"typescript-language-server", "--stdio"/,
+      /typescript-language-server\/lib\/cli\.mjs", "--stdio"/,
     );
+    assert.doesNotMatch(config, /\bnpx\b/);
     assert.match(config, /settings\.tabAutocomplete = true/);
     assert.match(
       config,
@@ -458,8 +464,12 @@ describe('project file viewer', () => {
   });
 
   it('does not duplicate the Kit Dev mlsp config marker', () => {
-    const once = kitDevMlspConfig('-- upstream\n');
-    const twice = kitDevMlspConfig(once);
+    const runtime = {
+      nodeExecutable: '/runtime/node',
+      serverEntry: '/workspace/server.mjs',
+    };
+    const once = kitDevMlspConfig('-- upstream\n', runtime);
+    const twice = kitDevMlspConfig(once, runtime);
 
     assert.equal(twice, once);
   });
@@ -497,6 +507,10 @@ describe('project file viewer', () => {
     const requested = [];
     const result = await ensureMicroMlsp({
       home,
+      runtime: {
+        nodeExecutable: '/runtime/node',
+        serverEntry: '/workspace/server.mjs',
+      },
       async fetch(url) {
         requested.push(url);
         const name = url.split('/').pop();
@@ -531,7 +545,9 @@ describe('project file viewer', () => {
       await readFile(join(result, 'bindings.json'), 'utf8'),
     );
 
-    assert.match(config, /typescript-language-server/);
+    assert.match(config, /cmd = "\/runtime\/node"/);
+    assert.match(config, /args = \{"\/workspace\/server\.mjs", "--stdio"\}/);
+    assert.doesNotMatch(config, /\bnpx\b/);
     assert.match(config, /settings\.tabAutocomplete = true/);
     assert.match(marker, /^[a-f0-9]{40}\n$/);
     assert.equal(
@@ -565,11 +581,16 @@ describe('project file viewer', () => {
       };
     };
 
-    await ensureMicroMlsp({ home, fetch: fakeFetch });
+    const runtime = {
+      nodeExecutable: '/runtime/node',
+      serverEntry: '/workspace/server.mjs',
+    };
+
+    await ensureMicroMlsp({ home, fetch: fakeFetch, runtime });
     assert.equal(downloads, 3);
 
     downloads = 0;
-    await ensureMicroMlsp({ home, fetch: fakeFetch });
+    await ensureMicroMlsp({ home, fetch: fakeFetch, runtime });
     assert.equal(downloads, 0);
   });
 
@@ -584,6 +605,10 @@ describe('project file viewer', () => {
       () =>
         ensureMicroMlsp({
           home,
+          runtime: {
+            nodeExecutable: '/runtime/node',
+            serverEntry: '/workspace/server.mjs',
+          },
           async fetch() {
             calls += 1;
             if (calls === 2) {
@@ -614,6 +639,38 @@ describe('project file viewer', () => {
       ),
       false,
     );
+  });
+
+
+  it('resolves the language server entry from the generated project node_modules', async (context) => {
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-lsp-runtime-'));
+    context.after(() => rm(root, { recursive: true, force: true }));
+
+    const entry = join(
+      root,
+      'node_modules',
+      'typescript-language-server',
+      'lib',
+      'cli.mjs',
+    );
+    await mkdir(join(entry, '..'), { recursive: true });
+    await writeFile(entry, 'export {}\n', 'utf8');
+
+    const runtime = languageServerRuntime(root);
+
+    assert.equal(runtime.nodeExecutable, process.execPath);
+    assert.equal(runtime.serverEntry, entry);
+  });
+
+  it('reports a missing TypeScript language server entry clearly', () => {
+    assert.throws(
+      () => languageServerRuntime(join(tmpdir(), 'kit-dev-missing-lsp')),
+      /TypeScript language server entry was not found/,
+    );
+  });
+
+  it('escapes runtime paths as Lua string literals', () => {
+    assert.equal(luaString('C:\\Program Files\\node.exe'), '"C:\\\\Program Files\\\\node.exe"');
   });
 
 });

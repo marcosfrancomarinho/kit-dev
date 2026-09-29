@@ -137,7 +137,7 @@ Windows:     %USERPROFILE%\.kit-dev\bin\micro.exe
 
 O mesmo binário em cache é reutilizado por todos os projetos Kit Dev da máquina. O download automático contempla os builds oficiais do Micro mapeados pelo Kit Dev para Windows, Linux, macOS, FreeBSD, NetBSD, OpenBSD, Solaris e illumos quando a combinação de plataforma e runtime Node.js estiver disponível.
 
-Os projetos gerados instalam `typescript-language-server@5.3.0` como dependência de desenvolvimento. No primeiro uso de `view` / `v`, o Kit Dev baixa uma revisão fixa do plugin `mlsp` do Micro para a configuração isolada em `~/.kit-dev/micro` e o conecta ao language server TypeScript local do projeto. O plugin antigo `lsp` é removido dessa configuração isolada para evitar dois clientes LSP rodando ao mesmo tempo. O `mlsp` inicia automaticamente em arquivos TypeScript/JavaScript e fornece autocomplete, diagnósticos, hover, definição e referências sem alterar as configurações normais do usuário em `~/.config/micro`.
+Os projetos gerados instalam `typescript-language-server@5.3.0` como dependência de desenvolvimento. No primeiro uso de `view` / `v`, o Kit Dev baixa uma revisão fixa do plugin `mlsp` do Micro para a configuração isolada em `~/.kit-dev/micro` e o conecta diretamente ao language server TypeScript local do projeto usando o executável Node atual, sem depender de `npx` dentro do Micro. O plugin antigo `lsp` é removido dessa configuração isolada para evitar dois clientes LSP rodando ao mesmo tempo. O `mlsp` inicia automaticamente em arquivos TypeScript/JavaScript e fornece autocomplete, diagnósticos, hover, definição e referências sem alterar as configurações normais do usuário em `~/.config/micro`.
 
 Atalhos mostrados antes de abrir o Micro:
 

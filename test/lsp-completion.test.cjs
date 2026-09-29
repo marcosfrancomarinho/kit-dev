@@ -6,7 +6,7 @@ const { join } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { test } = require('node:test');
 
-function createReader(stream) {
+function createReader(stream, onMessage = () => {}) {
   let buffer = Buffer.alloc(0);
   const waiters = [];
 
@@ -23,6 +23,7 @@ function createReader(stream) {
       const body = buffer.subarray(bodyStart, bodyStart + length).toString('utf8');
       buffer = buffer.subarray(bodyStart + length);
       const message = JSON.parse(body);
+      onMessage(message);
       const waiterIndex = waiters.findIndex((w) => w.predicate(message));
       if (waiterIndex >= 0) {
         const [waiter] = waiters.splice(waiterIndex, 1);
@@ -101,7 +102,21 @@ test('TypeScript 7 native LSP returns member completions after capability regist
     stderr += chunk;
   });
 
-  const reader = createReader(child.stdout);
+  const reader = createReader(child.stdout, (message) => {
+    if (
+      message.id != null &&
+      (
+        message.method === 'client/registerCapability' ||
+        message.method === 'client/unregisterCapability'
+      )
+    ) {
+      send(child, {
+        jsonrpc: '2.0',
+        id: message.id,
+        result: null,
+      });
+    }
+  });
 
   send(child, {
     jsonrpc: '2.0',
@@ -135,15 +150,6 @@ test('TypeScript 7 native LSP returns member completions after capability regist
     jsonrpc: '2.0',
     method: 'initialized',
     params: {},
-  });
-
-  const registration = await reader.waitFor(
-    (m) => m.method === 'client/registerCapability' && m.id != null,
-  );
-  send(child, {
-    jsonrpc: '2.0',
-    id: registration.id,
-    result: null,
   });
 
   send(child, {

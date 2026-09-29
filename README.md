@@ -131,8 +131,6 @@ Windows:     %USERPROFILE%\.kit-dev\bin\micro.exe
 
 The cached editor is reused by every Kit Dev project on the machine.
 
-For TypeScript and JavaScript files, Kit Dev also enables **code intelligence**: autocomplete, information about symbols, go to definition and references. This support is configured automatically the first time `view` / `v` is used. Autocomplete does not appear while you type; press `Tab` when you want suggestions.
-
 Useful shortcuts:
 
 ```text
@@ -141,9 +139,6 @@ Ctrl+Q  Quit
 Ctrl+F  Find
 Ctrl+B  Terminal / Shell mode
 Ctrl+E  Command / Help
-Tab     Show autocomplete suggestions
-Alt+K   Show information about the selected symbol
-Alt+D   Go to definition
 ```
 
 For the editor's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev view help is available with `yarn v --help`.

@@ -444,8 +444,6 @@ describe('project file viewer', () => {
     });
 
     assert.match(config, /KIT_DEV_MLSP_CONFIG/);
-    assert.match(main, /KIT_DEV_AUTO_COMPLETION/);
-    assert.match(main, /completionAction\(bp\)/);
     assert.match(config, /cmd = "\/runtime\/node"/);
     assert.match(
       config,

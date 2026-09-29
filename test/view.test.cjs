@@ -465,6 +465,9 @@ describe('project file viewer', () => {
     assert.match(patched, /util\.IsWordChar\(r\)/);
     assert.match(patched, /bp\.Buf\.HasSuggestions/);
     assert.match(patched, /completionAction\(bp\)/);
+    assert.match(patched, /client\/registerCapability/);
+    assert.match(patched, /client\/unregisterCapability/);
+    assert.match(patched, /responseResult\(request\.id, json\.null\)/);
 
     assert.equal(kitDevMlspMain(patched), patched);
   });
@@ -561,7 +564,7 @@ describe('project file viewer', () => {
     );
     assert.doesNotMatch(config, /\bnpx\b/);
     assert.match(config, /settings\.tabAutocomplete = true/);
-    assert.match(marker, /^[a-f0-9]{40}:typescript7-native-v2-auto-complete\n$/);
+    assert.match(marker, /^[a-f0-9]{40}:typescript7-native-v3-client-requests\n$/);
     assert.equal(
       bindings.CtrlSpace,
       'command:lsp autocomplete',

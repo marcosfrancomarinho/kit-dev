@@ -482,6 +482,27 @@ describe('project file viewer', () => {
     assert.equal(twice, once);
   });
 
+  it('replaces a stale project-specific LSP runtime', () => {
+    const first = kitDevMlspConfig('-- upstream\n', {
+      nodeExecutable: '/runtime/node',
+      serverEntry: '/project-a/node_modules/typescript/bin/tsc',
+      serverArgs: ['--lsp', '--stdio'],
+    });
+
+    const second = kitDevMlspConfig(first, {
+      nodeExecutable: '/runtime/node',
+      serverEntry: '/project-b/node_modules/typescript/bin/tsc',
+      serverArgs: ['--lsp', '--stdio'],
+    });
+
+    assert.doesNotMatch(second, /project-a/);
+    assert.match(second, /project-b/);
+    assert.equal(
+      (second.match(/KIT_DEV_MLSP_CONFIG/g) || []).length,
+      1,
+    );
+  });
+
   it('keeps autocomplete Tab-only and preserves hover/navigation bindings', () => {
     const bindings = mlspBindings();
 
@@ -600,6 +621,59 @@ describe('project file viewer', () => {
     downloads = 0;
     await ensureMicroMlsp({ home, fetch: fakeFetch, runtime });
     assert.equal(downloads, 0);
+  });
+
+  it('refreshes the cached LSP runtime when switching projects', async (context) => {
+    const home = await mkdtemp(join(tmpdir(), 'kit-dev-mlsp-project-switch-'));
+    context.after(() =>
+      rm(home, { recursive: true, force: true }),
+    );
+
+    let downloads = 0;
+    const fakeFetch = async (url) => {
+      downloads += 1;
+      const name = url.split('/').pop();
+      return {
+        ok: true,
+        status: 200,
+        async text() {
+          return name === 'config.lua'
+            ? '-- upstream mlsp config\n'
+            : '-- plugin\n';
+        },
+      };
+    };
+
+    await ensureMicroMlsp({
+      home,
+      fetch: fakeFetch,
+      runtime: {
+        nodeExecutable: '/runtime/node',
+        serverEntry: '/project-a/node_modules/typescript/bin/tsc',
+        serverArgs: ['--lsp', '--stdio'],
+      },
+    });
+
+    downloads = 0;
+
+    const configDirectory = await ensureMicroMlsp({
+      home,
+      fetch: fakeFetch,
+      runtime: {
+        nodeExecutable: '/runtime/node',
+        serverEntry: '/project-b/node_modules/typescript/bin/tsc',
+        serverArgs: ['--lsp', '--stdio'],
+      },
+    });
+
+    const config = await readFile(
+      join(configDirectory, 'plug', 'mlsp', 'config.lua'),
+      'utf8',
+    );
+
+    assert.equal(downloads, 0);
+    assert.doesNotMatch(config, /project-a/);
+    assert.match(config, /project-b/);
   });
 
   it('cleans a partial mlsp installation when a pinned file download fails', async (context) => {

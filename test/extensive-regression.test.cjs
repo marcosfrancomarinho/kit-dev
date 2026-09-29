@@ -20,7 +20,8 @@ function assertParseable(source, fileName = 'sample.ts') {
   assert.equal(
     sourceFile.parseDiagnostics.length,
     0,
-    sourceFile.parseDiagnostics.map((item) => item.messageText).join('\n'),
+    sourceFile.parseDiagnostics.map((item) => item.messageText).join('\\n') +
+      '\\n--- source ---\\n' + source,
   );
 }
 

@@ -6,6 +6,7 @@ export class ProjectTemplateCatalog {
         version: '1.0.0',
         type: 'module',
         main: 'src/main.ts',
+        source: 'src/main.ts',
         scripts: {
           start: 'node --enable-source-maps dist/bundle.cjs',
           dev: 'node kit-dev/build/dev.cjs',

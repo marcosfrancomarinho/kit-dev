@@ -22,7 +22,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // src/domain/project/project-name.ts
-var INVALID_NAME_PATTERN = /[<>:"/\\|?*\x00-\x1F]/, RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+var INVALID_NAME_PATTERN = /[<>:"/\\|?*\x00-\x1F]/, RESERVED_WINDOWS_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i, DOT_PATH_NAMES = /^(?:\.|\.\.)$/, WINDOWS_TRAILING_DOT = /\.$/;
 var ProjectName = class _ProjectName {
   constructor(value) {
     this.value = value;
@@ -34,7 +34,7 @@ var ProjectName = class _ProjectName {
   }
   static create(value) {
     let normalized = String(value ?? "").trim();
-    if (!normalized || normalized.length > 255 || INVALID_NAME_PATTERN.test(normalized) || RESERVED_WINDOWS_NAMES.test(normalized))
+    if (!normalized || normalized.length > 255 || INVALID_NAME_PATTERN.test(normalized) || RESERVED_WINDOWS_NAMES.test(normalized) || DOT_PATH_NAMES.test(normalized) || WINDOWS_TRAILING_DOT.test(normalized))
       throw new Error("\u274C Invalid project name.");
     return new _ProjectName(normalized);
   }
@@ -277,7 +277,8 @@ var NodeVersionPolicy = class {
   }
   minimumMajor = 22;
   assertSupported(version = process.versions.node) {
-    if (Number.parseInt(version, 10) < this.minimumMajor)
+    let major = Number.parseInt(version, 10);
+    if (!Number.isInteger(major) || major < this.minimumMajor)
       throw new Error(
         `Kit Dev requires Node.js ${this.minimumMajor} or newer. Current version: ${version}.`
       );
@@ -329,7 +330,7 @@ var NodePackageManagerDetector = class {
   environment = process.env;
   detect(environment = this.environment) {
     let execPath = environment.npm_execpath ?? "", userAgent = environment.npm_config_user_agent ?? "";
-    return userAgent.startsWith("pnpm") ? "pnpm" : userAgent.startsWith("yarn") ? "yarn" : (execPath.includes("npm-cli.js") || execPath.includes("npx"), "npm");
+    return userAgent.startsWith("pnpm") ? "pnpm" : userAgent.startsWith("yarn") ? "yarn" : execPath.includes("pnpm") ? "pnpm" : execPath.includes("yarn") ? "yarn" : (execPath.includes("npm-cli.js") || execPath.includes("npx"), "npm");
   }
 };
 

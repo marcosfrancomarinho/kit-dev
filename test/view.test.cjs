@@ -545,7 +545,9 @@ describe('project file viewer', () => {
       await readFile(join(result, 'bindings.json'), 'utf8'),
     );
 
-    assert.match(config, /typescript-language-server/);
+    assert.match(config, /cmd = "\/runtime\/node"/);
+    assert.match(config, /args = \{"\/workspace\/server\.mjs", "--stdio"\}/);
+    assert.doesNotMatch(config, /\bnpx\b/);
     assert.match(config, /settings\.tabAutocomplete = true/);
     assert.match(marker, /^[a-f0-9]{40}\n$/);
     assert.equal(

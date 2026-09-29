@@ -66,10 +66,8 @@ pnpm dev
 
 | Command | What it does |
 |---|---|
-| `dev` | Builds and runs the application once |
-| `dev --watch` | Keeps the application running and restarts it on changes |
-| `test` | Runs the tests once |
-| `test --watch` | Keeps tests running and reruns them on changes |
+| `dev [--watch]` | Builds and runs once or keeps the application running in watch mode |
+| `test [--watch]` | Runs tests once or keeps them running in watch mode |
 | `test <file>` | Generates or updates a test for a class |
 | `fmt [file]` | Formats all of `src/` and `test/` or only one provided file |
 | `view [file]` / `v [file]` | Finds a project file, formats supported source files, and opens it in Micro |
@@ -154,16 +152,10 @@ For Micro's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit
 
 Every generated project already includes a test runner. By default, tests run once. Use `--watch` only when you want continuous reruns.
 
-Run once:
+Run once or add `--watch` to keep watching for changes:
 
 ```bash
-npm test
-```
-
-Watch for changes:
-
-```bash
-npm test --watch
+npm test [--watch]
 ```
 
 To generate a test from a class:

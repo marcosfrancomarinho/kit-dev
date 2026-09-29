@@ -141,15 +141,15 @@ Generated projects install `typescript-language-server@5.3.0` as a development d
 
 Useful shortcuts shown before Micro opens:
 
-Useful shortcuts shown before Micro opens:
-
 ```text
 Ctrl+S  Save
 Ctrl+Q  Quit
 Ctrl+F  Find
 Ctrl+B  Terminal / Shell mode
 Ctrl+E  Command / Help
-Tab / Ctrl+Space  LSP autocomplete\nAlt+K  LSP hover\nAlt+D  Go to definition
+Tab / Ctrl+Space  LSP autocomplete
+Alt+K  LSP hover
+Alt+D  Go to definition
 ```
 
 For Micro's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev view help is available with `yarn v --help`.

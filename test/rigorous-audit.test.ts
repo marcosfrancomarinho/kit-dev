@@ -149,6 +149,7 @@ describe('rigorous application invariants', () => {
     );
 
     assert.equal(pkg.main, 'dist/bundle.cjs');
+    assert.equal(pkg.source, 'src/main.ts');
     assert.equal(pkg.bin['create-kit-dev'], 'dist/bundle.cjs');
     assert.ok(pkg.files.includes('dist/bundle.cjs'));
     assert.ok(pkg.files.includes('src/templates/files'));
@@ -175,6 +176,7 @@ describe('rigorous application invariants', () => {
     }
 
     assert.equal(pkg.engines.node, '>=22');
+    assert.equal(pkg.source, 'src/main.ts');
     assert.equal(tsconfig.compilerOptions.strict, true);
     assert.equal(tsconfig.compilerOptions.module, 'NodeNext');
     assert.equal(tsconfig.compilerOptions.moduleResolution, 'NodeNext');

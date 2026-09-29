@@ -417,7 +417,7 @@ describe('project file writer', () => {
 
     assert.match(
       scaffolder,
-      /copyTemplate\(paths, 'edit\.cjs', join\(paths\.edit\(\), 'edit\.cjs'\)/,
+      /copyTemplate\(paths, 'write\.cjs', join\(paths\.write\(\), 'write\.cjs'\)/,
     );
     assert.match(paths, /write\(\): string/);
     assert.match(

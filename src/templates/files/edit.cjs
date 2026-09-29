@@ -71,7 +71,7 @@ async function collectProjectFiles(root = projectRoot) {
   return files.sort((a, b) => a.localeCompare(b));
 }
 
-async function findViewCandidates(query, root = projectRoot) {
+async function findEditCandidates(query, root = projectRoot) {
   if (query) {
     const exact = isAbsolute(query)
       ? resolve(query)
@@ -79,7 +79,7 @@ async function findViewCandidates(query, root = projectRoot) {
 
     if (!isInside(root, exact)) {
       throw new Error(
-        'view only opens files inside the current project.',
+        'edit only opens files inside the current project.',
       );
     }
 
@@ -105,7 +105,7 @@ async function findViewCandidates(query, root = projectRoot) {
 }
 
 function renderSelection(files, selected, root = projectRoot) {
-  const lines = ['Kit Dev View', ''];
+  const lines = ['Kit Dev Edit', ''];
 
   files.forEach((file, index) => {
     lines.push(
@@ -124,7 +124,7 @@ async function selectFile(files, root = projectRoot) {
 
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     throw new Error(
-      'Multiple files matched. Run view with a more specific name or path.',
+      'Multiple files matched. Run edit with a more specific name or path.',
     );
   }
 
@@ -444,16 +444,16 @@ async function main() {
   if (args.includes('--help') || args.includes('-h')) {
     console.log(
       [
-        'Kit Dev View',
+        'Kit Dev Edit',
         '',
         'Usage:',
-        '  yarn v [file-or-name]',
-        '  yarn view [file-or-name]',
+        '  yarn e [file-or-name]',
+        '  yarn edit [file-or-name]',
         '',
         'Examples:',
-        '  yarn v product',
-        '  yarn v product.ts',
-        '  yarn v src/domain/entities/product.ts',
+        '  yarn e product',
+        '  yarn e product.ts',
+        '  yarn e src/domain/entities/product.ts',
         '',
         renderMicroTips().trimEnd(),
       ].join('\n'),
@@ -462,7 +462,7 @@ async function main() {
   }
 
   const query = args.join(' ').trim() || null;
-  const matches = await findViewCandidates(query, projectRoot);
+  const matches = await findEditCandidates(query, projectRoot);
 
   if (matches.length === 0) {
     throw new Error(
@@ -481,7 +481,7 @@ async function main() {
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error('\n❌ View failed');
+    console.error('\n❌ Edit failed');
     console.error(error && error.message ? error.message : error);
     process.exitCode = 1;
   });
@@ -491,7 +491,7 @@ module.exports = {
   MICRO_VERSION,
   collectProjectFiles,
   ensureMicro,
-  findViewCandidates,
+  findEditCandidates,
   formatBeforeOpen,
   microAsset,
   openWithMicro,

@@ -52,7 +52,7 @@ export class TerminalAdapter implements Terminal {
         '\n  ' +
         this.formatCommand(runCommand, 'fmt', 'Format src/ and test/ code') +
         '\n  ' +
-        this.formatCommand(runCommand, 'view', 'Find and open a file with Micro') +
+        this.formatCommand(runCommand, 'edit', 'Find and edit a file with Micro') +
         '\n  ' +
         this.formatCommand(runCommand, 'build', 'Build the project') +
         '\n  ' +

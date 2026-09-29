@@ -26,7 +26,7 @@ Instead of configuring the project from scratch, you start with:
 - TypeScript checking;
 - tests that run once by default, with optional watch mode;
 - automatic test generation from classes;
-- quick file search and editing through `view` / `v`;
+- quick file search and editing through `edit` / `e`;
 - optional dependency injection;
 - npm, Yarn and pnpm support.
 
@@ -70,7 +70,7 @@ pnpm dev
 | `test [--watch]` | Runs tests once or keeps them running in watch mode |
 | `test <file>` | Generates or updates a test for a class |
 | `fmt [file]` | Formats all of `src/` and `test/` or only one provided file |
-| `view [file]` / `v [file]` | Finds a project file, formats supported source files, and opens it in the terminal editor |
+| `edit [file]` / `e [file]` | Finds a project file, formats supported source files, and opens it in the terminal editor |
 | `build` | Checks types and creates the production bundle |
 | `start` | Runs the generated bundle |
 | `type [--watch]` | Checks TypeScript types once or keeps checking in watch mode |
@@ -83,7 +83,7 @@ npm run dev [--watch]
 npm test [--watch]
 npm test -- create-user
 npm run fmt
-npm run v -- product
+npm run e -- product
 npm run type [--watch]
 npm run build
 npm start
@@ -105,19 +105,19 @@ npm run fmt -- src/application/create-user.ts
 
 The `fmt` command is a lightweight formatter for JavaScript and TypeScript files in `src/` and `test/`. It fixes indentation, organizes compact or minified code, normalizes spacing, adds semicolons when needed, adjusts lists and calls, and removes unused imports. Comments, strings, templates, regexes, JSX, and other sensitive syntax are preserved.
 
-## View and edit files
+## Find and edit files
 
 Kit Dev can find and open project files directly in **Micro, a lightweight code editor that runs inside the terminal**:
 
 ```bash
-yarn v product
+yarn e product
 ```
 
 You can also use the full command or provide an exact path:
 
 ```bash
-yarn view product.ts
-yarn v src/domain/entities/product.ts
+yarn edit product.ts
+yarn e src/domain/entities/product.ts
 ```
 
 If one file matches, it opens immediately. If several files match, Kit Dev shows an interactive selector. JavaScript and TypeScript files inside `src/` or `test/` are formatted with `fmt` before opening.
@@ -141,7 +141,7 @@ Ctrl+B  Terminal / Shell mode
 Ctrl+E  Command / Help
 ```
 
-For the editor's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev view help is available with `yarn v --help`.
+For the editor's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev edit help is available with `yarn e --help`.
 
 ## Automatic tests
 
@@ -521,7 +521,7 @@ my-api/
 │   ├── di/
 │   ├── format/
 │   ├── test/
-│   └── view/
+│   └── edit/
 ├── src/
 │   └── main.ts
 ├── test/

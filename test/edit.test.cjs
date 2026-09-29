@@ -14,16 +14,16 @@ const { describe, it } = require('node:test');
 
 const {
   ensureMicro,
-  findViewCandidates,
+  findEditCandidates,
   formatBeforeOpen,
   microAsset,
   openWithMicro,
   renderMicroTips,
   renderSelection,
   shouldFormat,
-} = require('../src/templates/files/view.cjs');
+} = require('../src/templates/files/edit.cjs');
 
-describe('project file viewer', () => {
+describe('project file editor', () => {
   it('maps supported platforms to the correct Micro release asset', () => {
     const cases = [
       ['win32', 'ia32', 'micro-2.0.15-win32.zip'],
@@ -56,7 +56,7 @@ describe('project file viewer', () => {
   });
 
   it('opens an exact path before searching by file name', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-exact-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-exact-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -65,7 +65,7 @@ describe('project file viewer', () => {
     const target = join(root, 'src', 'domain', 'product.ts');
     await writeFile(target, 'export class Product {}\n', 'utf8');
 
-    const matches = await findViewCandidates(
+    const matches = await findEditCandidates(
       'src/domain/product.ts',
       root,
     );
@@ -74,7 +74,7 @@ describe('project file viewer', () => {
   });
 
   it('prefers exact file names and returns all duplicates for the selector', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-name-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-name-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -97,14 +97,14 @@ describe('project file viewer', () => {
       'utf8',
     );
 
-    const matches = await findViewCandidates('product.ts', root);
+    const matches = await findEditCandidates('product.ts', root);
 
     assert.equal(matches.length, 2);
     assert.ok(matches.every((file) => file.endsWith('product.ts')));
   });
 
   it('falls back to partial file-name search', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-partial-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-partial-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -114,14 +114,14 @@ describe('project file viewer', () => {
     await writeFile(join(root, 'src', 'product-item.ts'), '', 'utf8');
     await writeFile(join(root, 'src', 'user.ts'), '', 'utf8');
 
-    const matches = await findViewCandidates('product', root);
+    const matches = await findEditCandidates('product', root);
 
     assert.equal(matches.length, 2);
     assert.ok(matches.every((file) => file.includes('product')));
   });
 
   it('ignores node_modules dist build cache git and Kit Dev internals', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-ignore-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-ignore-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -139,7 +139,7 @@ describe('project file viewer', () => {
       await writeFile(join(root, directory, 'hidden.ts'), '', 'utf8');
     }
 
-    const matches = await findViewCandidates('hidden', root);
+    const matches = await findEditCandidates('hidden', root);
 
     assert.deepEqual(matches, [join(root, 'src', 'hidden.ts')]);
   });
@@ -159,7 +159,7 @@ describe('project file viewer', () => {
   });
 
   it('formats JavaScript and TypeScript under src or test before opening', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-format-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-format-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -187,7 +187,7 @@ describe('project file viewer', () => {
   });
 
   it('does not run fmt for files that the formatter does not support', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-non-source-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-non-source-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -212,8 +212,8 @@ describe('project file viewer', () => {
 
 
   it('rejects exact paths outside the current project', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-root-'));
-    const outside = await mkdtemp(join(tmpdir(), 'kit-dev-view-outside-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-root-'));
+    const outside = await mkdtemp(join(tmpdir(), 'kit-dev-edit-outside-'));
     context.after(async () => {
       await rm(root, { recursive: true, force: true });
       await rm(outside, { recursive: true, force: true });
@@ -223,13 +223,13 @@ describe('project file viewer', () => {
     await writeFile(externalFile, 'export {}\n', 'utf8');
 
     await assert.rejects(
-      () => findViewCandidates(externalFile, root),
+      () => findEditCandidates(externalFile, root),
       /only opens files inside the current project/,
     );
   });
 
   it('matches file names case-insensitively', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-case-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-case-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -239,17 +239,17 @@ describe('project file viewer', () => {
     await writeFile(file, 'export {}\n', 'utf8');
 
     assert.deepEqual(
-      await findViewCandidates('productservice.ts', root),
+      await findEditCandidates('productservice.ts', root),
       [file],
     );
     assert.deepEqual(
-      await findViewCandidates('SERVICE', root),
+      await findEditCandidates('SERVICE', root),
       [file],
     );
   });
 
-  it('returns project files when view is used without a query', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-all-'));
+  it('returns project files when edit is used without a query', async (context) => {
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-all-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -258,7 +258,7 @@ describe('project file viewer', () => {
     await writeFile(join(root, 'README.md'), '# test\n', 'utf8');
     await writeFile(join(root, 'src', 'main.ts'), 'export {}\n', 'utf8');
 
-    const files = await findViewCandidates(null, root);
+    const files = await findEditCandidates(null, root);
 
     assert.deepEqual(files.sort(), [
       join(root, 'README.md'),
@@ -267,7 +267,7 @@ describe('project file viewer', () => {
   });
 
   it('returns the cached Micro binary without downloading again', async (context) => {
-    const home = await mkdtemp(join(tmpdir(), 'kit-dev-view-home-'));
+    const home = await mkdtemp(join(tmpdir(), 'kit-dev-edit-home-'));
     context.after(() =>
       rm(home, { recursive: true, force: true }),
     );
@@ -289,7 +289,7 @@ describe('project file viewer', () => {
   });
 
   it('keeps the original file when fmt fails before opening', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-format-fail-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-format-fail-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -319,7 +319,7 @@ describe('project file viewer', () => {
   });
 
   it('formats then opens a source file through the selected editor', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-view-open-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-open-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -370,7 +370,7 @@ describe('project file viewer', () => {
       'src',
       'templates',
       'files',
-      'view.cjs',
+      'edit.cjs',
     );
     const result = spawnSync(
       process.execPath,
@@ -382,15 +382,15 @@ describe('project file viewer', () => {
     );
 
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /Kit Dev View/);
-    assert.match(result.stdout, /yarn v \[file-or-name\]/);
-    assert.match(result.stdout, /yarn view \[file-or-name\]/);
+    assert.match(result.stdout, /Kit Dev Edit/);
+    assert.match(result.stdout, /yarn e \[file-or-name\]/);
+    assert.match(result.stdout, /yarn edit \[file-or-name\]/);
     assert.match(result.stdout, /Ctrl\+S  Save/);
     assert.match(result.stdout, /help defaultkeys/);
     assert.doesNotMatch(result.stdout, /Downloading/);
   });
 
-  it('keeps the generated project wiring for the view template', async () => {
+  it('keeps the generated project wiring for the edit template', async () => {
     const root = join(__dirname, '..');
     const [scaffolder, paths] = await Promise.all([
       readFile(
@@ -417,14 +417,14 @@ describe('project file viewer', () => {
 
     assert.match(
       scaffolder,
-      /copyTemplate\(paths, 'view\.cjs', join\(paths\.view\(\), 'view\.cjs'\)/,
+      /copyTemplate\(paths, 'edit\.cjs', join\(paths\.edit\(\), 'edit\.cjs'\)/,
     );
-    assert.match(paths, /view\(\): string/);
+    assert.match(paths, /edit\(\): string/);
     assert.match(
       paths,
-      /return join\(this\.kitDev\(\), 'view'\)/,
+      /return join\(this\.kitDev\(\), 'edit'\)/,
     );
-    assert.match(paths, /this\.view\(\)/);
+    assert.match(paths, /this\.edit\(\)/);
   });
 
 

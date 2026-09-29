@@ -579,11 +579,16 @@ describe('project file viewer', () => {
       };
     };
 
-    await ensureMicroMlsp({ home, fetch: fakeFetch });
+    const runtime = {
+      nodeExecutable: '/runtime/node',
+      serverEntry: '/workspace/server.mjs',
+    };
+
+    await ensureMicroMlsp({ home, fetch: fakeFetch, runtime });
     assert.equal(downloads, 3);
 
     downloads = 0;
-    await ensureMicroMlsp({ home, fetch: fakeFetch });
+    await ensureMicroMlsp({ home, fetch: fakeFetch, runtime });
     assert.equal(downloads, 0);
   });
 

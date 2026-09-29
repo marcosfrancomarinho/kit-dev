@@ -137,6 +137,15 @@ test('TypeScript 7 native LSP returns member completions for name.', { timeout: 
     params: {},
   });
 
+  const registration = await reader.waitFor(
+    (m) => m.method === 'client/registerCapability' && m.id != null,
+  );
+  send(child, {
+    jsonrpc: '2.0',
+    id: registration.id,
+    result: null,
+  });
+
   send(child, {
     jsonrpc: '2.0',
     method: 'textDocument/didOpen',

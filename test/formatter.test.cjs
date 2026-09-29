@@ -12,6 +12,8 @@ const {
   removeUnusedImports,
   resolveTarget,
   splitSameLineStatements,
+  tokenSignature,
+  tokenSafeTransform,
   useSingleQuotes,
 } = require('../src/templates/files/formatter.cjs');
 
@@ -1446,6 +1448,79 @@ describe('source formatter', () => {
 
     assert.match(result, /firstVeryLongVariableName \+\n/);
     assert.equal(formatSource(result, 'example.ts'), result);
+  });
+
+  it('does not split TypeScript keywords identifiers or type names inside a class', () => {
+    const source = [
+      'export class User {',
+      'constructor(',
+      'private name: string,',
+      'private password: string',
+      ') {}',
+      '',
+      'public getName(): string {',
+      'return this.name',
+      '}',
+      '',
+      'public getPassword(): string {',
+      'return this.password',
+      '}',
+      '}',
+      '',
+    ].join('\n');
+
+    const result = formatSource(source, 'user.ts');
+
+    assert.equal(
+      result,
+      [
+        'export class User {',
+        '  constructor(private name: string, private password: string) {}',
+        '',
+        '  public getName(): string {',
+        '    return this.name;',
+        '  }',
+        '',
+        '  public getPassword(): string {',
+        '    return this.password;',
+        '  }',
+        '}',
+        '',
+      ].join('\n'),
+    );
+    assert.doesNotMatch(result, /\bp;\s*\nub;\s*\nlic;/);
+    assert.doesNotMatch(result, /\bst,\s*\n\s*ring\b/);
+    assert.doesNotMatch(result, /\bre;\s*\n\s*tur;/);
+    assert.equal(formatSource(result, 'user.ts'), result);
+  });
+
+  it('rejects token-changing output from whitespace-only formatter stages', () => {
+    const source = 'public getName(): string { return this.name; }';
+    const corrupted =
+      'p;\nub;\nlic;\ngetName(): st,\nring { re;\ntur;\nthis.name; }';
+
+    assert.equal(
+      tokenSafeTransform(source, 'example.ts', () => corrupted),
+      source,
+    );
+    assert.notEqual(
+      tokenSignature(source, 'example.ts'),
+      tokenSignature(corrupted, 'example.ts'),
+    );
+  });
+
+  it('allows whitespace-only changes when the token stream is unchanged', () => {
+    const source = 'const value=1+2;';
+    const formatted = 'const value = 1 + 2;';
+
+    assert.equal(
+      tokenSafeTransform(source, 'example.ts', () => formatted),
+      formatted,
+    );
+    assert.equal(
+      tokenSignature(source, 'example.ts'),
+      tokenSignature(formatted, 'example.ts'),
+    );
   });
 
 });

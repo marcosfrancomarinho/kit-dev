@@ -175,8 +175,8 @@ describe('rigorous application invariants', () => {
       'type',
       'test',
       'fmt',
-      'view',
-      'v',
+      'edit',
+      'e',
       'di',
     ]) {
       assert.equal(typeof pkg.scripts[command], 'string', command);

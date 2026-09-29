@@ -193,7 +193,7 @@ describe('automatic test generation regression matrix', () => {
       name: 'simple entity',
       file: 'user.ts',
       source: "export class User{constructor(public name:string,public age:number){}getName():string{return this.name}}",
-      expected: "describe('User'",
+      expected: 'describe(\"User\"',
     },
     {
       name: 'static factory',

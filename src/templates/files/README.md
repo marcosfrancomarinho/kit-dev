@@ -26,7 +26,7 @@ Instead of configuring the project from scratch, you start with:
 - TypeScript checking;
 - tests that run once by default, with optional watch mode;
 - automatic test generation from classes;
-- quick file search and editing with Micro through `edit` / `e`;
+- quick file search and editing with Micro through `write` / `w`;
 - optional dependency injection;
 - npm, Yarn and pnpm support.
 
@@ -72,7 +72,7 @@ pnpm dev
 | `test --watch` | Keeps tests running and reruns them on changes |
 | `test <file>` | Generates or updates a test for a class |
 | `fmt [file]` | Formats all of `src/` and `test/` or only one provided file |
-| `edit [file]` / `e [file]` | Finds a project file, formats supported source files, and opens it in Micro |
+| `write [file]` / `w [file]` | Finds a project file, formats supported source files, and opens it in Micro |
 | `build` | Checks types and creates the production bundle |
 | `start` | Runs the generated bundle |
 | `type` | Checks TypeScript types once |
@@ -88,7 +88,7 @@ npm test
 npm test --watch
 npm test -- create-user
 npm run fmt
-npm run e -- product
+npm run w -- product
 npm run type
 npm run type --watch
 npm run build
@@ -111,19 +111,19 @@ npm run fmt -- src/application/create-user.ts
 
 The `fmt` command is a lightweight formatter for JavaScript and TypeScript files in `src/` and `test/`. It fixes indentation, organizes compact or minified code, normalizes spacing, adds semicolons when needed, adjusts lists and calls, and removes unused imports. Comments, strings, templates, regexes, JSX, and other sensitive syntax are preserved.
 
-## Find and edit files
+## Write and edit files
 
 Kit Dev can find and open project files directly in the terminal with Micro:
 
 ```bash
-yarn e product
+yarn w product
 ```
 
 You can also use the full command or provide an exact path:
 
 ```bash
-yarn edit product.ts
-yarn e src/domain/entities/product.ts
+yarn write product.ts
+yarn w src/domain/entities/product.ts
 ```
 
 If one file matches, it opens immediately. If several files match, Kit Dev shows an interactive selector. JavaScript and TypeScript files inside `src/` or `test/` are formatted with `fmt` before opening.
@@ -147,7 +147,7 @@ Ctrl+B  Terminal / Shell mode
 Ctrl+E  Command / Help
 ```
 
-For Micro's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev edit help is available with `yarn e --help`.
+For Micro's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev write help is available with `yarn w --help`.
 
 ## Automatic tests
 
@@ -533,7 +533,7 @@ my-api/
 │   ├── di/
 │   ├── format/
 │   ├── test/
-│   └── edit/
+│   └── write/
 ├── src/
 │   └── main.ts
 ├── test/

@@ -71,7 +71,7 @@ async function collectProjectFiles(root = projectRoot) {
   return files.sort((a, b) => a.localeCompare(b));
 }
 
-async function findEditCandidates(query, root = projectRoot) {
+async function findWriteCandidates(query, root = projectRoot) {
   if (query) {
     const exact = isAbsolute(query)
       ? resolve(query)
@@ -79,7 +79,7 @@ async function findEditCandidates(query, root = projectRoot) {
 
     if (!isInside(root, exact)) {
       throw new Error(
-        'edit only opens files inside the current project.',
+        'write only opens files inside the current project.',
       );
     }
 
@@ -105,7 +105,7 @@ async function findEditCandidates(query, root = projectRoot) {
 }
 
 function renderSelection(files, selected, root = projectRoot) {
-  const lines = ['Kit Dev Edit', ''];
+  const lines = ['Kit Dev Write', ''];
 
   files.forEach((file, index) => {
     lines.push(
@@ -124,7 +124,7 @@ async function selectFile(files, root = projectRoot) {
 
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     throw new Error(
-      'Multiple files matched. Run edit with a more specific name or path.',
+      'Multiple files matched. Run write with a more specific name or path.',
     );
   }
 
@@ -444,16 +444,16 @@ async function main() {
   if (args.includes('--help') || args.includes('-h')) {
     console.log(
       [
-        'Kit Dev Edit',
+        'Kit Dev Write',
         '',
         'Usage:',
-        '  yarn e [file-or-name]',
-        '  yarn edit [file-or-name]',
+        '  yarn w [file-or-name]',
+        '  yarn write [file-or-name]',
         '',
         'Examples:',
-        '  yarn e product',
-        '  yarn e product.ts',
-        '  yarn e src/domain/entities/product.ts',
+        '  yarn w product',
+        '  yarn w product.ts',
+        '  yarn w src/domain/entities/product.ts',
         '',
         renderMicroTips().trimEnd(),
       ].join('\n'),
@@ -462,7 +462,7 @@ async function main() {
   }
 
   const query = args.join(' ').trim() || null;
-  const matches = await findEditCandidates(query, projectRoot);
+  const matches = await findWriteCandidates(query, projectRoot);
 
   if (matches.length === 0) {
     throw new Error(
@@ -481,7 +481,7 @@ async function main() {
 
 if (require.main === module) {
   main().catch((error) => {
-    console.error('\n❌ Edit failed');
+    console.error('\n❌ Write failed');
     console.error(error && error.message ? error.message : error);
     process.exitCode = 1;
   });
@@ -491,7 +491,7 @@ module.exports = {
   MICRO_VERSION,
   collectProjectFiles,
   ensureMicro,
-  findEditCandidates,
+  findWriteCandidates,
   formatBeforeOpen,
   microAsset,
   openWithMicro,

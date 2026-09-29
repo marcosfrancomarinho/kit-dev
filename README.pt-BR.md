@@ -26,7 +26,7 @@ Em vez de configurar tudo do zero, você já começa com:
 - verificação de tipos;
 - testes que executam uma vez por padrão, com modo watch opcional;
 - geração automática de testes a partir de classes;
-- busca e edição rápida de arquivos pelos comandos `edit` / `e`;
+- busca e edição rápida de arquivos pelos comandos `write` / `w`;
 - injeção de dependência opcional;
 - suporte a npm, Yarn e pnpm.
 
@@ -70,7 +70,7 @@ pnpm dev
 | `test [--watch]` | Executa os testes uma vez ou mantém ativos em modo watch |
 | `test <arquivo>` | Gera ou atualiza o teste de uma classe |
 | `fmt [arquivo]` | Formata `src/` e `test/` por completo ou somente um arquivo informado |
-| `edit [arquivo]` / `e [arquivo]` | Localiza um arquivo do projeto, formata código suportado e abre no editor do terminal |
+| `write [arquivo]` / `w [arquivo]` | Localiza um arquivo do projeto, formata código suportado e abre no editor do terminal |
 | `build` | Verifica os tipos e gera o bundle de produção |
 | `start` | Executa o bundle gerado |
 | `type [--watch]` | Verifica os tipos uma vez ou mantém a checagem em modo watch |
@@ -83,7 +83,7 @@ npm run dev [--watch]
 npm test [--watch]
 npm test -- create-user
 npm run fmt
-npm run e -- product
+npm run w -- product
 npm run type [--watch]
 npm run build
 npm start
@@ -105,19 +105,19 @@ npm run fmt -- src/application/create-user.ts
 
 O `fmt` é um formatador leve para JavaScript e TypeScript em `src/` e `test/`. Ele corrige indentação, organiza código compacto ou minificado, normaliza espaços, adiciona ponto e vírgula quando necessário, ajusta listas e chamadas e remove imports não usados. Comentários, strings, templates, regex, JSX e estruturas sensíveis são preservados.
 
-## Localizar e editar arquivos
+## Escrever e editar arquivos
 
 O Kit Dev pode localizar e abrir arquivos do projeto diretamente no **Micro, um editor de código leve que funciona dentro do terminal**:
 
 ```bash
-yarn e product
+yarn w product
 ```
 
 Também é possível usar o comando completo ou informar o caminho exato:
 
 ```bash
-yarn edit product.ts
-yarn e src/domain/entities/product.ts
+yarn write product.ts
+yarn w src/domain/entities/product.ts
 ```
 
 Se apenas um arquivo corresponder, ele é aberto diretamente. Se houver vários, o Kit Dev mostra um seletor interativo. Arquivos JavaScript e TypeScript dentro de `src/` ou `test/` passam pelo `fmt` antes de abrir.
@@ -141,7 +141,7 @@ Ctrl+B  Terminal / modo shell
 Ctrl+E  Comando / Ajuda
 ```
 
-Para consultar os atalhos padrão do editor, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do edit está disponível com `yarn e --help`.
+Para consultar os atalhos padrão do editor, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do write está disponível com `yarn w --help`.
 
 ## Testes automáticos
 
@@ -521,7 +521,7 @@ minha-api/
 │   ├── di/
 │   ├── format/
 │   ├── test/
-│   └── edit/
+│   └── write/
 ├── src/
 │   └── main.ts
 ├── test/

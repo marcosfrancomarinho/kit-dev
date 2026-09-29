@@ -143,7 +143,7 @@ describe('self-hosted architecture', () => {
     assert.doesNotMatch(output, /yarn type --watch/);
   });
 
-  it('shows edit shortcut in the final command list', () => {
+  it('shows write shortcut in the final command list', () => {
     const terminal = new TerminalAdapter(new TerminalPalette());
     const messages: string[] = [];
     const originalLog = console.log;
@@ -158,7 +158,7 @@ describe('self-hosted architecture', () => {
       console.log = originalLog;
     }
 
-    assert.match(messages.join('\n'), /yarn edit/);
+    assert.match(messages.join('\n'), /yarn write/);
     assert.match(
       messages.join('\n'),
       /Find and edit a file with Micro/,
@@ -166,7 +166,7 @@ describe('self-hosted architecture', () => {
   });
 
 
-  it('generates both edit and e scripts with the same editor command', () => {
+  it('generates both write and w scripts with the same editor command', () => {
     const templates = new ProjectTemplateCatalog();
     const packageJson = JSON.parse(
       templates.packageJson('api'),
@@ -175,12 +175,12 @@ describe('self-hosted architecture', () => {
     };
 
     assert.equal(
-      packageJson.scripts.edit,
-      'node kit-dev/edit/edit.cjs',
+      packageJson.scripts.write,
+      'node kit-dev/write/write.cjs',
     );
     assert.equal(
-      packageJson.scripts.e,
-      packageJson.scripts.edit,
+      packageJson.scripts.w,
+      packageJson.scripts.write,
     );
     assert.equal(
       packageJson.scripts.fmt,

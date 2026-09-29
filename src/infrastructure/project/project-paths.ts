@@ -28,8 +28,8 @@ export class ProjectPaths {
     return join(this.kitDev(), 'format');
   }
 
-  edit(): string {
-    return join(this.kitDev(), 'edit');
+  write(): string {
+    return join(this.kitDev(), 'write');
   }
 
   test(): string {
@@ -68,7 +68,7 @@ export class ProjectPaths {
       this.di(),
       this.kitDevTest(),
       this.format(),
-      this.edit(),
+      this.write(),
       this.test(),
     ];
   }

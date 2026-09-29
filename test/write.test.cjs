@@ -14,16 +14,16 @@ const { describe, it } = require('node:test');
 
 const {
   ensureMicro,
-  findEditCandidates,
+  findWriteCandidates,
   formatBeforeOpen,
   microAsset,
   openWithMicro,
   renderMicroTips,
   renderSelection,
   shouldFormat,
-} = require('../src/templates/files/edit.cjs');
+} = require('../src/templates/files/write.cjs');
 
-describe('project file editor', () => {
+describe('project file writer', () => {
   it('maps supported platforms to the correct Micro release asset', () => {
     const cases = [
       ['win32', 'ia32', 'micro-2.0.15-win32.zip'],
@@ -56,7 +56,7 @@ describe('project file editor', () => {
   });
 
   it('opens an exact path before searching by file name', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-exact-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-exact-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -65,7 +65,7 @@ describe('project file editor', () => {
     const target = join(root, 'src', 'domain', 'product.ts');
     await writeFile(target, 'export class Product {}\n', 'utf8');
 
-    const matches = await findEditCandidates(
+    const matches = await findWriteCandidates(
       'src/domain/product.ts',
       root,
     );
@@ -74,7 +74,7 @@ describe('project file editor', () => {
   });
 
   it('prefers exact file names and returns all duplicates for the selector', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-name-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-name-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -97,14 +97,14 @@ describe('project file editor', () => {
       'utf8',
     );
 
-    const matches = await findEditCandidates('product.ts', root);
+    const matches = await findWriteCandidates('product.ts', root);
 
     assert.equal(matches.length, 2);
     assert.ok(matches.every((file) => file.endsWith('product.ts')));
   });
 
   it('falls back to partial file-name search', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-partial-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-partial-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -114,14 +114,14 @@ describe('project file editor', () => {
     await writeFile(join(root, 'src', 'product-item.ts'), '', 'utf8');
     await writeFile(join(root, 'src', 'user.ts'), '', 'utf8');
 
-    const matches = await findEditCandidates('product', root);
+    const matches = await findWriteCandidates('product', root);
 
     assert.equal(matches.length, 2);
     assert.ok(matches.every((file) => file.includes('product')));
   });
 
   it('ignores node_modules dist build cache git and Kit Dev internals', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-ignore-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-ignore-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -139,7 +139,7 @@ describe('project file editor', () => {
       await writeFile(join(root, directory, 'hidden.ts'), '', 'utf8');
     }
 
-    const matches = await findEditCandidates('hidden', root);
+    const matches = await findWriteCandidates('hidden', root);
 
     assert.deepEqual(matches, [join(root, 'src', 'hidden.ts')]);
   });
@@ -159,7 +159,7 @@ describe('project file editor', () => {
   });
 
   it('formats JavaScript and TypeScript under src or test before opening', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-format-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-format-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -187,7 +187,7 @@ describe('project file editor', () => {
   });
 
   it('does not run fmt for files that the formatter does not support', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-non-source-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-non-source-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -212,8 +212,8 @@ describe('project file editor', () => {
 
 
   it('rejects exact paths outside the current project', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-root-'));
-    const outside = await mkdtemp(join(tmpdir(), 'kit-dev-edit-outside-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-root-'));
+    const outside = await mkdtemp(join(tmpdir(), 'kit-dev-write-outside-'));
     context.after(async () => {
       await rm(root, { recursive: true, force: true });
       await rm(outside, { recursive: true, force: true });
@@ -223,13 +223,13 @@ describe('project file editor', () => {
     await writeFile(externalFile, 'export {}\n', 'utf8');
 
     await assert.rejects(
-      () => findEditCandidates(externalFile, root),
+      () => findWriteCandidates(externalFile, root),
       /only opens files inside the current project/,
     );
   });
 
   it('matches file names case-insensitively', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-case-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-case-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -239,17 +239,17 @@ describe('project file editor', () => {
     await writeFile(file, 'export {}\n', 'utf8');
 
     assert.deepEqual(
-      await findEditCandidates('productservice.ts', root),
+      await findWriteCandidates('productservice.ts', root),
       [file],
     );
     assert.deepEqual(
-      await findEditCandidates('SERVICE', root),
+      await findWriteCandidates('SERVICE', root),
       [file],
     );
   });
 
-  it('returns project files when edit is used without a query', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-all-'));
+  it('returns project files when write is used without a query', async (context) => {
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-all-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -258,7 +258,7 @@ describe('project file editor', () => {
     await writeFile(join(root, 'README.md'), '# test\n', 'utf8');
     await writeFile(join(root, 'src', 'main.ts'), 'export {}\n', 'utf8');
 
-    const files = await findEditCandidates(null, root);
+    const files = await findWriteCandidates(null, root);
 
     assert.deepEqual(files.sort(), [
       join(root, 'README.md'),
@@ -267,7 +267,7 @@ describe('project file editor', () => {
   });
 
   it('returns the cached Micro binary without downloading again', async (context) => {
-    const home = await mkdtemp(join(tmpdir(), 'kit-dev-edit-home-'));
+    const home = await mkdtemp(join(tmpdir(), 'kit-dev-write-home-'));
     context.after(() =>
       rm(home, { recursive: true, force: true }),
     );
@@ -289,7 +289,7 @@ describe('project file editor', () => {
   });
 
   it('keeps the original file when fmt fails before opening', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-format-fail-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-format-fail-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -319,7 +319,7 @@ describe('project file editor', () => {
   });
 
   it('formats then opens a source file through the selected editor', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-edit-open-'));
+    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-open-'));
     context.after(() =>
       rm(root, { recursive: true, force: true }),
     );
@@ -370,7 +370,7 @@ describe('project file editor', () => {
       'src',
       'templates',
       'files',
-      'edit.cjs',
+      'write.cjs',
     );
     const result = spawnSync(
       process.execPath,
@@ -382,15 +382,15 @@ describe('project file editor', () => {
     );
 
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /Kit Dev Edit/);
-    assert.match(result.stdout, /yarn e \[file-or-name\]/);
-    assert.match(result.stdout, /yarn edit \[file-or-name\]/);
+    assert.match(result.stdout, /Kit Dev Write/);
+    assert.match(result.stdout, /yarn w \[file-or-name\]/);
+    assert.match(result.stdout, /yarn write \[file-or-name\]/);
     assert.match(result.stdout, /Ctrl\+S  Save/);
     assert.match(result.stdout, /help defaultkeys/);
     assert.doesNotMatch(result.stdout, /Downloading/);
   });
 
-  it('keeps the generated project wiring for the edit template', async () => {
+  it('keeps the generated project wiring for the write template', async () => {
     const root = join(__dirname, '..');
     const [scaffolder, paths] = await Promise.all([
       readFile(
@@ -417,14 +417,14 @@ describe('project file editor', () => {
 
     assert.match(
       scaffolder,
-      /copyTemplate\(paths, 'edit\.cjs', join\(paths\.edit\(\), 'edit\.cjs'\)/,
+      /copyTemplate\(paths, 'write\.cjs', join\(paths\.write\(\), 'write\.cjs'\)/,
     );
-    assert.match(paths, /edit\(\): string/);
+    assert.match(paths, /write\(\): string/);
     assert.match(
       paths,
-      /return join\(this\.kitDev\(\), 'edit'\)/,
+      /return join\(this\.kitDev\(\), 'write'\)/,
     );
-    assert.match(paths, /this\.edit\(\)/);
+    assert.match(paths, /this\.write\(\)/);
   });
 
 

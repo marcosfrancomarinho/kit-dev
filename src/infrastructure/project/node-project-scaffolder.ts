@@ -68,7 +68,7 @@ export class NodeProjectScaffolder implements ProjectScaffolder {
       this.copyTemplate(paths, 'runner.cjs', join(paths.kitDevTest(), 'test.cjs'), '🧪 Native test runner prepared'),
       this.copyTemplate(paths, 'test-generator.cjs', join(paths.kitDevTest(), 'generator.cjs'), '🧪 Automatic test generator prepared'),
       this.copyTemplate(paths, 'formatter.cjs', join(paths.format(), 'fmt.cjs'), '✨ Source formatter prepared'),
-      this.copyTemplate(paths, 'edit.cjs', join(paths.edit(), 'edit.cjs'), '✏️ Project file editor prepared'),
+      this.copyTemplate(paths, 'write.cjs', join(paths.write(), 'write.cjs'), '✏️ Project file editor prepared'),
     ]);
   }
 

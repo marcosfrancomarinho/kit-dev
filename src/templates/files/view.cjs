@@ -381,7 +381,34 @@ function mlspBindings() {
   };
 }
 
-function kitDevMlspConfig(baseConfig) {
+function luaString(value) {
+  return JSON.stringify(String(value));
+}
+
+function languageServerRuntime(root = projectRoot) {
+  const serverEntry = join(
+    root,
+    'node_modules',
+    'typescript-language-server',
+    'lib',
+    'cli.mjs',
+  );
+
+  if (!existsSync(serverEntry)) {
+    throw new Error(
+      'TypeScript language server entry was not found at ' +
+        serverEntry +
+        '. Reinstall project dependencies.',
+    );
+  }
+
+  return {
+    nodeExecutable: process.execPath,
+    serverEntry,
+  };
+}
+
+function kitDevMlspConfig(baseConfig, runtime = languageServerRuntime()) {
   const marker = '-- KIT_DEV_MLSP_CONFIG';
 
   if (baseConfig.includes(marker)) return baseConfig;
@@ -392,8 +419,8 @@ function kitDevMlspConfig(baseConfig) {
     marker,
     'languageServer.kitDevTypescript = {',
     '    shortName = "tsserver",',
-    '    cmd = "npx",',
-    '    args = {"--no-install", "typescript-language-server", "--stdio"},',
+    '    cmd = ' + luaString(runtime.nodeExecutable) + ',',
+    '    args = {' + luaString(runtime.serverEntry) + ', "--stdio"},',
     '    filetypes = {"javascript", "typescript"},',
     '}',
     'setmetatable(languageServer.kitDevTypescript, defaultLanguageServerOptions)',
@@ -414,6 +441,8 @@ function kitDevMlspConfig(baseConfig) {
 async function ensureMicroMlsp(options = {}) {
   const home = options.home || homedir();
   const fetchImpl = options.fetch || fetch;
+  const runtime =
+    options.runtime || languageServerRuntime(options.projectRoot || projectRoot);
   const configDirectory =
     options.configDirectory || microConfigDirectory(home);
   const plugDirectory = join(configDirectory, 'plug');
@@ -463,7 +492,7 @@ async function ensureMicroMlsp(options = {}) {
       );
       await writeFile(
         join(pluginDirectory, 'config.lua'),
-        kitDevMlspConfig(baseConfig),
+        kitDevMlspConfig(baseConfig, runtime),
         'utf8',
       );
       await writeFile(versionFile, MLSP_COMMIT + '\n', 'utf8');
@@ -645,6 +674,8 @@ module.exports = {
   findViewCandidates,
   formatBeforeOpen,
   kitDevMlspConfig,
+  languageServerRuntime,
+  luaString,
   mlspBindings,
   microAsset,
   microConfigDirectory,

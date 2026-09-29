@@ -131,8 +131,6 @@ Windows:     %USERPROFILE%\.kit-dev\bin\micro.exe
 
 O mesmo editor em cache é reutilizado por todos os projetos Kit Dev da máquina.
 
-Em arquivos TypeScript e JavaScript, o Kit Dev também ativa **recursos inteligentes de código**: autocomplete, informações sobre símbolos, ir para definição e localizar referências. Essa configuração é feita automaticamente no primeiro uso de `view` / `v`. O autocomplete não aparece enquanto você digita; pressione `Tab` quando quiser ver sugestões.
-
 Atalhos úteis:
 
 ```text
@@ -141,9 +139,6 @@ Ctrl+Q  Sair
 Ctrl+F  Buscar
 Ctrl+B  Terminal / modo shell
 Ctrl+E  Comando / Ajuda
-Tab     Mostrar sugestões de autocomplete
-Alt+K   Mostrar informações do símbolo selecionado
-Alt+D   Ir para definição
 ```
 
 Para consultar os atalhos padrão do editor, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do view está disponível com `yarn v --help`.

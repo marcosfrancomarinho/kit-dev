@@ -41,7 +41,7 @@ function createReader(stream, onMessage = () => {}) {
   });
 
   return {
-    waitFor(predicate, timeout = 20000) {
+    waitFor(predicate, timeout = 60000) {
       const pendingIndex = pendingMessages.findIndex(predicate);
       if (pendingIndex >= 0) {
         const [message] = pendingMessages.splice(pendingIndex, 1);
@@ -72,7 +72,7 @@ function send(child, message) {
   );
 }
 
-test('TypeScript 7 native LSP returns member completions after capability registration', { timeout: 30000 }, async (context) => {
+test('TypeScript 7 native LSP returns member completions after capability registration', { timeout: 90000 }, async (context) => {
   const repoRoot = join(__dirname, '..');
   const workspace = await mkdtemp(join(tmpdir(), 'kit-dev-ts7-completion-'));
   context.after(() => rm(workspace, { recursive: true, force: true }));

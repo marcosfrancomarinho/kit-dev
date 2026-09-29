@@ -505,7 +505,13 @@ function addSemicolons(source, fileName = 'source.ts') {
       const end = node.getEnd();
       const beforeEnd = source.slice(0, end).trimEnd();
 
-      if (!beforeEnd.endsWith(';')) {
+      const afterEnd = source.slice(end).match(/^\s*([\s\S]?)/)?.[1] || '';
+
+      if (
+        !beforeEnd.endsWith(';') &&
+        !beforeEnd.endsWith(',') &&
+        afterEnd !== ','
+      ) {
         positions.add(end);
       }
     }

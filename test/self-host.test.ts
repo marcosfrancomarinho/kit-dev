@@ -158,7 +158,7 @@ describe('self-hosted architecture', () => {
       console.log = originalLog;
     }
 
-    assert.match(messages.join('\n'), /yarn v/);
+    assert.match(messages.join('\n'), /yarn view/);
     assert.match(
       messages.join('\n'),
       /Find and open a file with Micro/,

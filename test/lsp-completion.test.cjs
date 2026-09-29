@@ -171,6 +171,8 @@ test('TypeScript 7 native LSP returns member completions after capability regist
     },
   });
 
+  const completionResponse = reader.waitFor((m) => m.id === 2);
+
   send(child, {
     jsonrpc: '2.0',
     id: 2,
@@ -182,7 +184,7 @@ test('TypeScript 7 native LSP returns member completions after capability regist
     },
   });
 
-  const completion = await reader.waitFor((m) => m.id === 2);
+  const completion = await completionResponse;
   assert.ok(
     completion.result,
     'Completion failed: ' + JSON.stringify(completion) + '\nstderr: ' + stderr,
@@ -210,12 +212,14 @@ test('TypeScript 7 native LSP returns member completions after capability regist
     'Expected String member completion. First items: ' + JSON.stringify(labels),
   );
 
+  const shutdownResponse = reader.waitFor((m) => m.id === 3);
+
   send(child, {
     jsonrpc: '2.0',
     id: 3,
     method: 'shutdown',
   });
-  const shutdown = await reader.waitFor((m) => m.id === 3);
+  const shutdown = await shutdownResponse;
   assert.equal(shutdown.error, undefined);
 
   const exited = new Promise((resolve, reject) => {

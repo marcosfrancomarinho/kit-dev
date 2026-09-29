@@ -600,7 +600,7 @@ var TerminalAdapter = class {
   ` + this.formatCommand(runCommand, "dev [--watch]", "Run application") + `
   ` + this.formatCommand(runCommand, "test [--watch]", "Run tests") + `
   ` + this.formatCommand(runCommand, "fmt", "Format src/ and test/ code") + `
-  ` + this.formatCommand(runCommand, "v", "Find and open a file with Micro") + `
+  ` + this.formatCommand(runCommand, "view", "Find and open a file with Micro") + `
   ` + this.formatCommand(runCommand, "build", "Build the project") + `
   ` + this.formatCommand(runCommand, "start", "Run bundled output") + `
   ` + this.formatCommand(runCommand, "type [--watch]", "Check TypeScript types") + `

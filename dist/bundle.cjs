@@ -431,8 +431,8 @@ var ProjectPaths = class {
   format() {
     return (0, import_node_path2.join)(this.kitDev(), "format");
   }
-  view() {
-    return (0, import_node_path2.join)(this.kitDev(), "view");
+  edit() {
+    return (0, import_node_path2.join)(this.kitDev(), "edit");
   }
   test() {
     return (0, import_node_path2.join)(this.projectPath, "test");
@@ -464,7 +464,7 @@ var ProjectPaths = class {
       this.di(),
       this.kitDevTest(),
       this.format(),
-      this.view(),
+      this.edit(),
       this.test()
     ];
   }
@@ -532,7 +532,7 @@ var NodeProjectScaffolder = class {
       this.copyTemplate(paths, "runner.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test.cjs"), "\u{1F9EA} Native test runner prepared"),
       this.copyTemplate(paths, "test-generator.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "generator.cjs"), "\u{1F9EA} Automatic test generator prepared"),
       this.copyTemplate(paths, "formatter.cjs", (0, import_node_path3.join)(paths.format(), "fmt.cjs"), "\u2728 Source formatter prepared"),
-      this.copyTemplate(paths, "view.cjs", (0, import_node_path3.join)(paths.view(), "view.cjs"), "\u{1F441} Project file viewer prepared")
+      this.copyTemplate(paths, "edit.cjs", (0, import_node_path3.join)(paths.edit(), "edit.cjs"), "\u270F\uFE0F Project file editor prepared")
     ]);
   }
   async createDirectory(directory) {
@@ -600,7 +600,7 @@ var TerminalAdapter = class {
   ` + this.formatCommand(runCommand, "dev [--watch]", "Run application") + `
   ` + this.formatCommand(runCommand, "test [--watch]", "Run tests") + `
   ` + this.formatCommand(runCommand, "fmt", "Format src/ and test/ code") + `
-  ` + this.formatCommand(runCommand, "view", "Find and open a file with Micro") + `
+  ` + this.formatCommand(runCommand, "edit", "Find and edit a file with Micro") + `
   ` + this.formatCommand(runCommand, "build", "Build the project") + `
   ` + this.formatCommand(runCommand, "start", "Run bundled output") + `
   ` + this.formatCommand(runCommand, "type [--watch]", "Check TypeScript types") + `
@@ -655,8 +655,8 @@ var ProjectTemplateCatalog = class {
           type: "node kit-dev/build/type.cjs",
           test: "node kit-dev/test/test.cjs",
           fmt: "node kit-dev/format/fmt.cjs",
-          view: "node kit-dev/view/view.cjs",
-          v: "node kit-dev/view/view.cjs",
+          edit: "node kit-dev/edit/edit.cjs",
+          e: "node kit-dev/edit/edit.cjs",
           di: "node kit-dev/di/install.cjs"
         },
         dependencies: {},

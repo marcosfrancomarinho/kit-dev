@@ -27,7 +27,7 @@ const projectRoot = process.cwd();
 const MICRO_VERSION = '2.0.15';
 const MLSP_COMMIT = '91261a0926c9e95d059cf5854a0c2e8d4e7d4051';
 const MLSP_FILES = ['main.lua', 'json.lua', 'config.lua'];
-const MLSP_CONFIG_VERSION = 'typescript7-native-v3-client-requests';
+const MLSP_CONFIG_VERSION = 'typescript7-native-v4-dot-completion';
 const ignoredDirectories = new Set([
   '.git',
   'node_modules',
@@ -451,7 +451,7 @@ function kitDevMlspMain(baseMain) {
     '',
     marker,
     'local function kitDevShouldAutocomplete(r)',
-    '    return r == "." or util.IsWordChar(r)',
+    '    return r == "."',
     'end',
     '',
     'local kitDevOriginalHandleRequest = LSPClient.handleRequest',

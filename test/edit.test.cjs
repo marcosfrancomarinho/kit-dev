@@ -383,7 +383,7 @@ describe('project file editor', () => {
 
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Kit Dev Edit/);
-    assert.match(result.stdout, /yarn v \[file-or-name\]/);
+    assert.match(result.stdout, /yarn e \[file-or-name\]/);
     assert.match(result.stdout, /yarn edit \[file-or-name\]/);
     assert.match(result.stdout, /Ctrl\+S  Save/);
     assert.match(result.stdout, /help defaultkeys/);

@@ -411,11 +411,12 @@ function languageServerRuntime(root = projectRoot) {
 
 function kitDevMlspConfig(baseConfig, runtime = languageServerRuntime()) {
   const marker = '-- KIT_DEV_MLSP_CONFIG';
-
-  if (baseConfig.includes(marker)) return baseConfig;
+  const markerIndex = baseConfig.indexOf(marker);
+  const upstreamConfig =
+    markerIndex >= 0 ? baseConfig.slice(0, markerIndex) : baseConfig;
 
   return [
-    baseConfig.trimEnd(),
+    upstreamConfig.trimEnd(),
     '',
     marker,
     'languageServer.kitDevTypescript = {',
@@ -535,6 +536,14 @@ async function ensureMicroMlsp(options = {}) {
       throw error;
     }
   }
+
+  const configPath = join(pluginDirectory, 'config.lua');
+  const currentConfig = await readFile(configPath, 'utf8');
+  await writeFile(
+    configPath,
+    kitDevMlspConfig(currentConfig, runtime),
+    'utf8',
+  );
 
   await writeFile(
     join(configDirectory, 'bindings.json'),

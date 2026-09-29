@@ -26,7 +26,7 @@ Em vez de configurar tudo do zero, você já começa com:
 - verificação de tipos;
 - testes que executam uma vez por padrão, com modo watch opcional;
 - geração automática de testes a partir de classes;
-- busca e edição rápida de arquivos com Micro pelos comandos `view` / `v`;
+- busca e edição rápida de arquivos pelos comandos `view` / `v`;
 - injeção de dependência opcional;
 - suporte a npm, Yarn e pnpm.
 
@@ -70,7 +70,7 @@ pnpm dev
 | `test [--watch]` | Executa os testes uma vez ou mantém ativos em modo watch |
 | `test <arquivo>` | Gera ou atualiza o teste de uma classe |
 | `fmt [arquivo]` | Formata `src/` e `test/` por completo ou somente um arquivo informado |
-| `view [arquivo]` / `v [arquivo]` | Localiza um arquivo do projeto, formata código suportado e abre no Micro |
+| `view [arquivo]` / `v [arquivo]` | Localiza um arquivo do projeto, formata código suportado e abre no editor do terminal |
 | `build` | Verifica os tipos e gera o bundle de produção |
 | `start` | Executa o bundle gerado |
 | `type [--watch]` | Verifica os tipos uma vez ou mantém a checagem em modo watch |
@@ -107,7 +107,7 @@ O `fmt` é um formatador leve para JavaScript e TypeScript em `src/` e `test/`. 
 
 ## Visualizar e editar arquivos
 
-O Kit Dev pode localizar e abrir arquivos do projeto diretamente pelo terminal usando o Micro:
+O Kit Dev pode localizar e abrir arquivos do projeto diretamente no **Micro, um editor de código leve que funciona dentro do terminal**:
 
 ```bash
 yarn v product
@@ -122,18 +122,18 @@ yarn v src/domain/entities/product.ts
 
 Se apenas um arquivo corresponder, ele é aberto diretamente. Se houver vários, o Kit Dev mostra um seletor interativo. Arquivos JavaScript e TypeScript dentro de `src/` ou `test/` passam pelo `fmt` antes de abrir.
 
-O Micro não é incluído dentro do pacote npm. O Kit Dev primeiro procura um `micro` já disponível no `PATH`; se não encontrar, baixa somente o binário oficial correspondente ao sistema operacional e à arquitetura atuais, valida o SHA-256 e guarda em cache na pasta do usuário:
+O Micro não é incluído dentro do pacote npm. O Kit Dev primeiro procura o comando `micro` já instalado no sistema; se não encontrar, baixa automaticamente o binário oficial correspondente ao sistema operacional e à arquitetura, valida o download e guarda em cache na pasta do usuário:
 
 ```text
 Linux/macOS: ~/.kit-dev/bin/micro
 Windows:     %USERPROFILE%\.kit-dev\bin\micro.exe
 ```
 
-O mesmo binário em cache é reutilizado por todos os projetos Kit Dev da máquina. O download automático contempla os builds oficiais do Micro mapeados pelo Kit Dev para Windows, Linux, macOS, FreeBSD, NetBSD, OpenBSD, Solaris e illumos quando a combinação de plataforma e runtime Node.js estiver disponível.
+O mesmo editor em cache é reutilizado por todos os projetos Kit Dev da máquina.
 
-O Kit Dev usa o LSP nativo já fornecido pelo `typescript@7.0.2`, então nenhum pacote separado de language server para TypeScript é instalado. No primeiro uso de `view` / `v`, o Kit Dev baixa uma revisão fixa do plugin `mlsp` do Micro para a configuração isolada em `~/.kit-dev/micro` e inicia diretamente o `node_modules/typescript/bin/tsc --lsp --stdio` do próprio projeto usando Node. O plugin antigo `lsp` é removido dessa configuração isolada para evitar dois clientes LSP rodando ao mesmo tempo. O `mlsp` inicia automaticamente em arquivos TypeScript/JavaScript e o Kit Dev não dispara autocomplete automaticamente. As sugestões são solicitadas somente ao pressionar `Tab`; digitar normalmente, inclusive acesso a membros com `.`, não abre nem aplica sugestões sozinho.
+Em arquivos TypeScript e JavaScript, o Kit Dev também ativa **recursos inteligentes de código**: autocomplete, informações sobre símbolos, ir para definição e localizar referências. Essa configuração é feita automaticamente no primeiro uso de `view` / `v`. O autocomplete não aparece enquanto você digita; pressione `Tab` quando quiser ver sugestões.
 
-Atalhos mostrados antes de abrir o Micro:
+Atalhos úteis:
 
 ```text
 Ctrl+S  Salvar
@@ -141,12 +141,12 @@ Ctrl+Q  Sair
 Ctrl+F  Buscar
 Ctrl+B  Terminal / modo shell
 Ctrl+E  Comando / Ajuda
-Tab  Autocomplete LSP
-Alt+K  Hover LSP
-Alt+D  Ir para definição
+Tab     Mostrar sugestões de autocomplete
+Alt+K   Mostrar informações do símbolo selecionado
+Alt+D   Ir para definição
 ```
 
-Para consultar os atalhos padrão do Micro, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do view está disponível com `yarn v --help`.
+Para consultar os atalhos padrão do editor, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do view está disponível com `yarn v --help`.
 
 ## Testes automáticos
 

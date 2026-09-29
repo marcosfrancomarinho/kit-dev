@@ -26,7 +26,7 @@ Instead of configuring the project from scratch, you start with:
 - TypeScript checking;
 - tests that run once by default, with optional watch mode;
 - automatic test generation from classes;
-- quick file search and editing with Micro through `view` / `v`;
+- quick file search and editing through `view` / `v`;
 - optional dependency injection;
 - npm, Yarn and pnpm support.
 
@@ -70,7 +70,7 @@ pnpm dev
 | `test [--watch]` | Runs tests once or keeps them running in watch mode |
 | `test <file>` | Generates or updates a test for a class |
 | `fmt [file]` | Formats all of `src/` and `test/` or only one provided file |
-| `view [file]` / `v [file]` | Finds a project file, formats supported source files, and opens it in Micro |
+| `view [file]` / `v [file]` | Finds a project file, formats supported source files, and opens it in the terminal editor |
 | `build` | Checks types and creates the production bundle |
 | `start` | Runs the generated bundle |
 | `type [--watch]` | Checks TypeScript types once or keeps checking in watch mode |
@@ -107,7 +107,7 @@ The `fmt` command is a lightweight formatter for JavaScript and TypeScript files
 
 ## View and edit files
 
-Kit Dev can find and open project files directly in the terminal with Micro:
+Kit Dev can find and open project files directly in **Micro, a lightweight code editor that runs inside the terminal**:
 
 ```bash
 yarn v product
@@ -122,18 +122,18 @@ yarn v src/domain/entities/product.ts
 
 If one file matches, it opens immediately. If several files match, Kit Dev shows an interactive selector. JavaScript and TypeScript files inside `src/` or `test/` are formatted with `fmt` before opening.
 
-Micro is not bundled into the npm package. Kit Dev first uses an existing `micro` from `PATH`; otherwise it downloads only the official binary for the current operating system and architecture, validates its SHA-256 checksum, and caches it in the user's home directory:
+Micro is not bundled into the npm package. Kit Dev first uses an existing `micro` command from the system; if it is not available, Kit Dev downloads the official editor binary for the current operating system and architecture, validates the download, and stores it in the user's cache:
 
 ```text
 Linux/macOS: ~/.kit-dev/bin/micro
 Windows:     %USERPROFILE%\.kit-dev\bin\micro.exe
 ```
 
-The cached binary is reused by every Kit Dev project on the machine. Automatic download supports the official Micro builds mapped by Kit Dev for Windows, Linux, macOS, FreeBSD, NetBSD, OpenBSD, Solaris and illumos where the current Node.js runtime/platform combination is available.
+The cached editor is reused by every Kit Dev project on the machine.
 
-Kit Dev uses the native LSP already provided by `typescript@7.0.2`, so no separate TypeScript language-server package is installed. On the first `view` / `v` use, Kit Dev downloads a pinned revision of the `mlsp` Micro plugin into the isolated `~/.kit-dev/micro` configuration and starts the project's own `node_modules/typescript/bin/tsc --lsp --stdio` directly with Node. The legacy `lsp` plugin is removed from this isolated configuration to avoid two LSP clients running together. `mlsp` autostarts for TypeScript/JavaScript and provides intelligent completion, hover, definitions and references without changing the user's normal `~/.config/micro` settings.
+For TypeScript and JavaScript files, Kit Dev also enables **code intelligence**: autocomplete, information about symbols, go to definition and references. This support is configured automatically the first time `view` / `v` is used. Autocomplete does not appear while you type; press `Tab` when you want suggestions.
 
-Useful shortcuts shown before Micro opens:
+Useful shortcuts:
 
 ```text
 Ctrl+S  Save
@@ -141,12 +141,12 @@ Ctrl+Q  Quit
 Ctrl+F  Find
 Ctrl+B  Terminal / Shell mode
 Ctrl+E  Command / Help
-Tab  LSP autocomplete
-Alt+K  LSP hover
-Alt+D  Go to definition
+Tab     Show autocomplete suggestions
+Alt+K   Show information about the selected symbol
+Alt+D   Go to definition
 ```
 
-For Micro's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev view help is available with `yarn v --help`.
+For the editor's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev view help is available with `yarn v --help`.
 
 ## Automatic tests
 

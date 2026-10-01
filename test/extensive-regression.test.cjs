@@ -69,15 +69,15 @@ describe('extensive formatter regression matrix', () => {
   ];
 
   for (const [fileName, source] of samples) {
-    it('keeps ' + fileName + ' parseable and idempotent', () => {
+    it('keeps ' + fileName + ' parseable and idempotent', async () => {
       assertParseable(source, fileName);
-      const once = formatSource(source, fileName);
+      const once = await formatSource(source, fileName);
       assertParseable(once, fileName);
-      assert.equal(formatSource(once, fileName), once);
+      assert.equal(await formatSource(once, fileName), once);
     });
   }
 
-  it('does not fragment TypeScript keywords or primitive type names', () => {
+  it('does not fragment TypeScript keywords or primitive type names', async () => {
     const source = [
       'export class User {',
       'constructor(',
@@ -91,7 +91,7 @@ describe('extensive formatter regression matrix', () => {
       '',
     ].join('\n');
 
-    const result = formatSource(source, 'user.ts');
+    const result = await formatSource(source, 'user.ts');
 
     assert.doesNotMatch(result, /\\bp;\\s*\\nub;\\s*\\nlic;/);
     assert.doesNotMatch(result, /\\bst,\\s*\\n\\s*ring\\b/);
@@ -99,14 +99,14 @@ describe('extensive formatter regression matrix', () => {
     assertParseable(result, 'user.ts');
   });
 
-  it('preserves meaningful whitespace inside literals and comments', () => {
+  it('preserves meaningful whitespace inside literals and comments', async () => {
     const source = [
       "const text='a   b = c:d'; // keep   spaces",
       'const regex=/x   y/;',
       '',
     ].join('\n');
 
-    const result = formatSource(source, 'literals.ts');
+    const result = await formatSource(source, 'literals.ts');
 
     assert.match(result, /'a   b = c:d'/);
     assert.match(result, /keep   spaces/);

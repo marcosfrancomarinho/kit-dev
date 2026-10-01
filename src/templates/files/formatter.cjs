@@ -293,4 +293,4 @@ if (require.main === module) {
     .finally(disposeImportService);
 }
 
-module.exports = { disposeImportService, formatSource, resolveTarget };
+module.exports = { formatSource, resolveTarget };

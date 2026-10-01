@@ -34,8 +34,6 @@ const ignoredDirectories = new Set([
   '.cache',
   '.tmp',
 ]);
-const sourcePattern = /\.(?:[cm]?[jt]sx?)$/i;
-
 function isInside(root, candidate) {
   const normalizedRoot = resolve(root);
   const normalized = resolve(candidate);
@@ -366,41 +364,6 @@ async function ensureMicro(options = {}) {
   return executable;
 }
 
-function shouldFormat(file, root = projectRoot) {
-  if (!sourcePattern.test(file)) return false;
-
-  return (
-    isInside(join(root, 'src'), file) ||
-    isInside(join(root, 'test'), file)
-  );
-}
-
-function formatBeforeOpen(file, root = projectRoot) {
-  if (!shouldFormat(file, root)) return true;
-
-  const formatter = join(root, 'kit-dev', 'format', 'fmt.cjs');
-
-  if (!existsSync(formatter)) return true;
-
-  const result = spawnSync(
-    process.execPath,
-    [formatter, relative(root, file)],
-    {
-      cwd: root,
-      stdio: 'inherit',
-    },
-  );
-
-  if (result.status !== 0) {
-    console.warn(
-      '⚠ Could not format the file. Opening it unchanged.',
-    );
-    return false;
-  }
-
-  return true;
-}
-
 function renderMicroTips() {
   return [
     '',
@@ -420,7 +383,6 @@ function showMicroTips() {
 }
 
 function openWithMicro(editor, file, root = projectRoot) {
-  formatBeforeOpen(file, root);
   showMicroTips();
 
   const result = spawnSync(editor, [file], {
@@ -492,11 +454,9 @@ module.exports = {
   collectProjectFiles,
   ensureMicro,
   findWriteCandidates,
-  formatBeforeOpen,
   microAsset,
   openWithMicro,
   renderMicroTips,
   renderSelection,
   selectFile,
-  shouldFormat,
 };

@@ -106,7 +106,7 @@ npm run write -- product.ts
 npm run w -- src/domain/entities/product.ts
 ```
 
-If one file matches, it opens immediately. If several files match, Kit Dev shows an interactive selector. `write` opens the file unchanged; run `fmt` explicitly when you want formatting.
+If one file matches, it opens immediately. If several files match, Kit Dev shows an interactive selector. `write` does not run `fmt` automatically before opening the file; the file is opened unchanged. Run `fmt` explicitly only when you want formatting.
 
 Micro is not bundled into the npm package. Kit Dev first uses an existing `micro` command from the system; if it is not available, Kit Dev downloads the official editor binary for the current operating system and architecture, validates the download, and stores it in the user's cache:
 

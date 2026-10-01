@@ -13,8 +13,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node: [22, 24]
+        os: [ubuntu-latest]
+        node: [22]
 
     runs-on: ${{ matrix.os }}
 
@@ -34,6 +34,9 @@ jobs:
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile --non-interactive
+
+      - name: Benchmark fmt
+        run: node scripts/fmt-benchmark.cjs
 
       - name: Check types
         run: yarn type

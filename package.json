@@ -1,6 +1,6 @@
 {
   "name": "create-kit-dev",
-  "version": "1.1.48",
+  "version": "1.1.49",
   "description": "Fast Node.js + TypeScript project generator with esbuild, native testing, automatic test generation, optional dependency injection, and a zero-config developer workflow.",
   "type": "module",
   "main": "dist/bundle.cjs",
@@ -95,6 +95,7 @@
     "@types/node": "^22.0.0",
     "@typescript/typescript6": "6.0.2",
     "esbuild": "^0.28.2",
+    "prettier": "3.9.9",
     "typescript": "7.0.2"
   },
   "files": [

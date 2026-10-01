@@ -302,7 +302,8 @@ var NodePackageInstaller = class {
     "typescript@7.0.2",
     "@typescript/typescript6@6.0.2",
     "esbuild@0.28.2",
-    "@types/node@22"
+    "@types/node@22",
+    "prettier@3.9.9"
   ]);
   getRunCommand(manager) {
     return this.registry.get(manager).runCommand;

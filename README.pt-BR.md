@@ -103,7 +103,7 @@ npm run fmt -- src/application/create-user.ts
 ```
 
 
-O `fmt` formata JavaScript e TypeScript em `src/` e `test/`, incluindo código compacto ou minificado. Por padrão, usa indentação de dois espaços, aspas simples, ponto e vírgula e largura de linha de 100 caracteres. Respeita a configuração de formatação do projeto e preserva imports não usados. Erros de sintaxe são informados sem sobrescrever o arquivo afetado.
+O `fmt` formata JavaScript e TypeScript em `src/` e `test/`, incluindo código compacto ou minificado. Por padrão, usa indentação de dois espaços, aspas simples, ponto e vírgula e largura de linha de 100 caracteres. Respeita a configuração de formatação do projeto e remove imports não usados, preservando imports de efeito colateral. Erros de sintaxe são informados sem sobrescrever o arquivo afetado.
 
 ## Escrever e editar arquivos
 

@@ -48,11 +48,67 @@ async function collectFiles(directory) {
   return files;
 }
 
+function removeUnusedImports(source, filepath) {
+  const projectRequire = createRequire(join(projectRoot, 'package.json'));
+  const ts = projectRequire('@typescript/typescript6');
+  const kind = /\.tsx$/i.test(filepath) ? ts.ScriptKind.TSX
+    : /\.jsx$/i.test(filepath) ? ts.ScriptKind.JSX
+    : /\.(?:js|mjs|cjs)$/i.test(filepath) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
+  const tree = ts.createSourceFile(filepath, source, ts.ScriptTarget.Latest, true, kind);
+  if (!tree.statements.some(ts.isImportDeclaration)) return source;
+
+  let options = { allowJs: true, jsx: ts.JsxEmit.React, target: ts.ScriptTarget.Latest };
+  const configPath = ts.findConfigFile(dirname(filepath), ts.sys.fileExists);
+  if (configPath) {
+    const config = ts.readConfigFile(configPath, ts.sys.readFile);
+    if (config.error) throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
+    options = { ...options, ...ts.parseJsonConfigFileContent(config.config, ts.sys, dirname(configPath)).options };
+  }
+  const host = {
+    getCompilationSettings: () => options,
+    getScriptFileNames: () => [filepath],
+    getScriptVersion: () => '0',
+    getScriptSnapshot(file) {
+      const text = resolve(file) === filepath ? source : ts.sys.readFile(file);
+      return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text);
+    },
+    getCurrentDirectory: () => projectRoot,
+    getDefaultLibFileName: ts.getDefaultLibFilePath,
+    fileExists: ts.sys.fileExists,
+    readFile: ts.sys.readFile,
+    readDirectory: ts.sys.readDirectory,
+    directoryExists: ts.sys.directoryExists,
+    realpath: ts.sys.realpath,
+    useCaseSensitiveFileNames: () => ts.sys.useCaseSensitiveFileNames,
+  };
+  const service = ts.createLanguageService(host);
+  try {
+    const edits = service.organizeImports(
+      { type: 'file', fileName: filepath, mode: ts.OrganizeImportsMode.RemoveUnused },
+      {},
+      {},
+    );
+    const changes = edits.filter(edit => resolve(edit.fileName) === filepath)
+      .flatMap(edit => edit.textChanges).sort((a, b) => b.span.start - a.span.start);
+    let result = source;
+    for (const { span, newText } of changes) {
+      result = result.slice(0, span.start) + newText + result.slice(span.start + span.length);
+    }
+    return result;
+  } finally {
+    service.dispose();
+  }
+}
+
 async function formatSource(source, fileName = 'source.ts') {
   const prettier = loadPrettier();
   const filepath = resolve(projectRoot, fileName);
   const config = await prettier.resolveConfig(filepath, { editorconfig: true });
-  return prettier.format(source, { ...defaultOptions, ...config, filepath });
+  const options = { ...defaultOptions, ...config, filepath };
+  // Parse before cleanup so invalid input is never rewritten into apparently valid code.
+  const formatted = await prettier.format(source, options);
+  const cleaned = removeUnusedImports(formatted, filepath);
+  return cleaned === formatted ? formatted : prettier.format(cleaned, options);
 }
 
 function canonicalPath(path) {

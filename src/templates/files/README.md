@@ -109,7 +109,7 @@ npm run fmt -- src/application/create-user.ts
 ```
 
 
-The `fmt` command formats JavaScript and TypeScript in `src/` and `test/`, including compact or minified code. By default, it uses two-space indentation, single quotes, semicolons, and a line width of 100 characters. It respects project formatting configuration and preserves unused imports. Invalid syntax is reported without overwriting the affected file.
+The `fmt` command formats JavaScript and TypeScript in `src/` and `test/`, including compact or minified code. By default, it uses two-space indentation, single quotes, semicolons, and a line width of 100 characters. It respects project formatting configuration and removes unused imports while preserving side-effect imports. Invalid syntax is reported without overwriting the affected file.
 
 ## Write and edit files
 

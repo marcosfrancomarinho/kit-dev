@@ -18,6 +18,7 @@ function parse(source, fileName) {
 function values(tree) {
   const result = [];
   function visit(node) {
+    if (ts.isImportDeclaration(node)) return;
     if (ts.isIdentifier(node) || ts.isStringLiteralLike(node) || ts.isNumericLiteral(node)) {
       result.push([node.kind, node.text]);
     }
@@ -53,10 +54,39 @@ describe('source formatter', () => {
       "function run() {\n  return 'ok';\n}\n");
   });
 
-  it('preserves unused imports and side-effect imports', async () => {
+  it('removes unused imports while preserving side-effect imports', async () => {
     const result = await formatSource('import {unused} from "pkg";import "side-effects";console.log("ok")');
-    assert.match(result, /import \{ unused \} from 'pkg';/);
+    assert.doesNotMatch(result, /unused|from 'pkg'/);
     assert.match(result, /import 'side-effects';/);
+  });
+
+  it('keeps used bindings, type imports, aliases and exports', async () => {
+    const source = 'import Default,{used as renamed,unused} from "pkg";import type {Model,Unused} from "types";export {renamed};export const x:Model=Default;';
+    const result = await formatSource(source);
+    assert.match(result, /Default/);
+    assert.match(result, /used as renamed/);
+    assert.match(result, /import type \{ Model \}/);
+    assert.doesNotMatch(result, /\bunused\b|\bUnused\b/);
+  });
+
+  it('does not mistake a shadowed local for a used import', async () => {
+    const result = await formatSource('import {value} from "pkg";function run(value:string){return value}');
+    assert.doesNotMatch(result, /from 'pkg'/);
+    assert.match(result, /function run\(value: string\)/);
+  });
+
+  it('keeps JSX component imports and default React for the classic JSX runtime', async () => {
+    const result = await formatSource('import React,{useState} from "react";import {Button,Unused} from "ui";export const view=<Button />;', 'view.tsx');
+    assert.match(result, /import React from 'react'/);
+    assert.match(result, /import \{ Button \}/);
+    assert.doesNotMatch(result, /useState|Unused/);
+  });
+
+  it('preserves local functions, unused variables and initializer side effects', async () => {
+    const source = 'const unused=register();function helper(){return 1}';
+    const result = await formatSource(source);
+    assert.match(result, /const unused = register\(\)/);
+    assert.match(result, /function helper/);
   });
 
   it('preserves runtime behavior of strings, regexes, templates and nested control flow', async () => {

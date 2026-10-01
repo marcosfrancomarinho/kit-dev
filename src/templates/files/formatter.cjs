@@ -48,29 +48,75 @@ async function collectFiles(directory) {
   return files;
 }
 
-function removeUnusedImports(source, filepath) {
-  const projectRequire = createRequire(join(projectRoot, 'package.json'));
-  const ts = projectRequire('@typescript/typescript6');
-  const kind = /\.tsx$/i.test(filepath) ? ts.ScriptKind.TSX
-    : /\.jsx$/i.test(filepath) ? ts.ScriptKind.JSX
-    : /\.(?:js|mjs|cjs)$/i.test(filepath) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
-  const tree = ts.createSourceFile(filepath, source, ts.ScriptTarget.Latest, true, kind);
-  if (!tree.statements.some(ts.isImportDeclaration)) return source;
+let typeScript;
+let importService;
+let activeFile = '';
+let activeSource = '';
+let activeOptions;
+let projectVersion = 0;
+const compilerOptionsCache = new Map();
 
-  let options = { allowJs: true, jsx: ts.JsxEmit.React, target: ts.ScriptTarget.Latest };
+function loadTypeScript() {
+  if (typeScript) return typeScript;
+  const projectRequire = createRequire(join(projectRoot, 'package.json'));
+  typeScript = projectRequire('@typescript/typescript6');
+  return typeScript;
+}
+
+function getCompilerOptions(ts, filepath) {
   const configPath = ts.findConfigFile(dirname(filepath), ts.sys.fileExists);
+  const cacheKey = configPath || '<default>';
+
+  if (compilerOptionsCache.has(cacheKey)) {
+    return compilerOptionsCache.get(cacheKey);
+  }
+
+  let options = {
+    allowJs: true,
+    jsx: ts.JsxEmit.React,
+    target: ts.ScriptTarget.Latest,
+  };
+
   if (configPath) {
     const config = ts.readConfigFile(configPath, ts.sys.readFile);
-    if (config.error) throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
-    options = { ...options, ...ts.parseJsonConfigFileContent(config.config, ts.sys, dirname(configPath)).options };
+    if (config.error) {
+      throw new Error(
+        ts.flattenDiagnosticMessageText(config.error.messageText, '\n'),
+      );
+    }
+
+    options = {
+      ...options,
+      ...ts.parseJsonConfigFileContent(
+        config.config,
+        ts.sys,
+        dirname(configPath),
+      ).options,
+    };
   }
+
+  compilerOptionsCache.set(cacheKey, options);
+  return options;
+}
+
+function getImportService(ts) {
+  if (importService) return importService;
+
   const host = {
-    getCompilationSettings: () => options,
-    getScriptFileNames: () => [filepath],
-    getScriptVersion: () => '0',
+    getCompilationSettings: () => activeOptions,
+    getScriptFileNames: () => (activeFile ? [activeFile] : []),
+    getScriptVersion: (file) =>
+      resolve(file) === activeFile ? String(projectVersion) : '0',
+    getProjectVersion: () => String(projectVersion),
     getScriptSnapshot(file) {
-      const text = resolve(file) === filepath ? source : ts.sys.readFile(file);
-      return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text);
+      const normalized = resolve(file);
+      const text = normalized === activeFile
+        ? activeSource
+        : ts.sys.readFile(file);
+
+      return text === undefined
+        ? undefined
+        : ts.ScriptSnapshot.fromString(text);
     },
     getCurrentDirectory: () => projectRoot,
     getDefaultLibFileName: ts.getDefaultLibFilePath,
@@ -81,23 +127,51 @@ function removeUnusedImports(source, filepath) {
     realpath: ts.sys.realpath,
     useCaseSensitiveFileNames: () => ts.sys.useCaseSensitiveFileNames,
   };
-  const service = ts.createLanguageService(host);
-  try {
-    const edits = service.organizeImports(
-      { type: 'file', fileName: filepath, mode: ts.OrganizeImportsMode.RemoveUnused },
-      {},
-      {},
-    );
-    const changes = edits.filter(edit => resolve(edit.fileName) === filepath)
-      .flatMap(edit => edit.textChanges).sort((a, b) => b.span.start - a.span.start);
-    let result = source;
-    for (const { span, newText } of changes) {
-      result = result.slice(0, span.start) + newText + result.slice(span.start + span.length);
-    }
-    return result;
-  } finally {
-    service.dispose();
+
+  importService = ts.createLanguageService(host);
+  return importService;
+}
+
+function disposeImportService() {
+  if (importService) {
+    importService.dispose();
+    importService = undefined;
   }
+
+  activeFile = '';
+  activeSource = '';
+  activeOptions = undefined;
+}
+
+function removeUnusedImports(source, filepath) {
+  const ts = loadTypeScript();
+  const kind = /\.tsx$/i.test(filepath) ? ts.ScriptKind.TSX
+    : /\.jsx$/i.test(filepath) ? ts.ScriptKind.JSX
+    : /\.(?:js|mjs|cjs)$/i.test(filepath) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
+  const tree = ts.createSourceFile(filepath, source, ts.ScriptTarget.Latest, true, kind);
+  if (!tree.statements.some(ts.isImportDeclaration)) return source;
+
+  activeFile = resolve(filepath);
+  activeSource = source;
+  activeOptions = getCompilerOptions(ts, activeFile);
+  projectVersion += 1;
+
+  const edits = getImportService(ts).organizeImports(
+    { type: 'file', fileName: activeFile, mode: ts.OrganizeImportsMode.RemoveUnused },
+    {},
+    {},
+  );
+
+  const changes = edits.filter(edit => resolve(edit.fileName) === activeFile)
+    .flatMap(edit => edit.textChanges)
+    .sort((a, b) => b.span.start - a.span.start);
+
+  let result = source;
+  for (const { span, newText } of changes) {
+    result = result.slice(0, span.start) + newText + result.slice(span.start + span.length);
+  }
+
+  return result;
 }
 
 async function formatSource(source, fileName = 'source.ts') {
@@ -210,11 +284,13 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch((error) => {
-    console.error('\n❌ Format failed');
-    console.error(error && error.message ? error.message : error);
-    process.exitCode = 1;
-  });
+  main()
+    .catch((error) => {
+      console.error('\n❌ Format failed');
+      console.error(error && error.message ? error.message : error);
+      process.exitCode = 1;
+    })
+    .finally(disposeImportService);
 }
 
 module.exports = { formatSource, resolveTarget };

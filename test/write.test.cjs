@@ -15,12 +15,10 @@ const { describe, it } = require('node:test');
 const {
   ensureMicro,
   findWriteCandidates,
-  formatBeforeOpen,
   microAsset,
   openWithMicro,
   renderMicroTips,
   renderSelection,
-  shouldFormat,
 } = require('../src/templates/files/write.cjs');
 
 describe('project file writer', () => {
@@ -158,48 +156,6 @@ describe('project file writer', () => {
     assert.match(output, /Enter open/);
   });
 
-  it('formats JavaScript and TypeScript under src or test before opening', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-format-'));
-    context.after(() =>
-      rm(root, { recursive: true, force: true }),
-    );
-
-    await mkdir(join(root, 'src'), { recursive: true });
-    await mkdir(join(root, 'kit-dev', 'format'), { recursive: true });
-
-    const file = join(root, 'src', 'product.ts');
-    await writeFile(file, 'const value="raw"\n', 'utf8');
-    await writeFile(
-      join(root, 'kit-dev', 'format', 'fmt.cjs'),
-      [
-        "const { readFileSync, writeFileSync } = require('node:fs');",
-        "const { resolve } = require('node:path');",
-        "const file = resolve(process.cwd(), process.argv[2]);",
-        "writeFileSync(file, readFileSync(file, 'utf8').replace('raw', 'formatted'));",
-        '',
-      ].join('\n'),
-      'utf8',
-    );
-
-    assert.equal(shouldFormat(file, root), true);
-    assert.equal(formatBeforeOpen(file, root), true);
-    assert.match(await readFile(file, 'utf8'), /formatted/);
-  });
-
-  it('does not run fmt for files that the formatter does not support', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-non-source-'));
-    context.after(() =>
-      rm(root, { recursive: true, force: true }),
-    );
-
-    const readme = join(root, 'README.md');
-    await writeFile(readme, '# README\n', 'utf8');
-
-    assert.equal(shouldFormat(readme, root), false);
-    assert.equal(formatBeforeOpen(readme, root), true);
-    assert.equal(await readFile(readme, 'utf8'), '# README\n');
-  });
-
   it('shows concise Micro shortcuts before opening the editor', () => {
     const tips = renderMicroTips();
 
@@ -287,81 +243,6 @@ describe('project file writer', () => {
 
     assert.equal(result, expected);
   });
-
-  it('keeps the original file when fmt fails before opening', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-format-fail-'));
-    context.after(() =>
-      rm(root, { recursive: true, force: true }),
-    );
-
-    await mkdir(join(root, 'src'), { recursive: true });
-    await mkdir(join(root, 'kit-dev', 'format'), { recursive: true });
-
-    const file = join(root, 'src', 'product.ts');
-    const original = 'const value="raw"\n';
-    await writeFile(file, original, 'utf8');
-    await writeFile(
-      join(root, 'kit-dev', 'format', 'fmt.cjs'),
-      'process.exitCode = 1\n',
-      'utf8',
-    );
-
-    const originalWarn = console.warn;
-    console.warn = () => {};
-
-    try {
-      assert.equal(formatBeforeOpen(file, root), false);
-    } finally {
-      console.warn = originalWarn;
-    }
-
-    assert.equal(await readFile(file, 'utf8'), original);
-  });
-
-  it('formats then opens a source file through the selected editor', async (context) => {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-write-open-'));
-    context.after(() =>
-      rm(root, { recursive: true, force: true }),
-    );
-
-    await mkdir(join(root, 'src'), { recursive: true });
-    await mkdir(join(root, 'kit-dev', 'format'), { recursive: true });
-
-    const file = join(root, 'src', 'open-me.js');
-    await writeFile(
-      file,
-      "if (process.argv[1]) { process.exitCode = 0 }\n",
-      'utf8',
-    );
-    await writeFile(
-      join(root, 'kit-dev', 'format', 'fmt.cjs'),
-      [
-        "const { appendFileSync } = require('node:fs');",
-        "const { resolve } = require('node:path');",
-        "const file = resolve(process.cwd(), process.argv[2]);",
-        "appendFileSync(file, '\\n// formatted-before-open\\n');",
-        '',
-      ].join('\n'),
-      'utf8',
-    );
-
-    const originalWrite = process.stdout.write;
-    process.stdout.write = () => true;
-
-    try {
-      assert.doesNotThrow(() =>
-        openWithMicro(process.execPath, file, root),
-      );
-    } finally {
-      process.stdout.write = originalWrite;
-    }
-
-    assert.match(
-      await readFile(file, 'utf8'),
-      /formatted-before-open/,
-    );
-  });
-
 
   it('prints help without scanning files or starting Micro', () => {
     const script = join(

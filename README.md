@@ -34,18 +34,10 @@ Kit Dev is designed to stay minimalist: simple, fast, and with few external depe
 
 ## Quick start
 
-Choose the command for your package manager:
+Create a project with npm:
 
 ```bash
 npx create-kit-dev
-```
-
-```bash
-yarn create kit-dev
-```
-
-```bash
-pnpm create kit-dev
 ```
 
 Enter the project name and then:
@@ -55,12 +47,6 @@ cd my-api
 npm run dev
 ```
 
-If you created it with Yarn or pnpm, use the equivalent command:
-
-```bash
-yarn dev
-pnpm dev
-```
 
 ## Main commands
 
@@ -110,14 +96,14 @@ The `fmt` command formats JavaScript and TypeScript in `src/` and `test/`, inclu
 Kit Dev can find and open project files directly in **Micro, a lightweight code editor that runs inside the terminal**:
 
 ```bash
-yarn w product
+npm run w -- product
 ```
 
 You can also use the full command or provide an exact path:
 
 ```bash
-yarn write product.ts
-yarn w src/domain/entities/product.ts
+npm run write -- product.ts
+npm run w -- src/domain/entities/product.ts
 ```
 
 If one file matches, it opens immediately. If several files match, Kit Dev shows an interactive selector. `write` opens the file unchanged; run `fmt` explicitly when you want formatting.
@@ -141,7 +127,7 @@ Ctrl+B  Terminal / Shell mode
 Ctrl+E  Command / Help
 ```
 
-For the editor's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev write help is available with `yarn w --help`.
+For the editor's default key bindings, press `Ctrl+E` and run `help defaultkeys`. Kit Dev write help is available with `npm run w -- --help`.
 
 ## Automatic tests
 

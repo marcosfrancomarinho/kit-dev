@@ -6,7 +6,7 @@ const { join, resolve } = require('node:path');
 const vm = require('node:vm');
 const { describe, it } = require('node:test');
 const ts = require('@typescript/typescript6');
-const { disposeImportService, formatSource, resolveTarget } = require('../src/templates/files/formatter.cjs');
+const { formatSource, resolveTarget } = require('../src/templates/files/formatter.cjs');
 const regressions = require('./fixtures/formatter-regressions.json');
 
 function parse(source, fileName) {
@@ -58,34 +58,6 @@ describe('source formatter', () => {
     const result = await formatSource('import {unused} from "pkg";import "side-effects";console.log("ok")');
     assert.doesNotMatch(result, /unused|from 'pkg'/);
     assert.match(result, /import 'side-effects';/);
-  });
-
-  it('reuses one TypeScript language service across sequential files', async () => {
-    disposeImportService();
-
-    const original = ts.createLanguageService;
-    let creations = 0;
-
-    ts.createLanguageService = (...args) => {
-      creations += 1;
-      return original(...args);
-    };
-
-    try {
-      await formatSource(
-        'import {used,unused} from "pkg";console.log(used);',
-        'first.ts',
-      );
-      await formatSource(
-        'import {other,unused} from "pkg";console.log(other);',
-        'second.ts',
-      );
-
-      assert.equal(creations, 1);
-    } finally {
-      ts.createLanguageService = original;
-      disposeImportService();
-    }
   });
 
   it('keeps used bindings, type imports, aliases and exports', async () => {

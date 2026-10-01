@@ -70,7 +70,7 @@ pnpm dev
 | `test [--watch]` | Runs tests once or keeps them running in watch mode |
 | `test <file>` | Generates or updates a test for a class |
 | `fmt [file]` | Formats all of `src/` and `test/` or only one provided file |
-| `write [file]` / `w [file]` | Finds a project file, formats supported source files, and opens it in the terminal editor |
+| `write [file]` / `w [file]` | Finds a project file and opens it in the terminal editor |
 | `build` | Checks types and creates the production bundle |
 | `start` | Runs the generated bundle |
 | `type [--watch]` | Checks TypeScript types once or keeps checking in watch mode |
@@ -120,7 +120,7 @@ yarn write product.ts
 yarn w src/domain/entities/product.ts
 ```
 
-If one file matches, it opens immediately. If several files match, Kit Dev shows an interactive selector. JavaScript and TypeScript files inside `src/` or `test/` are formatted with `fmt` before opening.
+If one file matches, it opens immediately. If several files match, Kit Dev shows an interactive selector. `write` opens the file unchanged; run `fmt` explicitly when you want formatting.
 
 Micro is not bundled into the npm package. Kit Dev first uses an existing `micro` command from the system; if it is not available, Kit Dev downloads the official editor binary for the current operating system and architecture, validates the download, and stores it in the user's cache:
 

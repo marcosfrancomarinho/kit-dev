@@ -1,6 +1,7 @@
 const { readdir, readFile, writeFile } = require('node:fs/promises');
 const { createRequire } = require('node:module');
-const { isAbsolute, join, relative, resolve, sep } = require('node:path');
+const { realpathSync } = require('node:fs');
+const { basename, dirname, isAbsolute, join, relative, resolve, sep } = require('node:path');
 
 const projectRoot = join(__dirname, '..', '..');
 const roots = [join(projectRoot, 'src'), join(projectRoot, 'test')];
@@ -54,11 +55,23 @@ async function formatSource(source, fileName = 'source.ts') {
   return prettier.format(source, { ...defaultOptions, ...config, filepath });
 }
 
+function canonicalPath(path) {
+  const absolute = resolve(path);
+  try {
+    return realpathSync.native(absolute);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    const parent = dirname(absolute);
+    if (parent === absolute) return absolute;
+    return join(canonicalPath(parent), basename(absolute));
+  }
+}
+
 function isInsideAllowedRoots(path) {
-  const normalized = resolve(path);
+  const normalized = canonicalPath(path);
 
   return roots.some((root) => {
-    const normalizedRoot = resolve(root);
+    const normalizedRoot = canonicalPath(root);
     return (
       normalized === normalizedRoot ||
       normalized.startsWith(normalizedRoot + sep)
@@ -81,7 +94,7 @@ function resolveTarget(target) {
     );
   }
 
-  return candidate;
+  return canonicalPath(candidate);
 }
 
 async function formatFile(file) {

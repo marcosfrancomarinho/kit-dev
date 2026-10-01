@@ -135,6 +135,29 @@ describe('source formatter', () => {
     assert.equal(await readFile(target, 'utf8'), "const name = 'Book';\n");
   });
 
+  it('accepts an absolute target through a directory alias', async (t) => {
+    const root = await fixture(t);
+    const alias = join(root, 'project-alias');
+    await symlink(root, alias, 'junction');
+    const target = join(root, 'src/nested/book.ts');
+    await writeFile(target, 'const name="Book"');
+    const result = run(root, [join(alias, 'src/nested/book.ts')]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(await readFile(target, 'utf8'), "const name = 'Book';\n");
+  });
+
+  it('rejects a source symlink that points outside the allowed directories', async (t) => {
+    const root = await fixture(t);
+    const outside = join(root, 'outside.ts');
+    const link = join(root, 'src/external.ts');
+    await writeFile(outside, 'const x=1');
+    await symlink(outside, link, 'file');
+    const result = run(root, [link]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /only accepts files inside/);
+    assert.equal(await readFile(outside, 'utf8'), 'const x=1');
+  });
+
   it('respects project configuration and .prettierignore', async (t) => {
     const root = await fixture(t);
     await writeFile(join(root, '.prettierrc'), '{"singleQuote":false,"semi":false,"tabWidth":4}');

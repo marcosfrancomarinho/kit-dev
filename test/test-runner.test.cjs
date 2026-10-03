@@ -194,9 +194,10 @@ export class CreateUser {
     ),
   );
   assert.match(generated, /const name = 'value';/);
-  assert.match(generated, /const result = await sut\\.execute\\(name\\);/);
+  assert.ok(generated.includes('const result = await sut.execute(name);'));
   assert.match(generated, /TODO: add the expected assertion/);
-  assert.doesNotMatch(generated, /mock\\.fn|typescript6/);
+  assert.equal(generated.includes('mock.fn'), false);
+  assert.equal(generated.includes('typescript6'), false);
 });
 
 function waitForOutput(child, expected, timeout = 7000) {

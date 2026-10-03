@@ -110,7 +110,7 @@ function developmentBuildOptions() {
     outfile: outputFile,
     minify: false,
     minifySyntax: false,
-    minifyWhitespace: false,
+    minifyWhitespace: true,
     minifyIdentifiers: false,
     sourcemap: 'inline',
     metafile: false,

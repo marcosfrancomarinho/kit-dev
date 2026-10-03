@@ -103,29 +103,17 @@ For the editor's default key bindings, press `Ctrl+E` and run `help defaultkeys`
 
 ## Automatic tests
 
-Every generated project already includes a test runner. By default, tests run once. Use `--watch` only when you want continuous reruns.
-
-Run once or add `--watch` to keep watching for changes:
+Tests run once by default. Add `--watch` when you want continuous runs.
 
 ```bash
-npm test [--watch]
-```
-
-To generate a test from a class:
-
-```bash
+npm test
+npm test -- --watch
 npm test -- create-user
 ```
 
-or:
+Generated tests create one block per public method and leave the business assertion as a `TODO`. The generator can prepare simple values, DTOs, entities and Value Objects with public constructors or common factories.
 
-```bash
-npm test -- src/application/create-user.ts
-```
-
-Kit Dev creates a small starting test from the class constructor and public methods. It uses simple values for common primitive parameters, creates simple dependency mocks with `mock.fn()` when obvious method calls can be detected, and leaves a `TODO` for the expected assertion instead of trying to infer business rules.
-
-Existing generated tests can be regenerated when the source changes.
+Dependencies used by the class get native `node:test` mocks. Simple return types also get useful default values. Complex types keep a typed fallback instead of being guessed.
 
 ## Production build
 

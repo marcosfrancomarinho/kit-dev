@@ -50,7 +50,7 @@ pnpm create kit-dev
 **3. Entre no projeto**
 
 ```bash
-cd minha-api
+cd app
 ```
 
 **4. Inicie**

@@ -186,16 +186,30 @@ function subject(meta) {
   const factory = meta.factory;
   const parameters = factory ? paramsOf(factory.parameters) : meta.constructorParameters;
   const lines = [], names = [];
-  const setups = parameters.map((p) => {
-    const fallbackType = factory ? `Parameters<typeof ${meta.className}.${factory.name}>[${p.index}]` : `ConstructorParameters<typeof ${meta.className}>[${p.index}]`;
-    const type = directTypeName(p, meta) || fallbackType;
-    const methods = meta.dependencyMethods.get(p.name) || [];
-    return { parameter: p, type, methods };
+  const setups = parameters.map((parameter) => {
+    const fallbackType = factory
+      ? `Parameters<typeof ${meta.className}.${factory.name}>[${parameter.index}]`
+      : `ConstructorParameters<typeof ${meta.className}>[${parameter.index}]`;
+    const typeName = simpleTypeName(parameter.type);
+    const declaration = typeName
+      ? resolveSimpleDeclaration(typeName, meta)
+      : null;
+    const concreteClass =
+      declaration?.kind === 'class' && !declaration.abstract;
+    const methods = concreteClass
+      ? []
+      : meta.dependencyMethods.get(parameter.name) || [];
+
+    return { parameter, fallbackType, typeName, declaration, methods };
   });
 
   for (const setup of setups) {
     for (const method of setup.methods) {
-      const returnType = methodReturnType(setup.parameter.type, method, meta);
+      const returnType = methodReturnType(
+        setup.parameter.type,
+        method,
+        meta,
+      );
       lines.push(
         `    const ${mockName(setup.parameter.name, method)} = mock.fn(${mockImplementation(returnType)});`,
       );
@@ -205,21 +219,64 @@ function subject(meta) {
   if (setups.some((setup) => setup.methods.length)) lines.push('');
 
   for (const setup of setups) {
-    const p = setup.parameter;
+    const parameter = setup.parameter;
+
     if (setup.methods.length) {
       const properties = setup.methods
-        .map((method) => `${method}: ${mockName(p.name, method)}`)
+        .map((method) => `${method}: ${mockName(parameter.name, method)}`)
         .join(', ');
-      lines.push(`    const ${p.name} = { ${properties} } as unknown as ${setup.type};`);
+      const type = mockTypeReference(
+        parameter,
+        setup.fallbackType,
+        meta,
+      );
+
+      lines.push(
+        `    const ${parameter.name} = { ${properties} } as unknown as ${type};`,
+      );
     } else {
-      lines.push(`    const ${p.name} = ${valueFor(p, setup.type, meta)};`);
+      lines.push(
+        `    const ${parameter.name} = ${valueFor(parameter, setup.fallbackType, meta)};`,
+      );
     }
-    names.push(p.name);
+
+    names.push(parameter.name);
   }
 
   if (parameters.length) lines.push('');
-  lines.push(`    const sut = ${factory?.async ? 'await ' : ''}${factory ? `${meta.className}.${factory.name}` : `new ${meta.className}`}(${names.join(', ')});`, '');
+  lines.push(
+    `    const sut = ${factory?.async ? 'await ' : ''}${factory ? `${meta.className}.${factory.name}` : `new ${meta.className}`}(${names.join(', ')});`,
+    '',
+  );
+
   return { lines, async: !!factory?.async };
+}
+
+function mockTypeReference(parameter, fallbackType, meta) {
+  const typeName = simpleTypeName(parameter.type);
+  if (!typeName) return fallbackType;
+
+  if (meta.exportedTypes.has(typeName)) return typeName;
+
+  const imported = importedType(meta.source, typeName);
+  if (!imported || !imported.specifier.startsWith('.')) return fallbackType;
+
+  const resolvedFile = resolveImportedSource(meta.sourcePath, imported.specifier);
+  if (!resolvedFile) return fallbackType;
+
+  const generatedPath = importPath(meta.destinationPath, resolvedFile);
+  const importedName =
+    imported.exportedName === typeName
+      ? typeName
+      : `${imported.exportedName} as ${typeName}`;
+
+  meta.extraImports.add(
+    imported.default
+      ? `import type ${typeName} from '${generatedPath}';`
+      : `import type { ${importedName} } from '${generatedPath}';`,
+  );
+
+  return typeName;
 }
 
 function mockName(parameterName, methodName) {
@@ -244,13 +301,23 @@ function methodArgs(method, target, meta) {
   return { lines, names };
 }
 
-function valueFor(p, typeRef, meta, depth = 0, resolving = new Set()) {
-  if (p.optional) return 'undefined';
-  const simple = primitiveValue(p.type);
+function valueFor(parameter, typeRef, meta, depth = 0, resolving = new Set()) {
+  if (parameter.optional) return 'undefined';
+
+  const simple = primitiveValue(parameter.type);
   if (simple !== null) return simple;
 
-  const typeName = simpleTypeName(p.type);
-  if (!typeName || depth >= maxGeneratedObjectDepth || resolving.has(typeName)) {
+  if (depth >= maxGeneratedObjectDepth) {
+    return fallbackValue(typeRef, depth);
+  }
+
+  const inlineProperties = inlineObjectProperties(parameter.type);
+  if (inlineProperties) {
+    return objectValue(inlineProperties, meta, depth, resolving);
+  }
+
+  const typeName = simpleTypeName(parameter.type);
+  if (!typeName || resolving.has(typeName)) {
     return fallbackValue(typeRef, depth);
   }
 
@@ -261,34 +328,62 @@ function valueFor(p, typeRef, meta, depth = 0, resolving = new Set()) {
   next.add(typeName);
 
   if (declaration.kind === 'class') {
-    if (declaration.factory?.async) return fallbackValue(typeRef, depth);
+    if (declaration.abstract || declaration.factory?.async) {
+      return fallbackValue(typeRef, depth);
+    }
+
     if (declaration.importLine) meta.extraImports.add(declaration.importLine);
 
     const parameters = declaration.factory
       ? paramsOf(declaration.factory.parameters)
       : declaration.constructorParameters;
-    const values = parameters.map((parameter) => {
+    const values = parameters.map((child) => {
       const fallback = declaration.factory
-        ? `Parameters<typeof ${declaration.name}.${declaration.factory.name}>[${parameter.index}]`
-        : `ConstructorParameters<typeof ${declaration.name}>[${parameter.index}]`;
-      return valueFor(parameter, fallback, declaration.meta, depth + 1, next);
+        ? `Parameters<typeof ${declaration.name}.${declaration.factory.name}>[${child.index}]`
+        : `ConstructorParameters<typeof ${declaration.name}>[${child.index}]`;
+
+      return valueFor(child, fallback, declaration.meta, depth + 1, next);
     });
     const create = declaration.factory
       ? `${declaration.name}.${declaration.factory.name}`
       : `new ${declaration.name}`;
+
     return `${create}(${values.join(', ')})`;
   }
 
   if (declaration.kind === 'object') {
-    const values = declaration.properties
-      .filter((property) => !property.optional)
-      .map((property) =>
-        `${property.name}: ${valueFor(property, property.type, declaration.meta, depth + 1, next)}`,
-      );
-    return values.length ? `{ ${values.join(', ')} }` : '{}';
+    return objectValue(
+      declaration.properties,
+      declaration.meta,
+      depth,
+      next,
+    );
   }
 
   return fallbackValue(typeRef, depth);
+}
+
+function objectValue(properties, meta, depth, resolving) {
+  const values = properties
+    .filter((property) => !property.optional)
+    .map(
+      (property) =>
+        `${property.name}: ${valueFor(
+          property,
+          property.type,
+          meta,
+          depth + 1,
+          resolving,
+        )}`,
+    );
+
+  return values.length ? `{ ${values.join(', ')} }` : '{}';
+}
+
+function inlineObjectProperties(typeText) {
+  const type = String(typeText || '').trim();
+  if (!type.startsWith('{') || !type.endsWith('}')) return null;
+  return objectProperties(type.slice(1, -1));
 }
 
 function fallbackValue(typeRef, depth) {
@@ -373,9 +468,14 @@ function resolveSimpleDeclaration(typeName, meta) {
   filePath = resolvedFile;
   localName = imported.exportedName;
   const generatedPath = importPath(meta.destinationPath, filePath);
+  const importedName =
+    imported.exportedName === typeName
+      ? typeName
+      : `${imported.exportedName} as ${typeName}`;
+
   importLine = imported.default
     ? `import ${typeName} from '${generatedPath}';`
-    : `import { ${typeName} } from '${generatedPath}';`;
+    : `import { ${importedName} } from '${generatedPath}';`;
 
   const childMeta = { ...meta, source, sourcePath: filePath };
   declaration = declarationFromSource(source, localName, filePath, childMeta, importLine);
@@ -410,6 +510,7 @@ function analyzeNamedClass(source, typeName) {
   const close = open < 0 ? -1 : matching(source, open, '{', '}');
   if (close < 0) return null;
   const body = source.slice(open + 1, close);
+  const abstract = /\babstract\s+class\b/.test(match[0]);
   const members = membersOf(body);
   const ctor = members.find((member) => member.name === 'constructor');
   const constructorParameters = paramsOf(ctor?.parameters || '');
@@ -419,28 +520,93 @@ function analyzeNamedClass(source, typeName) {
     ? methods.find((member) => member.modifiers.has('static') && factories.has(member.name))
     : null;
   if (privateCtor && !factory) return null;
-  return { body, constructorParameters, factory };
+  return { body, constructorParameters, factory, abstract };
 }
 
 function analyzeObjectType(source, typeName) {
   const escaped = typeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const interfacePattern = new RegExp(`\\b(?:export\\s+)?interface\\s+${escaped}(?:\\s+extends[^\\{]+)?\\s*\\{`);
-  const aliasPattern = new RegExp(`\\b(?:export\\s+)?type\\s+${escaped}\\s*=\\s*\\{`);
+  const interfacePattern = new RegExp(
+    `\\b(?:export\\s+)?interface\\s+${escaped}(?:\\s+extends[^\\{]+)?\\s*\\{`,
+  );
+  const aliasPattern = new RegExp(
+    `\\b(?:export\\s+)?type\\s+${escaped}\\s*=\\s*\\{`,
+  );
   const match = interfacePattern.exec(source) || aliasPattern.exec(source);
   if (!match) return null;
+
   const open = source.indexOf('{', match.index);
   const close = matching(source, open, '{', '}');
   if (close < 0) return null;
+
   const body = source.slice(open + 1, close);
+  return { body, properties: objectProperties(body) };
+}
+
+function objectProperties(body) {
   const properties = [];
-  const pattern = /\b([A-Za-z_$][\w$]*)(\?)?\s*:\s*([^;\n]+)[;]?/g;
-  let property;
-  while ((property = pattern.exec(body))) {
-    const type = property[3].trim().replace(/,$/, '').trim();
-    if (type.includes('=>')) continue;
-    properties.push({ name: property[1], type, optional: !!property[2], index: properties.length });
+
+  for (const member of splitObjectMembers(body)) {
+    const value = member.trim();
+    if (!value) continue;
+
+    const colon = topLevel(value, ':');
+    if (colon < 0) continue;
+
+    const left = value.slice(0, colon).trim();
+    const type = value.slice(colon + 1).trim();
+    const match = left.match(/^([A-Za-z_$][\w$]*)(\?)?$/);
+
+    if (!match || !type || type.includes('=>')) continue;
+
+    properties.push({
+      name: match[1],
+      type,
+      optional: !!match[2],
+      index: properties.length,
+    });
   }
-  return { body, properties };
+
+  return properties;
+}
+
+function splitObjectMembers(source) {
+  const parts = [];
+  let start = 0;
+  let round = 0;
+  let square = 0;
+  let curly = 0;
+  let angle = 0;
+
+  for (let i = 0; i < source.length; i += 1) {
+    const skipped = skip(source, i);
+    if (skipped !== i) {
+      i = skipped - 1;
+      continue;
+    }
+
+    const char = source[i];
+    if (char === '(') round += 1;
+    else if (char === ')') round -= 1;
+    else if (char === '[') square += 1;
+    else if (char === ']') square -= 1;
+    else if (char === '{') curly += 1;
+    else if (char === '}') curly -= 1;
+    else if (char === '<') angle += 1;
+    else if (char === '>') angle -= 1;
+    else if (
+      (char === ';' || char === ',' || char === '\n') &&
+      !round &&
+      !square &&
+      !curly &&
+      !angle
+    ) {
+      parts.push(source.slice(start, i));
+      start = i + 1;
+    }
+  }
+
+  parts.push(source.slice(start));
+  return parts;
 }
 
 function importedType(source, localName) {

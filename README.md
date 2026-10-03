@@ -33,15 +33,13 @@ npm run dev
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Builds and runs the app |
-| `npm run dev -- --watch` | Rebuilds and restarts on changes |
-| `npm test` | Runs tests |
-| `npm test -- --watch` | Re-runs tests on changes |
-| `npm test -- create-user` | Generates a starter test for a class |
-| `npm run type` | Checks types |
+| `npm run dev [-- --watch]` | Builds and runs the app |
+| `npm test [-- --watch]` | Runs tests |
+| `npm test -- <file>` | Generates a test for a class |
+| `npm run type [-- --watch]` | Checks types |
 | `npm run build` | Creates the production bundle |
 | `npm start` | Runs the bundle |
-| `npm run w -- product` | Finds and opens a file |
+| `npm run w -- <file>` | Finds and opens a file |
 | `npm run di` | Installs optional DI |
 
 ## Tests

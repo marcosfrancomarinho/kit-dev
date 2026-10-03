@@ -190,13 +190,18 @@ export class CreateUser {
 
   assert.ok(
     generated.includes(
-      'const repository = { save: () => undefined } as unknown as ConstructorParameters<typeof CreateUser>[0];',
+      "import type { UserRepository } from '../../src/application/create-user.js';",
+    ),
+  );
+  assert.ok(
+    generated.includes(
+      'const repository = { save: mock.fn(() => undefined) } as unknown as UserRepository;',
     ),
   );
   assert.match(generated, /const name = 'value';/);
   assert.ok(generated.includes('const result = await sut.execute(name);'));
   assert.match(generated, /TODO: add the expected assertion/);
-  assert.equal(generated.includes('mock.fn'), false);
+  assert.equal(generated.includes('mock.fn'), true);
   assert.equal(generated.includes('typescript6'), false);
 });
 

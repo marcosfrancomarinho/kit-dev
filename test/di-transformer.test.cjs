@@ -298,7 +298,7 @@ test('executa o modo dev com esbuild antes da DI', async (context) => {
   ]);
 
   const devBundle = await readFile(
-    join(buildPath, '.cache', 'dev-bundle.cjs'),
+    join(projectPath, 'kit-dev', '.cache', 'dev', 'dev-bundle.cjs'),
     'utf-8',
   );
   const sourceMapMatch = devBundle.match(

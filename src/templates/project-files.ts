@@ -178,7 +178,8 @@ export class ProjectTemplateCatalog {
       '.idea/',
       '.DS_Store',
       '*.tsbuildinfo',
-      'kit-dev/.cache/',
+      'kit-dev/build/.cache/',
+      'kit-dev/test/.cache/',
       '',
     ].join('\n');
   }

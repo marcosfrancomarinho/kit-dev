@@ -54,11 +54,6 @@
     "dependency-inversion",
     "repository-pattern",
     "clean-code",
-    "formatter",
-    "code-formatter",
-    "source-formatter",
-    "minified-code",
-    "code-formatting",
     "developer-tools",
     "dev-tools",
     "zero-config",
@@ -93,9 +88,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@typescript/typescript6": "6.0.2",
     "esbuild": "^0.28.2",
-    "prettier": "3.9.9",
     "typescript": "7.0.2"
   },
   "files": [

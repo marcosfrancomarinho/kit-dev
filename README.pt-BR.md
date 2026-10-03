@@ -59,6 +59,13 @@ cd minha-api
 npm run dev | yarn dev | pnpm dev
 ```
 
+## Outras funcionalidades
+
+- modo `--watch` para desenvolvimento, testes e verificação de tipos;
+- geração de testes a partir de classes;
+- abertura rápida de arquivos pelo terminal;
+- build de produção;
+- injeção de dependência opcional.
 ## Comandos
 
 | Comando | Faz o quê |

@@ -5,7 +5,7 @@
 
 <h1 align="center">🚀 Kit Dev</h1>
 
-<p align="center">Crie rápido um projeto TypeScript minimalista, pronto para programar, sem framework ou arquitetura obrigatória.</p>
+<p align="center">Crie rápido um projeto TypeScript minimalista e pronto para programar.</p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/create-kit-dev"><img src="https://img.shields.io/npm/v/create-kit-dev?style=flat-square&color=CB3837&logo=npm" alt="versão npm"></a>
@@ -15,127 +15,65 @@
 
 ---
 
-## O que é o Kit Dev?
+## O que é?
 
-O **Kit Dev** cria rapidamente um projeto Node.js + TypeScript minimalista e pronto para programar.
+O **Kit Dev** cria a base de um projeto Node.js + TypeScript com o essencial já pronto.
 
-A proposta é começar com o essencial e sem impor framework ou arquitetura. Desenvolvimento, build, verificação de tipos, testes, geração de testes, abertura de arquivos pelo terminal e DI opcional já ficam preparados.
+Sem framework obrigatório, sem arquitetura imposta e sem configuração desnecessária.
 
 ## Começando
 
-Crie o projeto com npm:
-
 ```bash
 npx create-kit-dev
-```
-
-Informe o nome do projeto e depois:
-
-```bash
 cd minha-api
 npm run dev
 ```
 
-## Comandos principais
+## Comandos
 
-| Comando | O que faz |
+| Comando | Faz o quê |
 |---|---|
-| `dev [--watch]` | Faz o build e executa uma vez ou mantém a aplicação ativa em modo watch |
-| `test [--watch]` | Executa os testes uma vez ou mantém ativos em modo watch |
-| `test <arquivo>` | Gera ou atualiza o teste de uma classe |
-| `write [arquivo]` / `w [arquivo]` | Localiza um arquivo do projeto e abre no editor do terminal |
-| `build` | Verifica os tipos e gera o bundle de produção |
-| `start` | Executa o bundle gerado |
-| `type [--watch]` | Verifica os tipos uma vez ou mantém a checagem em modo watch |
-| `di` | Instala a injeção de dependência opcional |
+| `npm run dev` | Gera e executa a aplicação |
+| `npm run dev -- --watch` | Atualiza e reinicia ao salvar |
+| `npm test` | Executa os testes |
+| `npm test -- --watch` | Reexecuta os testes ao salvar |
+| `npm test -- create-user` | Gera a base de teste de uma classe |
+| `npm run type` | Verifica os tipos |
+| `npm run build` | Gera o bundle de produção |
+| `npm start` | Executa o bundle |
+| `npm run w -- product` | Procura e abre um arquivo |
+| `npm run di` | Instala a DI opcional |
 
-Exemplos com npm:
+## Testes gerados
+
+O Kit Dev cria um teste por método público e deixa a assertion como `TODO`.
+
+Ele tenta gerar valores simples, DTOs, entidades, Value Objects e mocks básicos. Quando não consegue inferir um tipo com segurança, usa um fallback tipado.
+
+## Abrir arquivos
+
+`write` / `w` procura arquivos e abre no **Micro**, um editor leve de terminal.
 
 ```bash
-npm run dev [--watch]
-npm test [--watch]
-npm test -- create-user
 npm run w -- product
-npm run type [--watch]
+npm run w -- src/domain/product.ts
+```
+
+Se o Micro não estiver instalado, o Kit Dev baixa o binário adequado e reutiliza o cache depois.
+
+## Build
+
+```bash
 npm run build
 npm start
 ```
 
-
-## Escrever e editar arquivos
-
-O Kit Dev pode localizar e abrir arquivos do projeto diretamente no **Micro, um editor de código leve que funciona dentro do terminal**:
-
-```bash
-npm run w -- product
-```
-
-Também é possível usar o comando completo ou informar o caminho exato:
-
-```bash
-npm run write -- product.ts
-npm run w -- src/domain/entities/product.ts
-```
-
-Se apenas um arquivo corresponder, ele é aberto diretamente. Se houver vários, o Kit Dev mostra um seletor interativo. O arquivo selecionado é aberto sem alterações automáticas.
-
-O Micro não é incluído dentro do pacote npm. O Kit Dev primeiro procura o comando `micro` já instalado no sistema; se não encontrar, baixa automaticamente o binário oficial correspondente ao sistema operacional e à arquitetura, valida o download e guarda em cache na pasta do usuário:
-
-```text
-Linux/macOS: ~/.kit-dev/bin/micro
-Windows:     %USERPROFILE%\.kit-dev\bin\micro.exe
-```
-
-O mesmo editor em cache é reutilizado por todos os projetos Kit Dev da máquina.
-
-Atalhos úteis:
-
-```text
-Ctrl+S  Salvar
-Ctrl+Q  Sair
-Ctrl+F  Buscar
-Ctrl+B  Terminal / modo shell
-Ctrl+E  Comando / Ajuda
-```
-
-Para consultar os atalhos padrão do editor, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do write está disponível com `npm run w -- --help`.
-
-## Testes automáticos
-
-Por padrão, os testes rodam uma vez. Use `--watch` quando quiser acompanhar alterações.
-
-```bash
-npm test
-npm test -- --watch
-npm test -- create-user
-```
-
-Ao gerar um teste, o Kit Dev cria um bloco por método público e deixa a assertion como `TODO`. Ele tenta criar valores úteis para tipos simples, DTOs, entidades e Value Objects com construtor público ou factories `create`, `from`, `of`, `build` e `make`.
-
-Dependências usadas pela classe recebem mocks nativos de `node:test`. Quando o retorno é simples, o gerador também cria um valor coerente, como `true`, `1`, `'value'`, `[]` ou `Promise` equivalente. Tipos complexos continuam usando um fallback tipado em vez de serem adivinhados.
-
-## Build de produção
-
-Execute:
-
-```bash
-npm run build
-```
-
-O build verifica o projeto e gera:
+O build gera:
 
 ```text
 dist/bundle.cjs
 dist/bundle.cjs.map
 ```
-
-Depois, execute a aplicação com:
-
-```bash
-npm start
-```
-
-O bundle é otimizado, mas continua legível.
 
 ## Injeção de dependência opcional
 

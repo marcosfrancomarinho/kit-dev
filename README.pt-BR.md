@@ -44,11 +44,16 @@ npm run dev
 
 ## Testes
 
-Rode os testes, use watch ou gere um teste de uma classe.
+### Executar testes
 
 ```bash
 npm test
 npm test -- --watch
+```
+
+### Criar teste
+
+```bash
 npm test -- create-user
 npm test -- src/application/create-user.ts
 ```

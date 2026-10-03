@@ -188,9 +188,10 @@ export class CreateUser {
     'utf-8',
   );
 
-  assert.match(
-    generated,
-    /const repository = \\{ save: \\(\\) => undefined \\} as unknown as ConstructorParameters<typeof CreateUser>\\[0\\];/,
+  assert.ok(
+    generated.includes(
+      'const repository = { save: () => undefined } as unknown as ConstructorParameters<typeof CreateUser>[0];',
+    ),
   );
   assert.match(generated, /const name = 'value';/);
   assert.match(generated, /const result = await sut\\.execute\\(name\\);/);

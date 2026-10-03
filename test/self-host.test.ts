@@ -99,25 +99,6 @@ describe('self-hosted architecture', () => {
       /requires Node\.js 22 or newer/,
     );
   });
-  it('shows fmt in the final command list', () => {
-    const terminal = new TerminalAdapter(new TerminalPalette());
-    const messages: string[] = [];
-    const originalLog = console.log;
-
-    console.log = (message?: unknown) => {
-      messages.push(String(message ?? ''));
-    };
-
-    try {
-      terminal.showFinalInstructions('api', 'npm run');
-    } finally {
-      console.log = originalLog;
-    }
-
-    assert.match(messages.join('\n'), /npm run fmt/);
-    assert.match(messages.join('\n'), /Format src\/ and test\/ code/);
-  });
-
   it('shows watch-capable commands once in a compact form', () => {
     const terminal = new TerminalAdapter(new TerminalPalette());
     const messages: string[] = [];
@@ -182,10 +163,7 @@ describe('self-hosted architecture', () => {
       packageJson.scripts.w,
       packageJson.scripts.write,
     );
-    assert.equal(
-      packageJson.scripts.fmt,
-      'node kit-dev/format/fmt.cjs',
-    );
+    assert.equal(packageJson.scripts.fmt, undefined);
     assert.equal(
       packageJson.scripts.type,
       'node kit-dev/build/type.cjs',

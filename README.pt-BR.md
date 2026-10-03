@@ -70,7 +70,7 @@ pnpm dev
 | `test [--watch]` | Executa os testes uma vez ou mantém ativos em modo watch |
 | `test <arquivo>` | Gera ou atualiza o teste de uma classe |
 | `fmt [arquivo]` | Formata `src/` e `test/` por completo ou somente um arquivo informado |
-| `write [arquivo]` / `w [arquivo]` | Localiza um arquivo do projeto, formata código suportado e abre no editor do terminal |
+| `write [arquivo]` / `w [arquivo]` | Localiza um arquivo do projeto e abre no editor do terminal |
 | `build` | Verifica os tipos e gera o bundle de produção |
 | `start` | Executa o bundle gerado |
 | `type [--watch]` | Verifica os tipos uma vez ou mantém a checagem em modo watch |
@@ -120,7 +120,7 @@ yarn write product.ts
 yarn w src/domain/entities/product.ts
 ```
 
-Se apenas um arquivo corresponder, ele é aberto diretamente. Se houver vários, o Kit Dev mostra um seletor interativo. Arquivos JavaScript e TypeScript dentro de `src/` ou `test/` passam pelo `fmt` antes de abrir.
+Se apenas um arquivo corresponder, ele é aberto diretamente. Se houver vários, o Kit Dev mostra um seletor interativo. O arquivo selecionado é aberto sem alterações automáticas.
 
 O Micro não é incluído dentro do pacote npm. O Kit Dev primeiro procura o comando `micro` já instalado no sistema; se não encontrar, baixa automaticamente o binário oficial correspondente ao sistema operacional e à arquitetura, valida o download e guarda em cache na pasta do usuário:
 
@@ -165,7 +165,7 @@ ou:
 npm test -- src/application/create-user.ts
 ```
 
-O Kit Dev analisa a classe, as dependências do construtor e os métodos públicos para criar uma boa base de teste. Quando não consegue inferir com segurança uma regra de negócio, deixa um `TODO` em vez de inventar uma assertion.
+O Kit Dev analisa a classe, as dependências do construtor e os métodos públicos para criar uma boa base de teste. Os mocks de dependências usam diretamente os tipos exportados do projeto quando eles podem ser importados com segurança; caso contrário, o Kit Dev usa tipos utilitários do TypeScript, como `ConstructorParameters<>`, como fallback. Quando não consegue inferir com segurança uma regra de negócio, deixa um `TODO` em vez de inventar uma assertion.
 
 Um teste já gerado pode ser criado novamente quando a classe mudar.
 

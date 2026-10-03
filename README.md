@@ -33,10 +33,10 @@ npm run dev
 
 | Command | What it does |
 |---|---|
-| `npm run dev [-- --watch]` | Builds and runs the app |
-| `npm test [-- --watch]` | Runs tests |
+| `npm run dev [-- --watch]` | Builds and runs the app; `--watch` rebuilds and restarts on save |
+| `npm test [-- --watch]` | Runs tests; `--watch` reruns them on save |
 | `npm test -- <file>` | Generates a test for a class |
-| `npm run type [-- --watch]` | Checks types |
+| `npm run type [-- --watch]` | Checks types; `--watch` checks again on save |
 | `npm run build` | Creates the production bundle |
 | `npm start` | Runs the bundle |
 | `npm run w -- <file>` | Finds and opens a file |

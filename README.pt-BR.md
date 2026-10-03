@@ -17,11 +17,9 @@
 
 ## O que é o Kit Dev?
 
-O **Kit Dev** é uma CLI minimalista para criar projetos TypeScript com a configuração essencial já pronta.
+O **Kit Dev** cria um projeto Node.js + TypeScript pronto para programar.
 
-Ela inclui ambiente de desenvolvimento, build, verificação de tipos, testes nativos, geração simples de testes, edição de arquivos pelo terminal e injeção de dependência opcional.
-
-A proposta é reduzir configuração inicial e deixar você começar a programar mais rápido, sem impor framework ou arquitetura.
+Ele prepara desenvolvimento, build, verificação de tipos, testes, geração de testes, abertura de arquivos pelo terminal e DI opcional. A ideia é ser simples e rápido, sem impor framework, arquitetura, formatter ou lint.
 
 ## Começando
 

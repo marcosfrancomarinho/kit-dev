@@ -29,11 +29,14 @@ yarn create kit-dev
 pnpm create kit-dev
 ```
 
-Depois:
+Depois, entre na pasta e inicie a aplicação com o gerenciador que preferir:
 
 ```bash
 cd minha-api
+
 npm run dev
+yarn dev
+pnpm dev
 ```
 
 Os exemplos abaixo usam npm, mas Yarn e pnpm também funcionam.

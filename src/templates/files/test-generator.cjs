@@ -140,6 +140,7 @@ function createFixtureContext(rootSourcePath) {
   return {
     rootSourcePath: resolve(rootSourcePath),
     imports: new Map(),
+    typeImports: new Map(),
     classPlanCache: new Map(),
     requiresAsync: false,
   };
@@ -159,6 +160,20 @@ function registerFixtureImport(context, name, sourcePath) {
   names.add(name);
 }
 
+function registerFixtureTypeImport(context, name, sourcePath) {
+  if (!context || !name || !sourcePath) return;
+
+  const normalizedPath = resolve(sourcePath);
+  let names = context.typeImports.get(normalizedPath);
+
+  if (!names) {
+    names = new Set();
+    context.typeImports.set(normalizedPath, names);
+  }
+
+  names.add(name);
+}
+
 function renderFixtureImports(
   context,
   destinationPath,
@@ -169,23 +184,40 @@ function renderFixtureImports(
 
   const rootPath = resolve(rootSourcePath);
   const lines = [];
+  const sourcePaths = new Set([
+    ...context.imports.keys(),
+    ...context.typeImports.keys(),
+  ]);
 
-  for (const [sourcePath, names] of context.imports) {
-    const filtered = [...names]
+  for (const sourcePath of sourcePaths) {
+    const valueNames = context.imports.get(sourcePath) || new Set();
+    const typeNames = context.typeImports.get(sourcePath) || new Set();
+    const filteredValues = [...valueNames]
       .filter(
         (name) =>
           !(sourcePath === rootPath && name === rootClassName),
       )
       .sort();
+    const filteredTypes = [...typeNames]
+      .filter(
+        (name) =>
+          !(sourcePath === rootPath && name === rootClassName) &&
+          !valueNames.has(name),
+      )
+      .sort();
+    const importPath = getImportPath(destinationPath, sourcePath);
 
-    if (filtered.length === 0) continue;
+    if (filteredValues.length > 0) {
+      lines.push(
+        `import { ${filteredValues.join(', ')} } from '${importPath}'`,
+      );
+    }
 
-    lines.push(
-      `import { ${filtered.join(', ')} } from '${getImportPath(
-        destinationPath,
-        sourcePath,
-      )}'`,
-    );
+    if (filteredTypes.length > 0) {
+      lines.push(
+        `import type { ${filteredTypes.join(', ')} } from '${importPath}'`,
+      );
+    }
   }
 
   return lines;
@@ -529,6 +561,17 @@ function analyzeParameters(
             fixture,
           );
 
+      const directType =
+        kind === 'dependency'
+          ? resolveDirectDependencyType(
+              ts,
+              checker,
+              parameter,
+              sourceFile,
+              fixtureContext,
+            )
+          : null;
+
       return {
         index,
         name,
@@ -538,6 +581,7 @@ function analyzeParameters(
           : checker.typeToString(
               checker.getTypeAtLocation(parameter),
             ),
+        directType,
         optional,
         kind,
         fixture:
@@ -547,6 +591,73 @@ function analyzeParameters(
         collectionBehavior,
       };
     });
+}
+
+function resolveDirectDependencyType(
+  ts,
+  checker,
+  parameter,
+  sourceFile,
+  fixtureContext,
+) {
+  const typeNode = parameter.type;
+
+  if (
+    !typeNode ||
+    !ts.isTypeReferenceNode(typeNode) ||
+    !ts.isIdentifier(typeNode.typeName) ||
+    (typeNode.typeArguments && typeNode.typeArguments.length > 0)
+  ) {
+    return null;
+  }
+
+  try {
+    let symbol = checker.getSymbolAtLocation(typeNode.typeName);
+
+    if (
+      symbol &&
+      symbol.flags & ts.SymbolFlags.Alias &&
+      checker.getAliasedSymbol
+    ) {
+      symbol = checker.getAliasedSymbol(symbol);
+    }
+
+    const declaration = symbol?.declarations?.find(
+      (item) =>
+        ts.isInterfaceDeclaration(item) ||
+        ts.isTypeAliasDeclaration(item) ||
+        ts.isClassDeclaration(item) ||
+        ts.isEnumDeclaration(item),
+    );
+
+    if (!declaration) return null;
+
+    const declarationSource = declaration.getSourceFile();
+    const declarationPath = declarationSource.fileName;
+
+    if (
+      declarationSource.isDeclarationFile ||
+      declarationPath.includes(sep + 'node_modules' + sep)
+    ) {
+      return null;
+    }
+
+    const exported = declaration.modifiers?.some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+    );
+
+    if (!exported) return null;
+
+    registerFixtureTypeImport(
+      fixtureContext,
+      typeNode.typeName.text,
+      declarationPath,
+    );
+
+    return typeNode.getText(sourceFile);
+  } catch {
+    return null;
+  }
 }
 
 function analyzeBehaviorCollection(
@@ -3470,6 +3581,7 @@ function renderCreationSetup(
             className,
             creation,
             parameter.index,
+            parameter.directType,
           )} = ${fixture}`,
         );
       }
@@ -3488,6 +3600,7 @@ function renderCreationSetup(
             className,
             creation,
             parameter.index,
+            parameter.directType,
           )} = []`,
         );
         continue;
@@ -3524,6 +3637,7 @@ function renderCreationSetup(
           className,
           creation,
           parameter.index,
+          parameter.directType,
         )} = ${collectionFixture}`,
       );
       continue;
@@ -3535,6 +3649,7 @@ function renderCreationSetup(
           className,
           creation,
           parameter.index,
+          parameter.directType,
         )} /* TODO: provide ${parameter.name} */`,
       );
       continue;
@@ -3633,7 +3748,10 @@ function creationParameterType(
   className,
   creation,
   index,
+  directType = null,
 ) {
+  if (directType) return directType;
+
   if (creation.kind === 'factory') {
     return (
       'Parameters<typeof ' +

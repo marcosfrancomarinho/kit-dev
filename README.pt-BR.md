@@ -33,10 +33,10 @@ npm run dev
 
 | Comando | Faz o quê |
 |---|---|
-| `npm run dev [-- --watch]` | Gera e executa a aplicação |
-| `npm test [-- --watch]` | Executa os testes |
+| `npm run dev [-- --watch]` | Gera e executa a aplicação; `--watch` atualiza e reinicia ao salvar |
+| `npm test [-- --watch]` | Executa os testes; `--watch` reexecuta ao salvar |
 | `npm test -- <arquivo>` | Gera o teste de uma classe |
-| `npm run type [-- --watch]` | Verifica os tipos |
+| `npm run type [-- --watch]` | Verifica os tipos; `--watch` verifica novamente ao salvar |
 | `npm run build` | Gera o bundle de produção |
 | `npm start` | Executa o bundle |
 | `npm run w -- <arquivo>` | Procura e abre um arquivo |

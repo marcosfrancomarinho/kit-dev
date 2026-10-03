@@ -45,7 +45,24 @@ Then:
 
 ```bash
 cd my-api
+```
+
+npm:
+
+```bash
 npm run dev
+```
+
+Yarn:
+
+```bash
+yarn dev
+```
+
+pnpm:
+
+```bash
+pnpm dev
 ```
 
 The examples below use npm, but Yarn and pnpm work too.

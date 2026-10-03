@@ -62,6 +62,11 @@ async function findLegacyTests() {
   ).sort();
 }
 
+async function clearCompiledTests() {
+  const files = await findCompiledTests();
+  await Promise.all(files.map((file) => rm(file, { force: true })));
+}
+
 function stopTestProcess() {
   if (
     testProcess &&
@@ -126,8 +131,8 @@ function reportBuildErrors(errors) {
 }
 
 async function createTestContext(files) {
-  await rm(cacheRoot, { recursive: true, force: true });
   await mkdir(cacheRoot, { recursive: true });
+  await clearCompiledTests();
 
   return context({
     absWorkingDir: projectRoot,
@@ -182,7 +187,7 @@ async function refreshContext(force = false) {
   }
 
   if (files.length === 0) {
-    await rm(cacheRoot, { recursive: true, force: true });
+    await clearCompiledTests();
     console.log('🧪 No test files found.');
 
     if (watchMode) {

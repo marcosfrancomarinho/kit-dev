@@ -137,7 +137,7 @@ test('gera teste automaticamente quando recebe um alvo', async (context) => {
     writeFile(
       join(projectPath, 'src', 'application', 'create-user.ts'),
       `
-interface UserRepository {
+export interface UserRepository {
   save(name: string): Promise<void>
 }
 
@@ -190,7 +190,15 @@ export class CreateUser {
 
   assert.match(
     generated,
-    /const repository: ConstructorParameters<typeof CreateUser>\[0\] = \{/,
+    /import type \{ UserRepository \} from '..\/..\/src\/application\/create-user\.js'/,
+  );
+  assert.match(
+    generated,
+    /const repository: UserRepository = \{/,
+  );
+  assert.doesNotMatch(
+    generated,
+    /const repository: ConstructorParameters<typeof CreateUser>\[0\]/,
   );
   assert.match(
     generated,

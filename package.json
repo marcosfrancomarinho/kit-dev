@@ -205,7 +205,16 @@
     "lightweight-node",
     "lightweight-tooling",
     "small-project",
-    "small-backend"
+    "small-backend",
+    "minimal-dev-tool",
+    "quick-typescript-start",
+    "quick-node-start",
+    "typescript-bootstrap",
+    "node-bootstrap",
+    "project-bootstrap-tool",
+    "fast-typescript-starter",
+    "fast-node-starter",
+    "lightweight-project-generator"
   ],
   "engines": {
     "node": ">=22"

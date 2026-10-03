@@ -59,6 +59,13 @@ cd my-api
 npm run dev | yarn dev | pnpm dev
 ```
 
+## Other features
+
+- `--watch` mode for development, tests, and type checking;
+- test generation from classes;
+- quick file opening from the terminal;
+- production build;
+- optional dependency injection.
 ## Commands
 
 | Command | What it does |

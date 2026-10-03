@@ -251,17 +251,17 @@ function valueFor(p, typeRef, meta, depth = 0, resolving = new Set()) {
 
   const typeName = simpleTypeName(p.type);
   if (!typeName || depth >= maxGeneratedObjectDepth || resolving.has(typeName)) {
-    return `undefined as unknown as ${typeRef}`;
+    return fallbackValue(typeRef, depth);
   }
 
   const declaration = resolveSimpleDeclaration(typeName, meta);
-  if (!declaration) return `undefined as unknown as ${typeRef}`;
+  if (!declaration) return fallbackValue(typeRef, depth);
 
   const next = new Set(resolving);
   next.add(typeName);
 
   if (declaration.kind === 'class') {
-    if (declaration.factory?.async) return `undefined as unknown as ${typeRef}`;
+    if (declaration.factory?.async) return fallbackValue(typeRef, depth);
     if (declaration.importLine) meta.extraImports.add(declaration.importLine);
 
     const parameters = declaration.factory
@@ -288,7 +288,13 @@ function valueFor(p, typeRef, meta, depth = 0, resolving = new Set()) {
     return values.length ? `{ ${values.join(', ')} }` : '{}';
   }
 
-  return `undefined as unknown as ${typeRef}`;
+  return fallbackValue(typeRef, depth);
+}
+
+function fallbackValue(typeRef, depth) {
+  return depth > 0
+    ? 'undefined as never'
+    : `undefined as unknown as ${typeRef}`;
 }
 
 function primitiveValue(typeText) {

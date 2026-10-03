@@ -326,4 +326,4 @@ function skip(source, index) {
   return source.length;
 }
 
-module.exports = { analyzeClass, generateTest, resolveSourceFile };
+module.exports = { generateTest };

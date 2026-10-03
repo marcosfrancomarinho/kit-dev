@@ -171,15 +171,41 @@ function subject(meta) {
   const factory = meta.factory;
   const parameters = factory ? paramsOf(factory.parameters) : meta.constructorParameters;
   const lines = [], names = [];
-  parameters.forEach((p) => {
+  const setups = parameters.map((p) => {
     const fallbackType = factory ? `Parameters<typeof ${meta.className}.${factory.name}>[${p.index}]` : `ConstructorParameters<typeof ${meta.className}>[${p.index}]`;
     const type = directTypeName(p, meta) || fallbackType;
-    lines.push(`    const ${p.name} = ${valueFor(p, type, meta.dependencyMethods.get(p.name))};`);
-    names.push(p.name);
+    const methods = meta.dependencyMethods.get(p.name) || [];
+    return { parameter: p, type, methods };
   });
+
+  for (const setup of setups) {
+    for (const method of setup.methods) {
+      lines.push(`    const ${mockName(setup.parameter.name, method)} = mock.fn(() => undefined);`);
+    }
+  }
+
+  if (setups.some((setup) => setup.methods.length)) lines.push('');
+
+  for (const setup of setups) {
+    const p = setup.parameter;
+    if (setup.methods.length) {
+      const properties = setup.methods
+        .map((method) => `${method}: ${mockName(p.name, method)}`)
+        .join(', ');
+      lines.push(`    const ${p.name} = { ${properties} } as unknown as ${setup.type};`);
+    } else {
+      lines.push(`    const ${p.name} = ${valueFor(p, setup.type)};`);
+    }
+    names.push(p.name);
+  }
+
   if (parameters.length) lines.push('');
   lines.push(`    const sut = ${factory?.async ? 'await ' : ''}${factory ? `${meta.className}.${factory.name}` : `new ${meta.className}`}(${names.join(', ')});`, '');
   return { lines, async: !!factory?.async };
+}
+
+function mockName(parameterName, methodName) {
+  return parameterName + methodName[0].toUpperCase() + methodName.slice(1) + 'Mock';
 }
 
 function methodArgs(method, target) {
@@ -205,7 +231,6 @@ function valueFor(p, typeRef, methods = []) {
   if (type === 'unknown' || type === 'any') return 'undefined';
   if (/\bnull\b/.test(type)) return 'null';
   if (/\[\]$/.test(type) || /^(?:Readonly)?Array\s*</.test(type)) return '[]';
-  if (methods.length) return `{ ${methods.map((name) => `${name}: mock.fn(() => undefined)`).join(', ')} } as unknown as ${typeRef}`;
   return `undefined as unknown as ${typeRef}`;
 }
 

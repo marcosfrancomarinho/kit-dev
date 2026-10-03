@@ -23,6 +23,8 @@ Sem framework obrigatório, sem arquitetura imposta e sem configuração desnece
 
 ## Começando
 
+Os exemplos usam npm, mas Yarn e pnpm também funcionam.
+
 ```bash
 npx create-kit-dev
 cd minha-api

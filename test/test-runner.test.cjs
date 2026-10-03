@@ -195,7 +195,12 @@ export class CreateUser {
   );
   assert.ok(
     generated.includes(
-      'const repository = { save: mock.fn(() => undefined) } as unknown as UserRepository;',
+      'const repositorySaveMock = mock.fn(() => undefined);',
+    ),
+  );
+  assert.ok(
+    generated.includes(
+      'const repository = { save: repositorySaveMock } as unknown as UserRepository;',
     ),
   );
   assert.match(generated, /const name = 'value';/);

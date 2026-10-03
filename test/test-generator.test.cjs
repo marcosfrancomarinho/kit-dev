@@ -85,7 +85,11 @@ export class CreateUser {
   );
   assert.match(
     generated,
-    /const repository = \{ save: mock\.fn\(\(\) => undefined\) \} as unknown as UserRepository;/,
+    /const repositorySaveMock = mock\.fn\(\(\) => undefined\);/,
+  );
+  assert.match(
+    generated,
+    /const repository = \{ save: repositorySaveMock \} as unknown as UserRepository;/,
   );
   assert.match(generated, /const name = 'value';/);
   assert.match(generated, /const result = await sut\.execute\(name\);/);

@@ -35,6 +35,7 @@ function analyzeClass(source) {
   const close = matching(source, open, '{', '}');
   if (close < 0) return null;
   const body = source.slice(open + 1, close);
+  const exportedTypes = exportedTypeNames(source);
   const members = membersOf(body);
   const ctor = members.find((m) => m.name === 'constructor');
   const constructorParameters = paramsOf(ctor?.parameters || '');
@@ -48,12 +49,42 @@ function analyzeClass(source) {
 
   return {
     className: chosen.className,
+    exportedTypes,
     abstract: chosen.abstract,
     constructorParameters,
     dependencyMethods,
     factory,
     methods: methods.filter((m) => m !== factory),
   };
+}
+
+
+function exportedTypeNames(source) {
+  const names = new Set();
+  const pattern = /\bexport\s+(?:default\s+)?(?:(?:abstract\s+)?class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g;
+  let match;
+  while ((match = pattern.exec(source))) names.add(match[1]);
+  return names;
+}
+
+function directTypeName(parameter, meta) {
+  const type = parameter.type.trim();
+  return /^[A-Za-z_$][\w$]*$/.test(type) &&
+    type !== meta.className &&
+    meta.exportedTypes.has(type)
+    ? type
+    : null;
+}
+
+function directTypeImports(meta) {
+  const parameters = meta.factory
+    ? paramsOf(meta.factory.parameters)
+    : meta.constructorParameters;
+  return [...new Set(
+    parameters
+      .map((parameter) => directTypeName(parameter, meta))
+      .filter(Boolean),
+  )].sort();
 }
 
 function membersOf(body) {
@@ -99,13 +130,19 @@ function paramsOf(text) {
 }
 
 function render(meta) {
+  const typeImports = directTypeImports(meta);
   const out = [
-    "import { describe, it } from 'node:test';",
+    "import { describe, it, mock } from 'node:test';",
     '',
     `import { ${meta.className} } from '${meta.importPath}';`,
+  ];
+  if (typeImports.length) {
+    out.push(`import type { ${typeImports.join(', ')} } from '${meta.importPath}';`);
+  }
+  out.push(
     '',
     `describe('${meta.className}', () => {`,
-  ];
+  );
   const methods = meta.methods.length ? meta.methods : [{ name: 'create', modifiers: new Set(), async: false, parameters: '', synthetic: true }];
 
   methods.forEach((method, index) => {
@@ -135,7 +172,8 @@ function subject(meta) {
   const parameters = factory ? paramsOf(factory.parameters) : meta.constructorParameters;
   const lines = [], names = [];
   parameters.forEach((p) => {
-    const type = factory ? `Parameters<typeof ${meta.className}.${factory.name}>[${p.index}]` : `ConstructorParameters<typeof ${meta.className}>[${p.index}]`;
+    const fallbackType = factory ? `Parameters<typeof ${meta.className}.${factory.name}>[${p.index}]` : `ConstructorParameters<typeof ${meta.className}>[${p.index}]`;
+    const type = directTypeName(p, meta) || fallbackType;
     lines.push(`    const ${p.name} = ${valueFor(p, type, meta.dependencyMethods.get(p.name))};`);
     names.push(p.name);
   });
@@ -167,7 +205,7 @@ function valueFor(p, typeRef, methods = []) {
   if (type === 'unknown' || type === 'any') return 'undefined';
   if (/\bnull\b/.test(type)) return 'null';
   if (/\[\]$/.test(type) || /^(?:Readonly)?Array\s*</.test(type)) return '[]';
-  if (methods.length) return `{ ${methods.map((name) => `${name}: () => undefined`).join(', ')} } as unknown as ${typeRef}`;
+  if (methods.length) return `{ ${methods.map((name) => `${name}: mock.fn(() => undefined)`).join(', ')} } as unknown as ${typeRef}`;
   return `undefined as unknown as ${typeRef}`;
 }
 

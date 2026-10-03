@@ -6,7 +6,7 @@ const { context } = require('esbuild');
 
 const projectRoot = join(__dirname, '..', '..');
 const testRoot = join(projectRoot, 'test');
-const cacheRoot = join(projectRoot, 'kit-dev', '.cache');
+const cacheRoot = join(__dirname, '.cache');
 
 let buildContext;
 let testProcess;
@@ -52,7 +52,7 @@ async function findTests() {
 
 async function findCompiledTests() {
   return (
-    await collectFiles(cacheRoot, (name) => /\.mjs$/i.test(name))
+    await collectFiles(cacheRoot, (name) => /\.(mjs|cjs|js)$/i.test(name))
   ).sort();
 }
 
@@ -60,11 +60,6 @@ async function findLegacyTests() {
   return (
     await collectFiles(testRoot, (name) => /\.(test|spec)\.cjs$/i.test(name))
   ).sort();
-}
-
-async function clearCompiledTests() {
-  const files = await findCompiledTests();
-  await Promise.all(files.map((file) => rm(file, { force: true })));
 }
 
 function stopTestProcess() {
@@ -139,8 +134,8 @@ function reportBuildErrors(errors) {
 }
 
 async function createTestContext(files) {
+  await rm(cacheRoot, { recursive: true, force: true });
   await mkdir(cacheRoot, { recursive: true });
-  await clearCompiledTests();
 
   return context({
     absWorkingDir: projectRoot,
@@ -195,7 +190,7 @@ async function refreshContext(force = false) {
   }
 
   if (files.length === 0) {
-    await clearCompiledTests();
+    await rm(cacheRoot, { recursive: true, force: true });
     console.log('🧪 No test files found.');
 
     if (watchMode) {

@@ -55,7 +55,7 @@ export class User {
   assert.match(generated, /TODO: add the expected assertion/);
 });
 
-test('creates a minimal dependency stub without TypeScript compiler analysis', async (context) => {
+test('creates a simple native mock using the exported dependency type', async (context) => {
   const root = await fixture(context);
   await mkdir(join(root, 'src', 'application'), { recursive: true });
   await writeFile(
@@ -81,11 +81,16 @@ export class CreateUser {
 
   assert.match(
     generated,
-    /const repository = \{ save: \(\) => undefined \} as unknown as ConstructorParameters<typeof CreateUser>\[0\];/,
+    /import type \{ UserRepository \} from '..\/..\/src\/application\/create-user\.js';/,
+  );
+  assert.match(
+    generated,
+    /const repository = \{ save: mock\.fn\(\(\) => undefined\) \} as unknown as UserRepository;/,
   );
   assert.match(generated, /const name = 'value';/);
   assert.match(generated, /const result = await sut\.execute\(name\);/);
-  assert.doesNotMatch(generated, /mock\.fn|typescript6|createProgram|TypeChecker/);
+  assert.match(generated, /mock\.fn/);
+  assert.doesNotMatch(generated, /typescript6|createProgram|TypeChecker/);
 });
 
 test('uses a common static factory for private constructors', async (context) => {

@@ -25,18 +25,10 @@ A proposta é reduzir configuração inicial e deixar você começar a programar
 
 ## Começando
 
-Escolha o comando do seu gerenciador:
+Crie o projeto com npm:
 
 ```bash
 npx create-kit-dev
-```
-
-```bash
-yarn create kit-dev
-```
-
-```bash
-pnpm create kit-dev
 ```
 
 Informe o nome do projeto e depois:
@@ -77,14 +69,14 @@ npm start
 O Kit Dev pode localizar e abrir arquivos do projeto diretamente no **Micro, um editor de código leve que funciona dentro do terminal**:
 
 ```bash
-yarn w product
+npm run w -- product
 ```
 
 Também é possível usar o comando completo ou informar o caminho exato:
 
 ```bash
-yarn write product.ts
-yarn w src/domain/entities/product.ts
+npm run write -- product.ts
+npm run w -- src/domain/entities/product.ts
 ```
 
 Se apenas um arquivo corresponder, ele é aberto diretamente. Se houver vários, o Kit Dev mostra um seletor interativo. O arquivo selecionado é aberto sem alterações automáticas.
@@ -108,7 +100,7 @@ Ctrl+B  Terminal / modo shell
 Ctrl+E  Comando / Ajuda
 ```
 
-Para consultar os atalhos padrão do editor, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do write está disponível com `yarn w --help`.
+Para consultar os atalhos padrão do editor, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do write está disponível com `npm run w -- --help`.
 
 ## Testes automáticos
 

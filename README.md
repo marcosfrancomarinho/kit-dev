@@ -47,22 +47,8 @@ Then:
 cd my-api
 ```
 
-npm:
-
-```bash
-npm run dev
-```
-
-Yarn:
-
-```bash
-yarn dev
-```
-
-pnpm:
-
-```bash
-pnpm dev
+```text
+npm run dev | yarn dev | pnpm dev
 ```
 
 The examples below use npm, but Yarn and pnpm work too.

@@ -23,6 +23,8 @@ No required framework, no forced architecture, and no unnecessary setup.
 
 ## Quick start
 
+Examples use npm, but Yarn and pnpm work too.
+
 ```bash
 npx create-kit-dev
 cd my-api

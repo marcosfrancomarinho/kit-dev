@@ -297,8 +297,16 @@ test('executa o modo dev com esbuild antes da DI', async (context) => {
     'Kit Dev: watching for changes...',
   ]);
 
+  const devBundle = await readFile(
+    join(buildPath, '.cache', 'dev-bundle.cjs'),
+    'utf-8',
+  );
+  const sourceMapMatch = devBundle.match(
+    /sourceMappingURL=data:application\/json;base64,([^\n]+)/,
+  );
+  assert.ok(sourceMapMatch);
   const sourceMap = JSON.parse(
-    await readFile(join(buildPath, '.cache', 'dev-bundle.cjs.map'), 'utf-8'),
+    Buffer.from(sourceMapMatch[1], 'base64').toString('utf-8'),
   );
   assert.ok(sourceMap.sources.some((source) => source.endsWith('src/main.ts')));
 

@@ -85,7 +85,7 @@ export class CreateUser {
   );
   assert.match(
     generated,
-    /const repositorySaveMock = mock\.fn\(\(\) => undefined\);/,
+    /const repositorySaveMock = mock\.fn\(async \(\) => undefined\);/,
   );
   assert.match(
     generated,
@@ -97,6 +97,97 @@ export class CreateUser {
   assert.doesNotMatch(generated, /typescript6|createProgram|TypeChecker/);
 });
 
+test('creates value objects used by another class', async (context) => {
+  const root = await fixture(context);
+  await writeFile(
+    join(root, 'src', 'email.ts'),
+    `
+export class Email {
+  private constructor(readonly value: string) {}
+
+  static create(value: string): Email {
+    return new Email(value)
+  }
+}
+`,
+    'utf8',
+  );
+  await writeFile(
+    join(root, 'src', 'user.ts'),
+    `
+import { Email } from './email.js'
+
+export class User {
+  constructor(readonly email: Email) {}
+
+  getEmail(): Email {
+    return this.email
+  }
+}
+`,
+    'utf8',
+  );
+
+  const result = await generateTest('user', root);
+  const generated = await readFile(result.destinationPath, 'utf8');
+
+  assert.match(generated, /import \{ Email \} from '..\/src\/email\.js';/);
+  assert.match(generated, /const email = Email\.create\('value'\);/);
+});
+
+test('creates simple DTO objects for method inputs', async (context) => {
+  const root = await fixture(context);
+  await writeFile(
+    join(root, 'src', 'create-user.ts'),
+    `
+export interface CreateUserInput {
+  name: string
+  age?: number
+  active: boolean
+}
+
+export class CreateUser {
+  execute(input: CreateUserInput): void {}
+}
+`,
+    'utf8',
+  );
+
+  const result = await generateTest('create-user', root);
+  const generated = await readFile(result.destinationPath, 'utf8');
+
+  assert.match(generated, /const input = \{ name: 'value', active: true \};/);
+  assert.doesNotMatch(generated, /age:/);
+});
+
+test('uses basic return values for native mocks', async (context) => {
+  const root = await fixture(context);
+  await writeFile(
+    join(root, 'src', 'check-user.ts'),
+    `
+export interface UserRepository {
+  exists(): Promise<boolean>
+}
+
+export class CheckUser {
+  constructor(private readonly repository: UserRepository) {}
+
+  async execute(): Promise<boolean> {
+    return this.repository.exists()
+  }
+}
+`,
+    'utf8',
+  );
+
+  const result = await generateTest('check-user', root);
+  const generated = await readFile(result.destinationPath, 'utf8');
+
+  assert.match(
+    generated,
+    /const repositoryExistsMock = mock\.fn\(async \(\) => true\);/,
+  );
+});
 test('uses a common static factory for private constructors', async (context) => {
   const root = await fixture(context);
   await writeFile(

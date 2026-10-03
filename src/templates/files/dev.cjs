@@ -112,7 +112,7 @@ function developmentBuildOptions() {
     minifySyntax: false,
     minifyWhitespace: false,
     minifyIdentifiers: false,
-    sourcemap: true,
+    sourcemap: 'inline',
     metafile: false,
     logLevel: 'info',
   };

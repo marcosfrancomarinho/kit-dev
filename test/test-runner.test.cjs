@@ -195,7 +195,7 @@ export class CreateUser {
   );
   assert.ok(
     generated.includes(
-      'const repositorySaveMock = mock.fn(() => undefined);',
+      'const repositorySaveMock = mock.fn(async () => undefined);',
     ),
   );
   assert.ok(

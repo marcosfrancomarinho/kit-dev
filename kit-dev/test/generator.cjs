@@ -1,9 +1,10 @@
 const { access, mkdir, readdir, readFile, writeFile } = require('node:fs/promises');
-const { constants } = require('node:fs');
+const { constants, existsSync, readFileSync } = require('node:fs');
 const { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } = require('node:path');
 
 const extensions = ['.ts', '.tsx', '.mts', '.cts'];
 const factories = new Set(['create', 'from', 'of', 'build', 'make']);
+const maxGeneratedObjectDepth = 3;
 
 async function generateTest(target, projectRoot = process.cwd()) {
   const sourcePath = await resolveSourceFile(projectRoot, target);
@@ -13,7 +14,15 @@ async function generateTest(target, projectRoot = process.cwd()) {
   if (metadata.abstract) throw new Error(metadata.className + ' is abstract. Test a concrete implementation instead.');
 
   const destinationPath = testPath(projectRoot, sourcePath);
-  const content = render({ ...metadata, importPath: importPath(destinationPath, sourcePath) });
+  const content = render({
+    ...metadata,
+    source,
+    sourcePath,
+    projectRoot,
+    destinationPath,
+    extraImports: new Set(),
+    importPath: importPath(destinationPath, sourcePath),
+  });
   await mkdir(dirname(destinationPath), { recursive: true });
   await writeFile(destinationPath, content, 'utf8');
   return { sourcePath, destinationPath, metadata };
@@ -155,7 +164,7 @@ function render(meta) {
       out.push('    void sut;');
     } else {
       const target = isStatic ? meta.className : 'sut';
-      const args = methodArgs(method, target);
+      const args = methodArgs(method, target, meta);
       out.push(...args.lines);
       out.push(`    const result = ${method.async ? 'await ' : ''}${target}.${method.name}(${args.names.join(', ')});`);
       out.push('    void result;');
@@ -163,6 +172,10 @@ function render(meta) {
     out.push('    // TODO: add the expected assertion.');
     out.push('  });');
   });
+  if (meta.extraImports.size) {
+    const insertAt = typeImports.length ? 4 : 3;
+    out.splice(insertAt, 0, ...[...meta.extraImports].sort());
+  }
   out.push('});', '');
   return out.join('\n');
 }
@@ -180,7 +193,10 @@ function subject(meta) {
 
   for (const setup of setups) {
     for (const method of setup.methods) {
-      lines.push(`    const ${mockName(setup.parameter.name, method)} = mock.fn(() => undefined);`);
+      const returnType = methodReturnType(setup.parameter.type, method, meta);
+      lines.push(
+        `    const ${mockName(setup.parameter.name, method)} = mock.fn(${mockImplementation(returnType)});`,
+      );
     }
   }
 
@@ -194,7 +210,7 @@ function subject(meta) {
         .join(', ');
       lines.push(`    const ${p.name} = { ${properties} } as unknown as ${setup.type};`);
     } else {
-      lines.push(`    const ${p.name} = ${valueFor(p, setup.type)};`);
+      lines.push(`    const ${p.name} = ${valueFor(p, setup.type, meta)};`);
     }
     names.push(p.name);
   }
@@ -208,30 +224,206 @@ function mockName(parameterName, methodName) {
   return parameterName + methodName[0].toUpperCase() + methodName.slice(1) + 'Mock';
 }
 
-function methodArgs(method, target) {
+function methodArgs(method, target, meta) {
   const lines = [], names = [];
   paramsOf(method.parameters).forEach((p) => {
     let name = p.name;
     while (names.includes(name)) name += '2';
-    lines.push(`    const ${name} = ${valueFor(p, `Parameters<typeof ${target}.${method.name}>[${p.index}]`)};`);
+    lines.push(
+      `    const ${name} = ${valueFor(
+        p,
+        `Parameters<typeof ${target}.${method.name}>[${p.index}]`,
+        meta,
+      )};`,
+    );
     names.push(name);
   });
   if (names.length) lines.push('');
   return { lines, names };
 }
 
-function valueFor(p, typeRef) {
+function valueFor(p, typeRef, meta, depth = 0, resolving = new Set()) {
   if (p.optional) return 'undefined';
-  const type = p.type.replace(/\s+/g, ' ').trim();
+  const simple = primitiveValue(p.type);
+  if (simple !== null) return simple;
+
+  const typeName = simpleTypeName(p.type);
+  if (!typeName || depth >= maxGeneratedObjectDepth || resolving.has(typeName)) {
+    return `undefined as unknown as ${typeRef}`;
+  }
+
+  const declaration = resolveSimpleDeclaration(typeName, meta);
+  if (!declaration) return `undefined as unknown as ${typeRef}`;
+
+  const next = new Set(resolving);
+  next.add(typeName);
+
+  if (declaration.kind === 'class') {
+    if (declaration.factory?.async) return `undefined as unknown as ${typeRef}`;
+    if (declaration.importLine) meta.extraImports.add(declaration.importLine);
+
+    const parameters = declaration.factory
+      ? paramsOf(declaration.factory.parameters)
+      : declaration.constructorParameters;
+    const values = parameters.map((parameter) => {
+      const fallback = declaration.factory
+        ? `Parameters<typeof ${declaration.name}.${declaration.factory.name}>[${parameter.index}]`
+        : `ConstructorParameters<typeof ${declaration.name}>[${parameter.index}]`;
+      return valueFor(parameter, fallback, declaration.meta, depth + 1, next);
+    });
+    const create = declaration.factory
+      ? `${declaration.name}.${declaration.factory.name}`
+      : `new ${declaration.name}`;
+    return `${create}(${values.join(', ')})`;
+  }
+
+  if (declaration.kind === 'object') {
+    const values = declaration.properties
+      .filter((property) => !property.optional)
+      .map((property) =>
+        `${property.name}: ${valueFor(property, property.type, declaration.meta, depth + 1, next)}`,
+      );
+    return values.length ? `{ ${values.join(', ')} }` : '{}';
+  }
+
+  return `undefined as unknown as ${typeRef}`;
+}
+
+function primitiveValue(typeText) {
+  const type = String(typeText || '').replace(/\s+/g, ' ').trim();
   if (type === 'string') return "'value'";
   if (type === 'number') return '1';
   if (type === 'boolean') return 'true';
   if (type === 'bigint') return '1n';
   if (type === 'Date') return 'new Date()';
-  if (type === 'unknown' || type === 'any') return 'undefined';
+  if (type === 'unknown' || type === 'any' || type === 'void') return 'undefined';
   if (/\bnull\b/.test(type)) return 'null';
   if (/\[\]$/.test(type) || /^(?:Readonly)?Array\s*</.test(type)) return '[]';
-  return `undefined as unknown as ${typeRef}`;
+  return null;
+}
+
+function simpleTypeName(typeText) {
+  const type = String(typeText || '').trim();
+  return /^[A-Za-z_$][\w$]*$/.test(type) ? type : null;
+}
+
+function mockImplementation(returnType) {
+  if (!returnType) return '() => undefined';
+  const normalized = returnType.replace(/\s+/g, ' ').trim();
+  const promise = normalized.match(/^Promise\s*<(.+)>$/);
+  const inner = promise ? promise[1].trim() : normalized;
+  const value = primitiveValue(inner) ?? 'undefined';
+  return `${promise ? 'async ' : ''}() => ${value}`;
+}
+
+function methodReturnType(typeText, methodName, meta) {
+  const typeName = simpleTypeName(typeText);
+  if (!typeName) return null;
+  const declaration = resolveSimpleDeclaration(typeName, meta);
+  if (!declaration) return null;
+  const escaped = methodName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = declaration.body.match(
+    new RegExp(`\\b${escaped}\\s*\\([^)]*\\)\\s*(?::\\s*([^;{\\n]+))?`),
+  );
+  return match?.[1]?.trim() || null;
+}
+
+function resolveSimpleDeclaration(typeName, meta) {
+  let source = meta.source;
+  let filePath = meta.sourcePath;
+  let localName = typeName;
+  let importLine = null;
+
+  let declaration = declarationFromSource(source, localName, filePath, meta, importLine);
+  if (declaration) return declaration;
+
+  const imported = importedType(source, typeName);
+  if (!imported || !imported.specifier.startsWith('.')) return null;
+  const resolvedFile = resolveImportedSource(filePath, imported.specifier);
+  if (!resolvedFile) return null;
+
+  source = readFileSync(resolvedFile, 'utf8');
+  filePath = resolvedFile;
+  localName = imported.exportedName;
+  const generatedPath = importPath(meta.destinationPath, filePath);
+  importLine = `import { ${typeName} } from '${generatedPath}';`;
+  const childMeta = { ...meta, source, sourcePath: filePath };
+  declaration = declarationFromSource(source, localName, filePath, childMeta, importLine);
+  if (!declaration) return null;
+  return { ...declaration, name: typeName, meta: childMeta, importLine };
+}
+
+function declarationFromSource(source, typeName, filePath, meta, importLine) {
+  const classData = analyzeNamedClass(source, typeName);
+  if (classData) return { ...classData, kind: 'class', name: typeName, filePath, meta, importLine };
+  const objectData = analyzeObjectType(source, typeName);
+  if (objectData) return { ...objectData, kind: 'object', name: typeName, filePath, meta, importLine: null };
+  return null;
+}
+
+function analyzeNamedClass(source, typeName) {
+  const escaped = typeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`\\b(?:export\\s+(?:default\\s+)?)?(?:abstract\\s+)?class\\s+${escaped}\\b`);
+  const match = pattern.exec(source);
+  if (!match) return null;
+  const open = source.indexOf('{', match.index + match[0].length);
+  const close = open < 0 ? -1 : matching(source, open, '{', '}');
+  if (close < 0) return null;
+  const body = source.slice(open + 1, close);
+  const members = membersOf(body);
+  const ctor = members.find((member) => member.name === 'constructor');
+  const constructorParameters = paramsOf(ctor?.parameters || '');
+  const privateCtor = !!ctor && (ctor.modifiers.has('private') || ctor.modifiers.has('protected'));
+  const methods = members.filter((member) => member.name !== 'constructor');
+  const factory = privateCtor
+    ? methods.find((member) => member.modifiers.has('static') && factories.has(member.name))
+    : null;
+  if (privateCtor && !factory) return null;
+  return { body, constructorParameters, factory };
+}
+
+function analyzeObjectType(source, typeName) {
+  const escaped = typeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const interfacePattern = new RegExp(`\\b(?:export\\s+)?interface\\s+${escaped}(?:\\s+extends[^\\{]+)?\\s*\\{`);
+  const aliasPattern = new RegExp(`\\b(?:export\\s+)?type\\s+${escaped}\\s*=\\s*\\{`);
+  const match = interfacePattern.exec(source) || aliasPattern.exec(source);
+  if (!match) return null;
+  const open = source.indexOf('{', match.index);
+  const close = matching(source, open, '{', '}');
+  if (close < 0) return null;
+  const body = source.slice(open + 1, close);
+  const properties = [];
+  const pattern = /\b([A-Za-z_$][\w$]*)(\?)?\s*:\s*([^;\n]+)[;]?/g;
+  let property;
+  while ((property = pattern.exec(body))) {
+    const type = property[3].trim().replace(/,$/, '').trim();
+    if (type.includes('=>')) continue;
+    properties.push({ name: property[1], type, optional: !!property[2], index: properties.length });
+  }
+  return { body, properties };
+}
+
+function importedType(source, localName) {
+  const pattern = /\bimport\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['\"]([^'\"]+)['\"]/g;
+  let match;
+  while ((match = pattern.exec(source))) {
+    for (const raw of match[1].split(',')) {
+      const item = raw.trim().replace(/^type\s+/, '');
+      const alias = item.match(/^([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?$/);
+      if (!alias) continue;
+      const exportedName = alias[1];
+      const importedName = alias[2] || exportedName;
+      if (importedName === localName) return { exportedName, specifier: match[2] };
+    }
+  }
+  return null;
+}
+
+function resolveImportedSource(originPath, specifier) {
+  const base = resolve(dirname(originPath), specifier).replace(/\.(?:mjs|cjs|js)$/i, '');
+  const candidates = extensions.map((extension) => base + extension);
+  for (const candidate of candidates) if (existsSync(candidate)) return candidate;
+  return null;
 }
 
 function callsOf(body, name) {

@@ -62,7 +62,7 @@ The examples below use npm, but Yarn and pnpm work too.
 | `npm run dev [-- --watch]` | Builds and runs the app; `--watch` rebuilds and restarts on save |
 | `npm test [-- --watch]` | Runs tests; `--watch` reruns them on save |
 | `npm test -- <file>` | Generates a test for a class |
-| `npm run type [-- --watch]` | Checks types; `--watch` checks again on save |
+| `npm run type [-- --watch]` | Checks that the TypeScript types are correct; `--watch` checks again on save |
 | `npm run build` | Creates the production bundle |
 | `npm start` | Runs the bundle |
 | `npm run w -- <file>` | Finds and opens a file |

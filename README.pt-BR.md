@@ -41,6 +41,8 @@ pnpm:
 pnpm create kit-dev
 ```
 
+Digite o nome da pasta do projeto quando o Kit Dev pedir.
+
 Depois:
 
 ```bash

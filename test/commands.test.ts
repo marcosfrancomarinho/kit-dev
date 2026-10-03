@@ -36,15 +36,13 @@ function run(f: Awaited<ReturnType<typeof fixture>>, command: string, args: stri
   return result.stdout + result.stderr;
 }
 
-test('generated project: dev, type, build, start, test, fmt, write/w, test generation and DI', async (t) => {
+test('generated project: dev, type, build, start, test, write/w, test generation and DI', async (t) => {
   const f = await fixture(t);
   assert.match(run(f, 'dev'), /Hello World!/);
   run(f, 'type');
   run(f, 'build');
   assert.match(run(f, 'start'), /Hello World!/);
   assert.match(run(f, 'test'), /pass 1/);
-  run(f, 'fmt');
-  run(f, 'fmt', ['src/main.ts']);
   assert.match(run(f, 'write', ['--help']), /write/i);
   assert.match(run(f, 'w', ['--help']), /write/i);
   await writeFile(join(f.root, 'src/product.ts'), 'export class Product { public name(): string { return "Book"; } }');

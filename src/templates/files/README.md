@@ -17,20 +17,11 @@
 
 ## What is Kit Dev?
 
-**Kit Dev** is a CLI that creates a ready-to-code TypeScript project.
+**Kit Dev** is a minimalist CLI for creating TypeScript projects with the essential setup already prepared.
 
-Instead of configuring the project from scratch, you start with:
+It includes development, build, type checking, native tests, simple test generation, terminal file editing, and optional dependency injection.
 
-- development command that runs once by default, with optional watch mode;
-- production build;
-- TypeScript checking;
-- tests that run once by default, with optional watch mode;
-- automatic test generation from classes;
-- quick file search and editing with Micro through `write` / `w`;
-- optional dependency injection;
-- npm, Yarn and pnpm support.
-
-Kit Dev is designed to stay minimalist: simple, fast, and with few external dependencies. It does not force a specific architecture or application type. Instead, it provides a lightweight base that can be used for APIs, services, CLIs, web applications, internal tools, learning projects, prototypes, and other small-to-medium TypeScript projects. The goal is to reduce configuration and repetitive work without turning the project into a heavy framework.
+The goal is to reduce initial setup and help you start coding faster without forcing a framework or architecture.
 
 ## Quick start
 
@@ -57,7 +48,6 @@ npm run dev
 | `test` | Runs the tests once |
 | `test --watch` | Keeps tests running and reruns them on changes |
 | `test <file>` | Generates or updates a test for a class |
-| `fmt [file]` | Formats all of `src/` and `test/` or only one provided file |
 | `write [file]` / `w [file]` | Finds a project file and opens it in Micro |
 | `build` | Checks types and creates the production bundle |
 | `start` | Runs the generated bundle |
@@ -73,7 +63,6 @@ npm run dev --watch
 npm test
 npm test --watch
 npm test -- create-user
-npm run fmt
 npm run w -- product
 npm run type
 npm run type --watch
@@ -81,21 +70,6 @@ npm run build
 npm start
 ```
 
-## Code formatting
-
-Run:
-
-```bash
-npm run fmt
-```
-To format only one file:
-
-```bash
-npm run fmt -- src/application/create-user.ts
-```
-
-
-The `fmt` command formats JavaScript and TypeScript in `src/` and `test/`, including compact or minified code. By default, it uses two-space indentation, single quotes, semicolons, and a line width of 100 characters. It respects project formatting configuration and removes unused imports while preserving side-effect imports. Invalid syntax is reported without overwriting the affected file.
 
 ## Write and edit files
 
@@ -163,7 +137,7 @@ or:
 npm test -- src/application/create-user.ts
 ```
 
-Kit Dev analyzes the class, constructor dependencies and public methods to create a useful starting test. Generated dependency mocks use exported project types directly when they can be safely imported; otherwise, Kit Dev falls back to TypeScript utility types such as `ConstructorParameters<>`. When it cannot safely infer business behavior, it leaves a `TODO` instead of inventing an assertion.
+Kit Dev creates a small starting test from the class constructor and public methods. It uses simple values for common primitive parameters, creates simple dependency mocks with `mock.fn()` when obvious method calls can be detected, and leaves a `TODO` for the expected assertion instead of trying to infer business rules.
 
 Existing generated tests can be regenerated when the source changes.
 
@@ -517,7 +491,6 @@ my-api/
 ├── kit-dev/
 │   ├── build/
 │   ├── di/
-│   ├── format/
 │   ├── test/
 │   └── write/
 ├── src/

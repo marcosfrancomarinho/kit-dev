@@ -188,23 +188,21 @@ export class CreateUser {
     'utf-8',
   );
 
-  assert.match(
-    generated,
-    /import type \{ UserRepository \} from '..\/..\/src\/application\/create-user\.js'/,
+  assert.ok(
+    generated.includes(
+      "import type { UserRepository } from '../../src/application/create-user.js';",
+    ),
   );
-  assert.match(
-    generated,
-    /const repository: UserRepository = \{/,
+  assert.ok(
+    generated.includes(
+      'const repository = { save: mock.fn(() => undefined) } as unknown as UserRepository;',
+    ),
   );
-  assert.doesNotMatch(
-    generated,
-    /const repository: ConstructorParameters<typeof CreateUser>\[0\]/,
-  );
-  assert.match(
-    generated,
-    /const repositorySaveMock = t\.mock\.fn\(async/,
-  );
-  assert.match(generated, /save: repositorySaveMock/);
+  assert.match(generated, /const name = 'value';/);
+  assert.ok(generated.includes('const result = await sut.execute(name);'));
+  assert.match(generated, /TODO: add the expected assertion/);
+  assert.equal(generated.includes('mock.fn'), true);
+  assert.equal(generated.includes('typescript6'), false);
 });
 
 function waitForOutput(child, expected, timeout = 7000) {

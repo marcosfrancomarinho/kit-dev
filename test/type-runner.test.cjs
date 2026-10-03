@@ -26,7 +26,7 @@ function run(root, args = [], env = {}) {
   });
 }
 
-for (const dependency of ['typescript', '@typescript/old']) {
+for (const dependency of ['typescript']) {
   test(`type checks valid and invalid code with ${dependency} without emitting files`, async (t) => {
     const root = await fixture(t);
     await symlink(dirname(require.resolve(`${dependency}/package.json`)), join(root, 'node_modules/typescript'), 'junction');

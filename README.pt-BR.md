@@ -17,35 +17,18 @@
 
 ## O que é o Kit Dev?
 
-O **Kit Dev** é uma CLI que cria um projeto TypeScript pronto para começar a programar.
+O **Kit Dev** é uma CLI minimalista para criar projetos TypeScript com a configuração essencial já pronta.
 
-Em vez de configurar tudo do zero, você já começa com:
+Ela inclui ambiente de desenvolvimento, build, verificação de tipos, testes nativos, geração simples de testes, edição de arquivos pelo terminal e injeção de dependência opcional.
 
-- comando de desenvolvimento que executa uma vez por padrão, com modo watch opcional;
-- build de produção;
-- verificação de tipos;
-- testes que executam uma vez por padrão, com modo watch opcional;
-- geração automática de testes a partir de classes;
-- busca e edição rápida de arquivos pelos comandos `write` / `w`;
-- injeção de dependência opcional;
-- suporte a npm, Yarn e pnpm.
-
-A proposta do Kit Dev é ser uma CLI minimalista: simples, rápida e com poucas dependências externas. A ideia não é impor uma arquitetura ou um tipo específico de aplicação, mas oferecer uma base enxuta que possa ser usada em APIs, serviços, CLIs, aplicações web, ferramentas internas, estudos, protótipos e outros projetos TypeScript de pequeno e médio porte. O objetivo é reduzir configuração e trabalho repetitivo sem transformar o projeto em um framework pesado.
+A proposta é reduzir configuração inicial e deixar você começar a programar mais rápido, sem impor framework ou arquitetura.
 
 ## Começando
 
-Escolha o comando do seu gerenciador:
+Crie o projeto com npm:
 
 ```bash
 npx create-kit-dev
-```
-
-```bash
-yarn create kit-dev
-```
-
-```bash
-pnpm create kit-dev
 ```
 
 Informe o nome do projeto e depois:
@@ -55,13 +38,6 @@ cd minha-api
 npm run dev
 ```
 
-Se criou com Yarn ou pnpm, use o equivalente:
-
-```bash
-yarn dev
-pnpm dev
-```
-
 ## Comandos principais
 
 | Comando | O que faz |
@@ -69,7 +45,6 @@ pnpm dev
 | `dev [--watch]` | Faz o build e executa uma vez ou mantém a aplicação ativa em modo watch |
 | `test [--watch]` | Executa os testes uma vez ou mantém ativos em modo watch |
 | `test <arquivo>` | Gera ou atualiza o teste de uma classe |
-| `fmt [arquivo]` | Formata `src/` e `test/` por completo ou somente um arquivo informado |
 | `write [arquivo]` / `w [arquivo]` | Localiza um arquivo do projeto e abre no editor do terminal |
 | `build` | Verifica os tipos e gera o bundle de produção |
 | `start` | Executa o bundle gerado |
@@ -82,42 +57,26 @@ Exemplos com npm:
 npm run dev [--watch]
 npm test [--watch]
 npm test -- create-user
-npm run fmt
 npm run w -- product
 npm run type [--watch]
 npm run build
 npm start
 ```
 
-## Formatação de código
-
-Use:
-
-```bash
-npm run fmt
-```
-Para formatar apenas um arquivo:
-
-```bash
-npm run fmt -- src/application/create-user.ts
-```
-
-
-O `fmt` formata JavaScript e TypeScript em `src/` e `test/`, incluindo código compacto ou minificado. Por padrão, usa indentação de dois espaços, aspas simples, ponto e vírgula e largura de linha de 100 caracteres. Respeita a configuração de formatação do projeto e remove imports não usados, preservando imports de efeito colateral. Erros de sintaxe são informados sem sobrescrever o arquivo afetado.
 
 ## Escrever e editar arquivos
 
 O Kit Dev pode localizar e abrir arquivos do projeto diretamente no **Micro, um editor de código leve que funciona dentro do terminal**:
 
 ```bash
-yarn w product
+npm run w -- product
 ```
 
 Também é possível usar o comando completo ou informar o caminho exato:
 
 ```bash
-yarn write product.ts
-yarn w src/domain/entities/product.ts
+npm run write -- product.ts
+npm run w -- src/domain/entities/product.ts
 ```
 
 Se apenas um arquivo corresponder, ele é aberto diretamente. Se houver vários, o Kit Dev mostra um seletor interativo. O arquivo selecionado é aberto sem alterações automáticas.
@@ -141,7 +100,7 @@ Ctrl+B  Terminal / modo shell
 Ctrl+E  Comando / Ajuda
 ```
 
-Para consultar os atalhos padrão do editor, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do write está disponível com `yarn w --help`.
+Para consultar os atalhos padrão do editor, pressione `Ctrl+E` e execute `help defaultkeys`. A ajuda do write está disponível com `npm run w -- --help`.
 
 ## Testes automáticos
 
@@ -165,7 +124,7 @@ ou:
 npm test -- src/application/create-user.ts
 ```
 
-O Kit Dev analisa a classe, as dependências do construtor e os métodos públicos para criar uma boa base de teste. Os mocks de dependências usam diretamente os tipos exportados do projeto quando eles podem ser importados com segurança; caso contrário, o Kit Dev usa tipos utilitários do TypeScript, como `ConstructorParameters<>`, como fallback. Quando não consegue inferir com segurança uma regra de negócio, deixa um `TODO` em vez de inventar uma assertion.
+O Kit Dev cria uma base pequena de teste a partir do construtor da classe e dos métodos públicos. Ele usa valores simples para parâmetros primitivos comuns, cria mocks simples de dependências com `mock.fn()` quando identifica chamadas de métodos de forma óbvia e deixa um `TODO` para a assertion esperada, sem tentar adivinhar regras de negócio.
 
 Um teste já gerado pode ser criado novamente quando a classe mudar.
 
@@ -519,7 +478,6 @@ minha-api/
 ├── kit-dev/
 │   ├── build/
 │   ├── di/
-│   ├── format/
 │   ├── test/
 │   └── write/
 ├── src/

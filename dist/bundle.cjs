@@ -300,10 +300,8 @@ var NodePackageInstaller = class {
   }
   dependencies = Object.freeze([
     "typescript@7.0.2",
-    "@typescript/typescript6@6.0.2",
     "esbuild@0.28.2",
-    "@types/node@22",
-    "prettier@3.9.9"
+    "@types/node@22"
   ]);
   getRunCommand(manager) {
     return this.registry.get(manager).runCommand;
@@ -429,9 +427,6 @@ var ProjectPaths = class {
   kitDevTest() {
     return (0, import_node_path2.join)(this.kitDev(), "test");
   }
-  format() {
-    return (0, import_node_path2.join)(this.kitDev(), "format");
-  }
   write() {
     return (0, import_node_path2.join)(this.kitDev(), "write");
   }
@@ -464,7 +459,6 @@ var ProjectPaths = class {
       this.build(),
       this.di(),
       this.kitDevTest(),
-      this.format(),
       this.write(),
       this.test()
     ];
@@ -532,7 +526,6 @@ var NodeProjectScaffolder = class {
       this.copyTemplate(paths, "providers.ts", (0, import_node_path3.join)(paths.di(), "providers.ts"), "\u{1F9E9} DI providers template prepared"),
       this.copyTemplate(paths, "runner.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test.cjs"), "\u{1F9EA} Native test runner prepared"),
       this.copyTemplate(paths, "test-generator.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "generator.cjs"), "\u{1F9EA} Automatic test generator prepared"),
-      this.copyTemplate(paths, "formatter.cjs", (0, import_node_path3.join)(paths.format(), "fmt.cjs"), "\u2728 Source formatter prepared"),
       this.copyTemplate(paths, "write.cjs", (0, import_node_path3.join)(paths.write(), "write.cjs"), "\u270F\uFE0F Project file editor prepared")
     ]);
   }
@@ -600,7 +593,6 @@ var TerminalAdapter = class {
 \u{1F680} Available commands:
   ` + this.formatCommand(runCommand, "dev [--watch]", "Run application") + `
   ` + this.formatCommand(runCommand, "test [--watch]", "Run tests") + `
-  ` + this.formatCommand(runCommand, "fmt", "Format src/ and test/ code") + `
   ` + this.formatCommand(runCommand, "write", "Find and edit a file with Micro") + `
   ` + this.formatCommand(runCommand, "build", "Build the project") + `
   ` + this.formatCommand(runCommand, "start", "Run bundled output") + `
@@ -655,7 +647,6 @@ var ProjectTemplateCatalog = class {
           build: "node kit-dev/build/esbuild.config.cjs",
           type: "node kit-dev/build/type.cjs",
           test: "node kit-dev/test/test.cjs",
-          fmt: "node kit-dev/format/fmt.cjs",
           write: "node kit-dev/write/write.cjs",
           w: "node kit-dev/write/write.cjs",
           di: "node kit-dev/di/install.cjs"

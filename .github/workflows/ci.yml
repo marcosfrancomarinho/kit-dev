@@ -47,6 +47,21 @@ jobs:
       - name: Check package
         run: npm pack --dry-run
 
+      - name: Dogfood packaged CLI
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 22
+        shell: bash
+        run: |
+          PACKAGE="$(npm pack --silent | tail -n 1)"
+          mkdir .dogfood
+          mv "$PACKAGE" .dogfood/
+          PACKAGE_PATH="$(pwd)/.dogfood/$PACKAGE"
+          cd .dogfood
+          printf 'kit-dev\n' | npm exec --yes --package="$PACKAGE_PATH" -- create-kit-dev
+          cd kit-dev
+          npm run type
+          npm test
+          npm run build
+
       - name: Upload bundle
         if: matrix.os == 'ubuntu-latest' && matrix.node == 22
         uses: actions/upload-artifact@v4

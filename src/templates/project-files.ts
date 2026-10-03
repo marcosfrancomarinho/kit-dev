@@ -13,7 +13,6 @@ export class ProjectTemplateCatalog {
           build: 'node kit-dev/build/esbuild.config.cjs',
           type: 'node kit-dev/build/type.cjs',
           test: 'node kit-dev/test/test.cjs',
-          fmt: 'node kit-dev/format/fmt.cjs',
           write: 'node kit-dev/write/write.cjs',
           w: 'node kit-dev/write/write.cjs',
           di: 'node kit-dev/di/install.cjs',

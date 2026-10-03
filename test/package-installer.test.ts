@@ -46,7 +46,14 @@ test('initial dependency install uses TypeScript 7 native language server suppor
     '--save-dev',
   ]);
   assert.ok(calls[0].args.includes('typescript@7.0.2'));
-  assert.ok(calls[0].args.includes('prettier@3.9.9'));
+  assert.equal(
+    calls[0].args.some((value) => value.includes('prettier')),
+    false,
+  );
+  assert.equal(
+    calls[0].args.some((value) => value.includes('@typescript/typescript6')),
+    false,
+  );
   assert.equal(
     calls[0].args.some((value) =>
       value.startsWith('typescript-language-server@'),

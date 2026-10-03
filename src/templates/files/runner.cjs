@@ -6,7 +6,7 @@ const { context } = require('esbuild');
 
 const projectRoot = join(__dirname, '..', '..');
 const testRoot = join(projectRoot, 'test');
-const cacheRoot = join(projectRoot, 'kit-dev', '.cache', 'test');
+const cacheRoot = join(projectRoot, 'kit-dev', '.cache');
 
 let buildContext;
 let testProcess;
@@ -52,7 +52,7 @@ async function findTests() {
 
 async function findCompiledTests() {
   return (
-    await collectFiles(cacheRoot, (name) => /\.(mjs|cjs|js)$/i.test(name))
+    await collectFiles(cacheRoot, (name) => /\.mjs$/i.test(name))
   ).sort();
 }
 

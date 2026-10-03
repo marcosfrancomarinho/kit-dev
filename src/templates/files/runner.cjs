@@ -6,7 +6,7 @@ const { context } = require('esbuild');
 
 const projectRoot = join(__dirname, '..', '..');
 const testRoot = join(projectRoot, 'test');
-const cacheRoot = join(__dirname, '.cache');
+const cacheRoot = join(projectRoot, 'kit-dev', '.cache', 'test');
 
 let buildContext;
 let testProcess;

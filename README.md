@@ -44,11 +44,16 @@ npm run dev
 
 ## Tests
 
-Run tests, use watch mode, or generate a test for a class.
+### Run tests
 
 ```bash
 npm test
 npm test -- --watch
+```
+
+### Create a test
+
+```bash
 npm test -- create-user
 npm test -- src/application/create-user.ts
 ```

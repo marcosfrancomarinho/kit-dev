@@ -5,7 +5,7 @@
 
 <h1 align="center">🚀 Kit Dev</h1>
 
-<p align="center">Start a TypeScript project with development, build, tests and optional dependency injection already prepared.</p>
+<p align="center">Quickly create a minimal TypeScript project ready to code, without forcing a framework or architecture.</p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/create-kit-dev"><img src="https://img.shields.io/npm/v/create-kit-dev?style=flat-square&color=CB3837&logo=npm" alt="npm version"></a>
@@ -17,9 +17,9 @@
 
 ## What is Kit Dev?
 
-**Kit Dev** creates a Node.js + TypeScript project ready to code.
+**Kit Dev** quickly creates a minimal Node.js + TypeScript project ready to code.
 
-It prepares development, build, type checking, tests, test generation, terminal file opening, and optional DI. The goal is to stay simple and fast without forcing a framework, architecture, formatter, or linter.
+The goal is to start with the essentials without forcing a framework or architecture. Development, build, type checking, tests, test generation, terminal file opening, and optional DI are already prepared.
 
 ## Quick start
 

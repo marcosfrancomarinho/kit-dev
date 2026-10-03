@@ -41,6 +41,8 @@ pnpm:
 pnpm create kit-dev
 ```
 
+Enter the project folder name when Kit Dev asks.
+
 Then:
 
 ```bash

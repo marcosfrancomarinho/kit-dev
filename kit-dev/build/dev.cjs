@@ -4,7 +4,7 @@ const { build, context } = require('esbuild');
 const { buildOptions } = require('./esbuild.config.cjs');
 
 const projectRoot = resolve(__dirname, '..', '..');
-const outputFile = resolve(__dirname, '.cache', 'dev-bundle.cjs');
+const outputFile = resolve(projectRoot, 'kit-dev', '.cache', 'dev', 'dev-bundle.cjs');
 const stopTimeout = 3000;
 let child;
 let buildContext;

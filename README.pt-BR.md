@@ -25,7 +25,7 @@ Sem framework obrigatório, sem arquitetura imposta e sem configuração desnece
 
 ```bash
 npx create-kit-dev
-npm create kit-dev
+yarn create kit-dev
 pnpm create kit-dev
 ```
 

@@ -69,7 +69,6 @@ pnpm dev
 | `dev [--watch]` | Faz o build e executa uma vez ou mantém a aplicação ativa em modo watch |
 | `test [--watch]` | Executa os testes uma vez ou mantém ativos em modo watch |
 | `test <arquivo>` | Gera ou atualiza o teste de uma classe |
-| `fmt [arquivo]` | Formata `src/` e `test/` por completo ou somente um arquivo informado |
 | `write [arquivo]` / `w [arquivo]` | Localiza um arquivo do projeto e abre no editor do terminal |
 | `build` | Verifica os tipos e gera o bundle de produção |
 | `start` | Executa o bundle gerado |
@@ -82,28 +81,12 @@ Exemplos com npm:
 npm run dev [--watch]
 npm test [--watch]
 npm test -- create-user
-npm run fmt
 npm run w -- product
 npm run type [--watch]
 npm run build
 npm start
 ```
 
-## Formatação de código
-
-Use:
-
-```bash
-npm run fmt
-```
-Para formatar apenas um arquivo:
-
-```bash
-npm run fmt -- src/application/create-user.ts
-```
-
-
-O `fmt` formata JavaScript e TypeScript em `src/` e `test/`, incluindo código compacto ou minificado. Por padrão, usa indentação de dois espaços, aspas simples, ponto e vírgula e largura de linha de 100 caracteres. Respeita a configuração de formatação do projeto e remove imports não usados, preservando imports de efeito colateral. Erros de sintaxe são informados sem sobrescrever o arquivo afetado.
 
 ## Escrever e editar arquivos
 
@@ -165,7 +148,7 @@ ou:
 npm test -- src/application/create-user.ts
 ```
 
-O Kit Dev analisa a classe, as dependências do construtor e os métodos públicos para criar uma boa base de teste. Os mocks de dependências usam diretamente os tipos exportados do projeto quando eles podem ser importados com segurança; caso contrário, o Kit Dev usa tipos utilitários do TypeScript, como `ConstructorParameters<>`, como fallback. Quando não consegue inferir com segurança uma regra de negócio, deixa um `TODO` em vez de inventar uma assertion.
+O Kit Dev cria uma base pequena de teste a partir do construtor da classe e dos métodos públicos. Ele usa valores simples para parâmetros primitivos comuns, cria stubs leves de dependências quando identifica chamadas de métodos de forma óbvia e deixa um `TODO` para a assertion esperada, sem tentar adivinhar regras de negócio.
 
 Um teste já gerado pode ser criado novamente quando a classe mudar.
 
@@ -519,7 +502,6 @@ minha-api/
 ├── kit-dev/
 │   ├── build/
 │   ├── di/
-│   ├── format/
 │   ├── test/
 │   └── write/
 ├── src/

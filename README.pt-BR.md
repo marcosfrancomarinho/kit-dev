@@ -44,11 +44,14 @@ npm run dev
 | `npm run w -- product` | Procura e abre um arquivo |
 | `npm run di` | Instala a DI opcional |
 
-## Testes gerados
+## Testes
 
-O Kit Dev cria um teste por método público e deixa a assertion como `TODO`.
-
-Ele tenta gerar valores simples, DTOs, entidades, Value Objects e mocks básicos. Quando não consegue inferir um tipo com segurança, usa um fallback tipado.
+```bash
+npm test
+npm test -- --watch
+npm test -- create-user
+npm test -- src/application/create-user.ts
+```
 
 ## Abrir arquivos
 

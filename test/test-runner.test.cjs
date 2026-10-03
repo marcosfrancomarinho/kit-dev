@@ -190,21 +190,12 @@ export class CreateUser {
 
   assert.match(
     generated,
-    /import type \{ UserRepository \} from '..\/..\/src\/application\/create-user\.js'/,
+    /const repository = \\{ save: \\(\\) => undefined \\} as unknown as ConstructorParameters<typeof CreateUser>\\[0\\];/,
   );
-  assert.match(
-    generated,
-    /const repository: UserRepository = \{/,
-  );
-  assert.doesNotMatch(
-    generated,
-    /const repository: ConstructorParameters<typeof CreateUser>\[0\]/,
-  );
-  assert.match(
-    generated,
-    /const repositorySaveMock = t\.mock\.fn\(async/,
-  );
-  assert.match(generated, /save: repositorySaveMock/);
+  assert.match(generated, /const name = 'value';/);
+  assert.match(generated, /const result = await sut\\.execute\\(name\\);/);
+  assert.match(generated, /TODO: add the expected assertion/);
+  assert.doesNotMatch(generated, /mock\\.fn|typescript6/);
 });
 
 function waitForOutput(child, expected, timeout = 7000) {

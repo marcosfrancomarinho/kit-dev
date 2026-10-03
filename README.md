@@ -29,11 +29,14 @@ yarn create kit-dev
 pnpm create kit-dev
 ```
 
-Then:
+Then enter the project folder and start the app with your preferred package manager:
 
 ```bash
 cd my-api
+
 npm run dev
+yarn dev
+pnpm dev
 ```
 
 The examples below use npm, but Yarn and pnpm work too.

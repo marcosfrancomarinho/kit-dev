@@ -139,7 +139,7 @@ ou:
 npm test -- src/application/create-user.ts
 ```
 
-O Kit Dev cria uma base pequena de teste a partir do construtor da classe e dos métodos públicos. Ele usa valores simples para parâmetros primitivos comuns, cria stubs leves de dependências quando identifica chamadas de métodos de forma óbvia e deixa um `TODO` para a assertion esperada, sem tentar adivinhar regras de negócio.
+O Kit Dev cria uma base pequena de teste a partir do construtor da classe e dos métodos públicos. Ele usa valores simples para parâmetros primitivos comuns, cria mocks simples de dependências com `mock.fn()` quando identifica chamadas de métodos de forma óbvia e deixa um `TODO` para a assertion esperada, sem tentar adivinhar regras de negócio.
 
 Um teste já gerado pode ser criado novamente quando a classe mudar.
 

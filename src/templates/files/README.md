@@ -146,7 +146,7 @@ or:
 npm test -- src/application/create-user.ts
 ```
 
-Kit Dev creates a small starting test from the class constructor and public methods. It uses simple values for common primitive parameters, creates lightweight dependency stubs when obvious method calls can be detected, and leaves a `TODO` for the expected assertion instead of trying to infer business rules.
+Kit Dev creates a small starting test from the class constructor and public methods. It uses simple values for common primitive parameters, creates simple dependency mocks with `mock.fn()` when obvious method calls can be detected, and leaves a `TODO` for the expected assertion instead of trying to infer business rules.
 
 Existing generated tests can be regenerated when the source changes.
 

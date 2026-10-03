@@ -188,6 +188,143 @@ export class CheckUser {
     /const repositoryExistsMock = mock\.fn\(async \(\) => true\);/,
   );
 });
+
+test('supports default imported value objects', async (context) => {
+  const root = await fixture(context);
+
+  await writeFile(
+    join(root, 'src', 'email.ts'),
+    `
+export default class Email {
+  private constructor(readonly value: string) {}
+
+  static create(value: string): Email {
+    return new Email(value)
+  }
+}
+`,
+    'utf8',
+  );
+
+  await writeFile(
+    join(root, 'src', 'user.ts'),
+    `
+import Email from './email.js'
+
+export class User {
+  constructor(readonly email: Email) {}
+}
+`,
+    'utf8',
+  );
+
+  const result = await generateTest('user', root);
+  const generated = await readFile(result.destinationPath, 'utf8');
+
+  assert.match(generated, /import Email from '..\/src\/email\.js';/);
+  assert.match(generated, /const email = Email\.create\('value'\);/);
+});
+
+test('creates nested DTO values across imported files', async (context) => {
+  const root = await fixture(context);
+
+  await writeFile(
+    join(root, 'src', 'profile-input.ts'),
+    `
+export interface ProfileInput {
+  name: string
+  active: boolean
+}
+`,
+    'utf8',
+  );
+
+  await writeFile(
+    join(root, 'src', 'create-user-input.ts'),
+    `
+import type { ProfileInput } from './profile-input.js'
+
+export interface CreateUserInput {
+  profile: ProfileInput
+}
+`,
+    'utf8',
+  );
+
+  await writeFile(
+    join(root, 'src', 'create-user.ts'),
+    `
+import type { CreateUserInput } from './create-user-input.js'
+
+export class CreateUser {
+  execute(input: CreateUserInput): void {}
+}
+`,
+    'utf8',
+  );
+
+  const result = await generateTest('create-user', root);
+  const generated = await readFile(result.destinationPath, 'utf8');
+
+  assert.match(
+    generated,
+    /const input = \{ profile: \{ name: 'value', active: true \} \};/,
+  );
+});
+
+test('stops recursive DTO cycles with a safe fallback', async (context) => {
+  const root = await fixture(context);
+
+  await writeFile(
+    join(root, 'src', 'tree.ts'),
+    `
+export interface NodeInput {
+  child: NodeInput
+}
+
+export class Tree {
+  execute(input: NodeInput): void {}
+}
+`,
+    'utf8',
+  );
+
+  const result = await generateTest('tree', root);
+  const generated = await readFile(result.destinationPath, 'utf8');
+
+  assert.match(
+    generated,
+    /const input = \{ child: undefined as never \};/,
+  );
+});
+
+test('limits deeply nested DTO generation', async (context) => {
+  const root = await fixture(context);
+
+  await writeFile(
+    join(root, 'src', 'deep.ts'),
+    `
+export interface LevelOne { two: LevelTwo }
+export interface LevelTwo { three: LevelThree }
+export interface LevelThree { four: LevelFour }
+export interface LevelFour { value: string }
+
+export class Deep {
+  execute(input: LevelOne): void {}
+}
+`,
+    'utf8',
+  );
+
+  const result = await generateTest('deep', root);
+  const generated = await readFile(result.destinationPath, 'utf8');
+
+  assert.match(
+    generated,
+    /const input = \{ two: \{ three: \{ four: undefined as never \} \} \};/,
+  );
+});
+
 test('uses a common static factory for private constructors', async (context) => {
   const root = await fixture(context);
   await writeFile(

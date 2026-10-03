@@ -25,7 +25,7 @@ No required framework, no forced architecture, and no unnecessary setup.
 
 ```bash
 npx create-kit-dev
-npm create kit-dev
+yarn create kit-dev
 pnpm create kit-dev
 ```
 

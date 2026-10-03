@@ -44,11 +44,14 @@ npm run dev
 | `npm run w -- product` | Finds and opens a file |
 | `npm run di` | Installs optional DI |
 
-## Generated tests
+## Tests
 
-Kit Dev creates one test per public method and leaves the assertion as a `TODO`.
-
-It can generate simple values, DTOs, entities, Value Objects, and basic mocks. When a type cannot be inferred safely, it uses a typed fallback.
+```bash
+npm test
+npm test -- --watch
+npm test -- create-user
+npm test -- src/application/create-user.ts
+```
 
 ## Open files
 

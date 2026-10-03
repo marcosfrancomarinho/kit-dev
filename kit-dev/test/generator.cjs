@@ -3672,6 +3672,7 @@ function renderCreationSetup(
         className,
         creation,
         parameter.index,
+        parameter.directType,
       )} = {`,
     );
 

@@ -220,7 +220,7 @@ function methodArgs(method, target) {
   return { lines, names };
 }
 
-function valueFor(p, typeRef, methods = []) {
+function valueFor(p, typeRef) {
   if (p.optional) return 'undefined';
   const type = p.type.replace(/\s+/g, ' ').trim();
   if (type === 'string') return "'value'";

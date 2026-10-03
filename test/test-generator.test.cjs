@@ -325,6 +325,131 @@ export class Deep {
   );
 });
 
+
+test('creates a concrete dependency instead of mocking its methods', async (context) => {
+  const root = await fixture(context);
+
+  await writeFile(
+    join(root, 'src', 'email.ts'),
+    `
+export class Email {
+  constructor(readonly value: string) {}
+
+  getEmail(): string {
+    return this.value
+  }
+}
+`,
+    'utf8',
+  );
+
+  await writeFile(
+    join(root, 'src', 'user.ts'),
+    `
+import { Email } from './email.js'
+
+export class User {
+  constructor(
+    private readonly email: Email,
+    private readonly password: string,
+  ) {}
+
+  getEmail(): string {
+    return this.email.getEmail()
+  }
+}
+`,
+    'utf8',
+  );
+
+  const result = await generateTest('user', root);
+  const generated = await readFile(result.destinationPath, 'utf8');
+
+  assert.match(generated, /import \{ Email \} from '..\/src\/email\.js';/);
+  assert.match(generated, /const email = new Email\('value'\);/);
+  assert.doesNotMatch(generated, /emailGetEmailMock/);
+  assert.match(generated, /const sut = new User\(email, password\);/);
+});
+
+test('creates inline DTO values for method inputs', async (context) => {
+  const root = await fixture(context);
+
+  await writeFile(
+    join(root, 'src', 'login-user.ts'),
+    `
+export class LoginUser {
+  async login(input: {
+    email: string
+    password: string
+    remember?: boolean
+  }): Promise<{ id: string }> {
+    return { id: input.email }
+  }
+}
+`,
+    'utf8',
+  );
+
+  const result = await generateTest('login-user', root);
+  const generated = await readFile(result.destinationPath, 'utf8');
+
+  assert.match(
+    generated,
+    /const input = \{ email: 'value', password: 'value' \};/,
+  );
+  assert.doesNotMatch(generated, /remember:/);
+  assert.doesNotMatch(
+    generated,
+    /undefined as unknown as Parameters<typeof sut\.login>\[0\]/,
+  );
+});
+
+test('uses readable imported dependency types in mocks', async (context) => {
+  const root = await fixture(context);
+
+  await writeFile(
+    join(root, 'src', 'user-repository.ts'),
+    `
+export interface UserRepository {
+  findByEmail(email: string): Promise<string>
+}
+`,
+    'utf8',
+  );
+
+  await writeFile(
+    join(root, 'src', 'login-user.ts'),
+    `
+import type { UserRepository } from './user-repository.js'
+
+export class LoginUser {
+  constructor(private readonly repository: UserRepository) {}
+
+  async login(email: string): Promise<string> {
+    return this.repository.findByEmail(email)
+  }
+}
+`,
+    'utf8',
+  );
+
+  const result = await generateTest('login-user', root);
+  const generated = await readFile(result.destinationPath, 'utf8');
+
+  assert.match(
+    generated,
+    /import type \{ UserRepository \} from '..\/src\/user-repository\.js';/,
+  );
+  assert.match(
+    generated,
+    /as unknown as UserRepository;/,
+  );
+  assert.doesNotMatch(
+    generated,
+    /as unknown as ConstructorParameters<typeof LoginUser>\[0\]/,
+  );
+});
+
 test('uses a common static factory for private constructors', async (context) => {
   const root = await fixture(context);
   await writeFile(

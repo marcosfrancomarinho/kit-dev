@@ -143,6 +143,7 @@ async function createTestContext(files) {
     format: 'esm',
     target: 'node22',
     sourcemap: 'inline',
+    minifyWhitespace: true,
     logLevel: 'silent',
     plugins: [
       {

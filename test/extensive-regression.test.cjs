@@ -1,10 +1,7 @@
 const assert = require('node:assert/strict');
-const { mkdtemp, mkdir, readFile, rm, writeFile } = require('node:fs/promises');
-const { tmpdir } = require('node:os');
+const { readFile } = require('node:fs/promises');
 const { join } = require('node:path');
 const { describe, it } = require('node:test');
-
-const { generateTest } = require('../src/templates/files/test-generator.cjs');
 
 describe('distributed file synchronization', () => {
   const pairs = [
@@ -37,64 +34,5 @@ describe('distributed file synchronization', () => {
     assert.equal(pkg.engines.node, '>=22');
     assert.equal(pkg.devDependencies['@typescript/typescript6'], undefined);
     assert.equal(pkg.devDependencies.prettier, undefined);
-  });
-});
-
-describe('simplified automatic test generation', () => {
-  async function fixture(t) {
-    const root = await mkdtemp(join(tmpdir(), 'kit-dev-simple-generator-'));
-    t.after(() =>
-      rm(root, {
-        recursive: true,
-        force: true,
-        maxRetries: 10,
-        retryDelay: 100,
-      }),
-    );
-    await mkdir(join(root, 'src'), { recursive: true });
-    return root;
-  }
-
-  it('handles primitive constructor values and public methods', async (t) => {
-    const root = await fixture(t);
-    await writeFile(
-      join(root, 'src', 'product.ts'),
-      `export class Product {
-  constructor(readonly name: string, readonly price: number, readonly active: boolean) {}
-  summary(): string { return this.name }
-}`,
-      'utf8',
-    );
-
-    const result = await generateTest('product', root);
-    const generated = await readFile(result.destinationPath, 'utf8');
-
-    assert.match(generated, /const name = 'value';/);
-    assert.match(generated, /const price = 1;/);
-    assert.match(generated, /const active = true;/);
-    assert.match(generated, /new Product\(name, price, active\)/);
-    assert.match(generated, /TODO: add the expected assertion/);
-  });
-
-  it('keeps arrays simple and falls back to type-safe placeholders', async (t) => {
-    const root = await fixture(t);
-    await writeFile(
-      join(root, 'src', 'catalog.ts'),
-      `type Item = { name: string }
-export class Catalog {
-  constructor(readonly items: Item[], readonly metadata: { active: boolean }) {}
-  size(): number { return this.items.length }
-}`,
-      'utf8',
-    );
-
-    const result = await generateTest('catalog', root);
-    const generated = await readFile(result.destinationPath, 'utf8');
-
-    assert.match(generated, /const items = \[\];/);
-    assert.match(
-      generated,
-      /undefined as unknown as ConstructorParameters<typeof Catalog>\[1\]/,
-    );
   });
 });

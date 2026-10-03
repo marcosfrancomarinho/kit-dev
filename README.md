@@ -46,6 +46,8 @@ npm run dev
 
 ## Tests
 
+Run tests, use watch mode, or generate a test for a class.
+
 ```bash
 npm test
 npm test -- --watch

@@ -23,9 +23,21 @@ No required framework, no forced architecture, and no unnecessary setup.
 
 ## Quick start
 
+npm:
+
 ```bash
 npx create-kit-dev
+```
+
+Yarn:
+
+```bash
 yarn create kit-dev
+```
+
+pnpm:
+
+```bash
 pnpm create kit-dev
 ```
 

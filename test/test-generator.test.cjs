@@ -911,7 +911,11 @@ export class CreateUserHandler {
     );
     assert.match(
       generated,
-      /const repository: ConstructorParameters<typeof CreateUserHandler>\[0\] = \{/,
+      /const repository: UserRepository = \{/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /const repository: ConstructorParameters<typeof CreateUserHandler>\[0\]/,
     );
     assert.match(
       generated,
@@ -1141,7 +1145,11 @@ export class UseCase {
 
     assert.match(
       generated,
-      /const repository: ConstructorParameters<typeof UseCase>\[0\] = \{/,
+      /const repository: UserRepository = \{/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /const repository: ConstructorParameters<typeof UseCase>\[0\]/,
     );
     assert.doesNotMatch(
       generated,
@@ -1403,7 +1411,11 @@ export class UserService {
     );
     assert.match(
       generated,
-      /const repository: ConstructorParameters<typeof UserService>\[1\] = \{/,
+      /const repository: UserRepository = \{/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /const repository: ConstructorParameters<typeof UserService>\[1\]/,
     );
     assert.match(generated, /save: repositorySaveMock/);
     assert.doesNotMatch(
@@ -1465,7 +1477,11 @@ export class Runner {
     );
     assert.match(
       generated,
-      /const port: ConstructorParameters<typeof Runner>\[0\] = \{/,
+      /const port: TaskPort = \{/,
+    );
+    assert.doesNotMatch(
+      generated,
+      /const port: ConstructorParameters<typeof Runner>\[0\]/,
     );
     assert.match(generated, /run: portRunMock/);
   },

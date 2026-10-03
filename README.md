@@ -69,7 +69,7 @@ npm run dev | yarn dev | pnpm dev
 
 ## ✨ Other features
 
-- `--watch` for development, tests, and types;
+- `--watch` for development, tests, and TypeScript code checking;
 - test generation from classes;
 - quick file opening from the terminal;
 - production build;
@@ -84,7 +84,7 @@ npm run dev | yarn dev | pnpm dev
 | `npm run dev [-- --watch]` | Runs the app; `--watch` restarts on save |
 | `npm test [-- --watch]` | Runs tests; `--watch` reruns on save |
 | `npm test -- <file>` | Generates a test for a class |
-| `npm run type [-- --watch]` | Checks TypeScript types; `--watch` checks on save |
+| `npm run type [-- --watch]` | Checks whether the TypeScript code is valid; `--watch` checks on save |
 | `npm run build` | Creates the production bundle |
 | `npm start` | Runs the bundle |
 | `npm run w -- <file>` | Finds and opens a file |

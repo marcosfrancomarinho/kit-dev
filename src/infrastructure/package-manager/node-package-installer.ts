@@ -10,10 +10,8 @@ import { PackageManagerRegistry } from './package-manager-registry.js';
 export class NodePackageInstaller implements PackageInstaller {
   private readonly dependencies = Object.freeze([
     'typescript@7.0.2',
-    '@typescript/typescript6@6.0.2',
     'esbuild@0.28.2',
     '@types/node@22',
-    'prettier@3.9.9',
   ]);
 
   constructor(

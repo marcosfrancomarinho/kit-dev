@@ -57,7 +57,6 @@ npm run dev
 | `test` | Runs the tests once |
 | `test --watch` | Keeps tests running and reruns them on changes |
 | `test <file>` | Generates or updates a test for a class |
-| `fmt [file]` | Formats all of `src/` and `test/` or only one provided file |
 | `write [file]` / `w [file]` | Finds a project file and opens it in Micro |
 | `build` | Checks types and creates the production bundle |
 | `start` | Runs the generated bundle |
@@ -73,7 +72,6 @@ npm run dev --watch
 npm test
 npm test --watch
 npm test -- create-user
-npm run fmt
 npm run w -- product
 npm run type
 npm run type --watch
@@ -81,21 +79,6 @@ npm run build
 npm start
 ```
 
-## Code formatting
-
-Run:
-
-```bash
-npm run fmt
-```
-To format only one file:
-
-```bash
-npm run fmt -- src/application/create-user.ts
-```
-
-
-The `fmt` command formats JavaScript and TypeScript in `src/` and `test/`, including compact or minified code. By default, it uses two-space indentation, single quotes, semicolons, and a line width of 100 characters. It respects project formatting configuration and removes unused imports while preserving side-effect imports. Invalid syntax is reported without overwriting the affected file.
 
 ## Write and edit files
 
@@ -163,7 +146,7 @@ or:
 npm test -- src/application/create-user.ts
 ```
 
-Kit Dev analyzes the class, constructor dependencies and public methods to create a useful starting test. Generated dependency mocks use exported project types directly when they can be safely imported; otherwise, Kit Dev falls back to TypeScript utility types such as `ConstructorParameters<>`. When it cannot safely infer business behavior, it leaves a `TODO` instead of inventing an assertion.
+Kit Dev creates a small starting test from the class constructor and public methods. It uses simple values for common primitive parameters, creates lightweight dependency stubs when obvious method calls can be detected, and leaves a `TODO` for the expected assertion instead of trying to infer business rules.
 
 Existing generated tests can be regenerated when the source changes.
 
@@ -517,7 +500,6 @@ my-api/
 ├── kit-dev/
 │   ├── build/
 │   ├── di/
-│   ├── format/
 │   ├── test/
 │   └── write/
 ├── src/

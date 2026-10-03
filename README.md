@@ -23,6 +23,10 @@ No required framework, no forced architecture, and no unnecessary setup.
 
 ## Quick start
 
+Getting started is simple:
+
+**1. Create the project**
+
 npm:
 
 ```bash
@@ -41,19 +45,19 @@ pnpm:
 pnpm create kit-dev
 ```
 
-Enter the project folder name when Kit Dev asks.
+**2. Enter the folder name** when Kit Dev asks.
 
-Then:
+**3. Open the project folder**
 
 ```bash
 cd my-api
 ```
 
+**4. Start it**
+
 ```text
 npm run dev | yarn dev | pnpm dev
 ```
-
-The examples below use npm, but Yarn and pnpm work too.
 
 ## Commands
 

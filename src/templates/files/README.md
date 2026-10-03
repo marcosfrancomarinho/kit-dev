@@ -112,7 +112,7 @@ npm run write -- product.ts
 npm run w -- src/domain/entities/product.ts
 ```
 
-If one file matches, it opens immediately. If several files match, Kit Dev shows an interactive selector. `write` does not run `fmt` automatically before opening the file; the file is opened unchanged. Run `fmt` explicitly only when you want formatting.
+If one file matches, it opens immediately. If several files match, Kit Dev shows an interactive selector. The selected file is opened unchanged.
 
 Micro is not bundled into the npm package. Kit Dev first uses an existing `micro` from `PATH`; otherwise it downloads only the official binary for the current operating system and architecture, validates its SHA-256 checksum, and caches it in the user's home directory:
 
@@ -163,7 +163,7 @@ or:
 npm test -- src/application/create-user.ts
 ```
 
-Kit Dev analyzes the class, constructor dependencies and public methods to create a useful starting test. When it cannot safely infer business behavior, it leaves a `TODO` instead of inventing an assertion.
+Kit Dev analyzes the class, constructor dependencies and public methods to create a useful starting test. Generated dependency mocks use exported project types directly when they can be safely imported; otherwise, Kit Dev falls back to TypeScript utility types such as `ConstructorParameters<>`. When it cannot safely infer business behavior, it leaves a `TODO` instead of inventing an assertion.
 
 Existing generated tests can be regenerated when the source changes.
 

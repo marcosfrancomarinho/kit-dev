@@ -5,7 +5,7 @@
 
 <h1 align="center">🚀 Kit Dev</h1>
 
-<p align="center">Quickly create a minimal TypeScript project ready to code.</p>
+<p align="center"><strong>Quickly create a minimal TypeScript project ready to code.</strong></p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/create-kit-dev"><img src="https://img.shields.io/npm/v/create-kit-dev?style=flat-square&color=CB3837&logo=npm" alt="npm version"></a>
@@ -15,87 +15,102 @@
 
 ---
 
-## What is it?
+## ⚡ What is it?
 
 **Kit Dev** creates the base of a Node.js + TypeScript project with the essentials ready to use.
 
 No required framework, no forced architecture, and no unnecessary setup.
 
-## Quick start
+---
 
-Getting started is simple:
+## 🚀 Quick start
 
-**1. Create the project**
+### 1. Create the project
 
-npm:
+**npm**
 
 ```bash
 npx create-kit-dev
 ```
 
-Yarn:
+**Yarn**
 
 ```bash
 yarn create kit-dev
 ```
 
-pnpm:
+**pnpm**
 
 ```bash
 pnpm create kit-dev
 ```
 
-**2. Enter the folder name** when Kit Dev asks.
+### 2. Enter the folder name
 
-**3. Open the project folder**
+When Kit Dev asks, enter the project name, for example:
+
+```text
+app
+```
+
+### 3. Open the project
 
 ```bash
 cd app
 ```
 
-**4. Start it**
+### 4. Start
 
 ```text
 npm run dev | yarn dev | pnpm dev
 ```
 
-## Other features
+---
 
-- `--watch` mode for development, tests, and type checking;
+## ✨ Other features
+
+- `--watch` for development, tests, and types;
 - test generation from classes;
 - quick file opening from the terminal;
 - production build;
-- optional dependency injection.
-## Commands
+- optional DI.
+
+---
+
+## 🛠 Commands
 
 | Command | What it does |
 |---|---|
-| `npm run dev [-- --watch]` | Builds and runs the app; `--watch` rebuilds and restarts on save |
-| `npm test [-- --watch]` | Runs tests; `--watch` reruns them on save |
+| `npm run dev [-- --watch]` | Runs the app; `--watch` restarts on save |
+| `npm test [-- --watch]` | Runs tests; `--watch` reruns on save |
 | `npm test -- <file>` | Generates a test for a class |
-| `npm run type [-- --watch]` | Checks that the TypeScript types are correct; `--watch` checks again on save |
+| `npm run type [-- --watch]` | Checks TypeScript types; `--watch` checks on save |
 | `npm run build` | Creates the production bundle |
 | `npm start` | Runs the bundle |
 | `npm run w -- <file>` | Finds and opens a file |
 | `npm run di` | Installs optional DI |
 
-## Tests
+---
 
-### Run tests
+## 🧪 Tests
+
+### Run
 
 ```bash
 npm test
 npm test -- --watch
 ```
 
-### Create a test
+### Create
 
 ```bash
 npm test -- create-user
 npm test -- src/application/create-user.ts
 ```
 
-## Open files
+---
+
+## ✏️ Open files
 
 `write` / `w` finds project files and opens them in **Micro**, a lightweight terminal editor.
 
@@ -106,19 +121,23 @@ npm run w -- src/domain/product.ts
 
 If Micro is not installed, Kit Dev downloads the matching binary and reuses it from cache.
 
-## Build
+---
+
+## 📦 Build
 
 ```bash
 npm run build
 npm start
 ```
 
-The build generates:
+Generates:
 
 ```text
 dist/bundle.cjs
 dist/bundle.cjs.map
 ```
+
+---
 
 ## Optional dependency injection
 

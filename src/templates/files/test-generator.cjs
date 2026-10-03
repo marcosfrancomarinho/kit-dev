@@ -21,6 +21,8 @@ async function generateTest(target, projectRoot = process.cwd()) {
     projectRoot,
     destinationPath,
     extraImports: new Set(),
+    sourceCache: new Map([[sourcePath, source]]),
+    declarationCache: new Map(),
     importPath: importPath(destinationPath, sourcePath),
   });
   await mkdir(dirname(destinationPath), { recursive: true });
@@ -329,28 +331,55 @@ function methodReturnType(typeText, methodName, meta) {
 }
 
 function resolveSimpleDeclaration(typeName, meta) {
+  const cacheKey = meta.sourcePath + '::' + typeName;
+  if (meta.declarationCache.has(cacheKey)) {
+    return meta.declarationCache.get(cacheKey);
+  }
+
   let source = meta.source;
   let filePath = meta.sourcePath;
   let localName = typeName;
   let importLine = null;
 
   let declaration = declarationFromSource(source, localName, filePath, meta, importLine);
-  if (declaration) return declaration;
+  if (declaration) {
+    meta.declarationCache.set(cacheKey, declaration);
+    return declaration;
+  }
 
   const imported = importedType(source, typeName);
-  if (!imported || !imported.specifier.startsWith('.')) return null;
-  const resolvedFile = resolveImportedSource(filePath, imported.specifier);
-  if (!resolvedFile) return null;
+  if (!imported || !imported.specifier.startsWith('.')) {
+    meta.declarationCache.set(cacheKey, null);
+    return null;
+  }
 
-  source = readFileSync(resolvedFile, 'utf8');
+  const resolvedFile = resolveImportedSource(filePath, imported.specifier);
+  if (!resolvedFile) {
+    meta.declarationCache.set(cacheKey, null);
+    return null;
+  }
+
+  if (!meta.sourceCache.has(resolvedFile)) {
+    meta.sourceCache.set(resolvedFile, readFileSync(resolvedFile, 'utf8'));
+  }
+
+  source = meta.sourceCache.get(resolvedFile);
   filePath = resolvedFile;
   localName = imported.exportedName;
   const generatedPath = importPath(meta.destinationPath, filePath);
-  importLine = `import { ${typeName} } from '${generatedPath}';`;
+  importLine = imported.default
+    ? `import ${typeName} from '${generatedPath}';`
+    : `import { ${typeName} } from '${generatedPath}';`;
+
   const childMeta = { ...meta, source, sourcePath: filePath };
   declaration = declarationFromSource(source, localName, filePath, childMeta, importLine);
-  if (!declaration) return null;
-  return { ...declaration, name: typeName, meta: childMeta, importLine };
+
+  const resolvedDeclaration = declaration
+    ? { ...declaration, name: typeName, meta: childMeta, importLine }
+    : null;
+
+  meta.declarationCache.set(cacheKey, resolvedDeclaration);
+  return resolvedDeclaration;
 }
 
 function declarationFromSource(source, typeName, filePath, meta, importLine) {
@@ -362,6 +391,11 @@ function declarationFromSource(source, typeName, filePath, meta, importLine) {
 }
 
 function analyzeNamedClass(source, typeName) {
+  if (typeName === 'default') {
+    const match = source.match(/\bexport\s+default\s+(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)/);
+    if (!match) return null;
+    typeName = match[1];
+  }
   const escaped = typeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(`\\b(?:export\\s+(?:default\\s+)?)?(?:abstract\\s+)?class\\s+${escaped}\\b`);
   const match = pattern.exec(source);
@@ -404,18 +438,31 @@ function analyzeObjectType(source, typeName) {
 }
 
 function importedType(source, localName) {
-  const pattern = /\bimport\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['\"]([^'\"]+)['\"]/g;
+  const defaultPattern = /\bimport\s+(?:type\s+)?([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/g;
   let match;
-  while ((match = pattern.exec(source))) {
+
+  while ((match = defaultPattern.exec(source))) {
+    if (match[1] === localName) {
+      return { exportedName: 'default', specifier: match[2], default: true };
+    }
+  }
+
+  const namedPattern = /\bimport\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/g;
+
+  while ((match = namedPattern.exec(source))) {
     for (const raw of match[1].split(',')) {
       const item = raw.trim().replace(/^type\s+/, '');
       const alias = item.match(/^([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?$/);
       if (!alias) continue;
+
       const exportedName = alias[1];
       const importedName = alias[2] || exportedName;
-      if (importedName === localName) return { exportedName, specifier: match[2] };
+      if (importedName === localName) {
+        return { exportedName, specifier: match[2], default: false };
+      }
     }
   }
+
   return null;
 }
 

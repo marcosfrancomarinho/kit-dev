@@ -102,29 +102,17 @@ Para consultar os atalhos padrão do editor, pressione `Ctrl+E` e execute `help 
 
 ## Testes automáticos
 
-Todo projeto gerado já possui um runner de testes. Por padrão, os testes executam uma única vez. Use `--watch` apenas quando quiser reexecução contínua.
-
-Execute uma vez ou adicione `--watch` para acompanhar alterações:
+Por padrão, os testes rodam uma vez. Use `--watch` quando quiser acompanhar alterações.
 
 ```bash
-npm test [--watch]
-```
-
-Para gerar um teste a partir de uma classe:
-
-```bash
+npm test
+npm test -- --watch
 npm test -- create-user
 ```
 
-ou:
+Ao gerar um teste, o Kit Dev cria um bloco por método público e deixa a assertion como `TODO`. Ele tenta criar valores úteis para tipos simples, DTOs, entidades e Value Objects com construtor público ou factories `create`, `from`, `of`, `build` e `make`.
 
-```bash
-npm test -- src/application/create-user.ts
-```
-
-O Kit Dev cria uma base pequena de teste a partir do construtor da classe e dos métodos públicos. Ele usa valores simples para parâmetros primitivos comuns, cria mocks simples de dependências com `mock.fn()` quando identifica chamadas de métodos de forma óbvia e deixa um `TODO` para a assertion esperada, sem tentar adivinhar regras de negócio.
-
-Um teste já gerado pode ser criado novamente quando a classe mudar.
+Dependências usadas pela classe recebem mocks nativos de `node:test`. Quando o retorno é simples, o gerador também cria um valor coerente, como `true`, `1`, `'value'`, `[]` ou `Promise` equivalente. Tipos complexos continuam usando um fallback tipado em vez de serem adivinhados.
 
 ## Build de produção
 

@@ -46,13 +46,6 @@ cd minha-api
 npm run dev
 ```
 
-Se criou com Yarn ou pnpm, use o equivalente:
-
-```bash
-yarn dev
-pnpm dev
-```
-
 ## Comandos principais
 
 | Comando | O que faz |

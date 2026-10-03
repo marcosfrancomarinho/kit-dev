@@ -23,13 +23,20 @@ Sem framework obrigatório, sem arquitetura imposta e sem configuração desnece
 
 ## Começando
 
-Os exemplos usam npm, mas Yarn e pnpm também funcionam.
-
 ```bash
 npx create-kit-dev
+npm create kit-dev
+pnpm create kit-dev
+```
+
+Depois:
+
+```bash
 cd minha-api
 npm run dev
 ```
+
+Os exemplos abaixo usam npm, mas Yarn e pnpm também funcionam.
 
 ## Comandos
 

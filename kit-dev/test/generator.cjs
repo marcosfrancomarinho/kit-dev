@@ -302,9 +302,11 @@ function inlineObjectProperties(typeText) {
 }
 
 function fallbackValue(typeRef, depth) {
-  return depth > 0
+  const value = depth > 0
     ? 'undefined as never'
     : `undefined as unknown as ${typeRef}`;
+
+  return value + ' /* TODO: replace fallback */';
 }
 
 function primitiveValue(typeText) {

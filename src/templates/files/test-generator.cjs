@@ -5,6 +5,8 @@ const { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } =
 const extensions = ['.ts', '.tsx', '.mts', '.cts'];
 const factories = new Set(['create', 'from', 'of', 'build', 'make']);
 const maxGeneratedObjectDepth = 3;
+const { matching, membersOf, objectProperties, paramsOf } = require('./syntax.cjs');
+const { importPath, resolveSourceFile, testPath } = require('./paths.cjs');
 
 async function generateTest(target, projectRoot = process.cwd()) {
   const sourcePath = await resolveSourceFile(projectRoot, target);
@@ -96,48 +98,6 @@ function directTypeImports(meta) {
       .map((parameter) => directTypeName(parameter, meta))
       .filter(Boolean),
   )].sort();
-}
-
-function membersOf(body) {
-  const result = [];
-  let depth = 0;
-  for (let i = 0; i < body.length; i += 1) {
-    const skipped = skip(body, i);
-    if (skipped !== i) { i = skipped - 1; continue; }
-    if (body[i] === '{') { depth += 1; continue; }
-    if (body[i] === '}') { depth = Math.max(0, depth - 1); continue; }
-    if (depth || !/[A-Za-z_$]/.test(body[i])) continue;
-
-    const found = body.slice(i).match(/^((?:(?:public|private|protected|static|async|override|readonly|declare|abstract)\s+)*)((?:constructor)|(?:[A-Za-z_$][\w$]*))\s*(?:<[^>{};()]*>)?\s*\(/);
-    if (!found) continue;
-    const modifiers = new Set(found[1].trim().split(/\s+/).filter(Boolean));
-    const open = i + found[0].lastIndexOf('(');
-    const close = matching(body, open, '(', ')');
-    if (close < 0) continue;
-    result.push({ name: found[2], modifiers, async: modifiers.has('async'), parameters: body.slice(open + 1, close) });
-    const brace = body.indexOf('{', close);
-    const semi = body.indexOf(';', close);
-    if (brace >= 0 && (semi < 0 || brace < semi)) {
-      const end = matching(body, brace, '{', '}');
-      if (end >= 0) i = end;
-    } else if (semi >= 0) i = semi;
-  }
-  return result;
-}
-
-function paramsOf(text) {
-  return split(text).map((part, index) => {
-    let value = part.trim().replace(/^(?:(?:public|private|protected|readonly|override)\s+)+/, '');
-    if (!value) return null;
-    const equal = topLevel(value, '=');
-    const defaulted = equal >= 0;
-    if (defaulted) value = value.slice(0, equal).trim();
-    const colon = topLevel(value, ':');
-    const left = (colon < 0 ? value : value.slice(0, colon)).trim();
-    const type = (colon < 0 ? 'unknown' : value.slice(colon + 1)).trim();
-    const match = left.match(/^(?:\.\.\.)?([A-Za-z_$][\w$]*)(\?)?$/);
-    return { name: match?.[1] || 'arg' + (index + 1), type, optional: !!match?.[2] || defaulted, index };
-  }).filter(Boolean);
 }
 
 function render(meta) {
@@ -542,73 +502,6 @@ function analyzeObjectType(source, typeName) {
   return { body, properties: objectProperties(body) };
 }
 
-function objectProperties(body) {
-  const properties = [];
-
-  for (const member of splitObjectMembers(body)) {
-    const value = member.trim();
-    if (!value) continue;
-
-    const colon = topLevel(value, ':');
-    if (colon < 0) continue;
-
-    const left = value.slice(0, colon).trim();
-    const type = value.slice(colon + 1).trim();
-    const match = left.match(/^([A-Za-z_$][\w$]*)(\?)?$/);
-
-    if (!match || !type || type.includes('=>')) continue;
-
-    properties.push({
-      name: match[1],
-      type,
-      optional: !!match[2],
-      index: properties.length,
-    });
-  }
-
-  return properties;
-}
-
-function splitObjectMembers(source) {
-  const parts = [];
-  let start = 0;
-  let round = 0;
-  let square = 0;
-  let curly = 0;
-  let angle = 0;
-
-  for (let i = 0; i < source.length; i += 1) {
-    const skipped = skip(source, i);
-    if (skipped !== i) {
-      i = skipped - 1;
-      continue;
-    }
-
-    const char = source[i];
-    if (char === '(') round += 1;
-    else if (char === ')') round -= 1;
-    else if (char === '[') square += 1;
-    else if (char === ']') square -= 1;
-    else if (char === '{') curly += 1;
-    else if (char === '}') curly -= 1;
-    else if (char === '<') angle += 1;
-    else if (char === '>') angle -= 1;
-    else if (
-      (char === ';' || char === ',' || char === '\n') &&
-      !round &&
-      !square &&
-      !curly &&
-      !angle
-    ) {
-      parts.push(source.slice(start, i));
-      start = i + 1;
-    }
-  }
-
-  parts.push(source.slice(start));
-  return parts;
-}
-
 function importedType(source, localName) {
   const defaultPattern = /\bimport\s+(?:type\s+)?([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]/g;
   let match;
@@ -656,110 +549,6 @@ function callsOf(body, name) {
 
 function words(name) {
   return name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').toLowerCase();
-}
-
-async function resolveSourceFile(projectRoot, target) {
-  const src = join(projectRoot, 'src');
-  const bases = [isAbsolute(target) ? target : resolve(projectRoot, target), isAbsolute(target) ? target : resolve(src, target)];
-  for (const base of bases) {
-    for (const candidate of [base, ...(!extname(base) ? extensions.map((ext) => base + ext) : [])]) {
-      if (await exists(candidate)) { inside(src, candidate); return resolve(candidate); }
-    }
-  }
-  const files = await collect(src);
-  const name = basename(target, extname(target)).toLowerCase();
-  const matches = files.filter((file) => basename(file, extname(file)).toLowerCase() === name);
-  if (matches.length === 1) return matches[0];
-  if (matches.length > 1) throw new Error('More than one source file matches "' + target + '". Use a path.');
-  throw new Error('Source file not found: ' + target);
-}
-
-async function collect(directory) {
-  let entries;
-  try { entries = await readdir(directory, { withFileTypes: true }); }
-  catch (error) { if (error.code === 'ENOENT') return []; throw error; }
-  const files = [];
-  for (const entry of entries) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...await collect(path));
-    else if (entry.isFile() && extensions.includes(extname(entry.name))) files.push(path);
-  }
-  return files;
-}
-
-async function exists(path) {
-  try { await access(path, constants.F_OK); return true; } catch { return false; }
-}
-
-function testPath(projectRoot, sourcePath) {
-  const src = join(projectRoot, 'src');
-  inside(src, sourcePath);
-  const rel = relative(src, sourcePath);
-  return join(projectRoot, 'test', rel.slice(0, -extname(rel).length) + '.test.ts');
-}
-
-function importPath(destinationPath, sourcePath) {
-  let path = relative(dirname(destinationPath), sourcePath).replace(/\\/g, '/').replace(/\.(?:tsx?|mts|cts)$/i, '.js');
-  return path.startsWith('.') ? path : './' + path;
-}
-
-function inside(root, candidate) {
-  const a = resolve(root), b = resolve(candidate);
-  if (b !== a && !b.startsWith(a + sep)) throw new Error('Tests can only be generated from files inside src/.');
-}
-
-function split(source) {
-  const parts = [];
-  let start = 0, round = 0, square = 0, curly = 0, angle = 0;
-  for (let i = 0; i < source.length; i += 1) {
-    const s = skip(source, i); if (s !== i) { i = s - 1; continue; }
-    const c = source[i];
-    if (c === '(') round++; else if (c === ')') round--;
-    else if (c === '[') square++; else if (c === ']') square--;
-    else if (c === '{') curly++; else if (c === '}') curly--;
-    else if (c === '<') angle++; else if (c === '>') angle--;
-    else if (c === ',' && !round && !square && !curly && !angle) { parts.push(source.slice(start, i)); start = i + 1; }
-  }
-  parts.push(source.slice(start));
-  return parts;
-}
-
-function topLevel(source, wanted) {
-  let round = 0, square = 0, curly = 0, angle = 0;
-  for (let i = 0; i < source.length; i += 1) {
-    const s = skip(source, i); if (s !== i) { i = s - 1; continue; }
-    const c = source[i];
-    if (c === '(') round++; else if (c === ')') round--;
-    else if (c === '[') square++; else if (c === ']') square--;
-    else if (c === '{') curly++; else if (c === '}') curly--;
-    else if (c === '<') angle++; else if (c === '>') angle--;
-    else if (c === wanted && !round && !square && !curly && !angle) return i;
-  }
-  return -1;
-}
-
-function matching(source, start, open, close) {
-  let depth = 0;
-  for (let i = start; i < source.length; i += 1) {
-    const s = skip(source, i); if (s !== i) { i = s - 1; continue; }
-    if (source[i] === open) depth++;
-    else if (source[i] === close && --depth === 0) return i;
-  }
-  return -1;
-}
-
-function skip(source, index) {
-  const c = source[index], n = source[index + 1];
-  if (c === '/' && n === '/') { const end = source.indexOf('\n', index + 2); return end < 0 ? source.length : end + 1; }
-  if (c === '/' && n === '*') { const end = source.indexOf('*/', index + 2); return end < 0 ? source.length : end + 2; }
-  if (c !== "'" && c !== '"' && c !== '`') return index;
-  let escaped = false;
-  for (let i = index + 1; i < source.length; i += 1) {
-    if (escaped) { escaped = false; continue; }
-    if (source[i] === '\\') { escaped = true; continue; }
-    if (source[i] === c) return i + 1;
-  }
-  return source.length;
 }
 
 module.exports = { generateTest };

@@ -517,16 +517,19 @@ var NodeProjectScaffolder = class {
         (0, import_node_path3.join)(input.projectPath, "README.md"),
         "\u{1F4D8} README.md created"
       ),
-      this.copyTemplate(paths, "di.cjs", (0, import_node_path3.join)(paths.di(), "install.cjs"), "\u{1F9E9} Optional DI command prepared"),
-      this.copyTemplate(paths, "dependency-injection.ts", (0, import_node_path3.join)(paths.di(), "container.ts"), "\u{1F9E9} DI template prepared"),
-      this.copyTemplate(paths, "dependency-injection.d.ts", (0, import_node_path3.join)(paths.di(), "container.d.ts"), "\u{1F9E9} DI types prepared"),
-      this.copyTemplate(paths, "di-transformer.cjs", (0, import_node_path3.join)(paths.di(), "transformer.cjs"), "\u{1F9E9} DI transformer prepared"),
-      this.copyTemplate(paths, "dev.cjs", (0, import_node_path3.join)(paths.build(), "dev.cjs"), "\u26A1 esbuild development runner prepared"),
-      this.copyTemplate(paths, "type.cjs", (0, import_node_path3.join)(paths.build(), "type.cjs"), "\u{1F50E} TypeScript checker prepared"),
-      this.copyTemplate(paths, "providers.ts", (0, import_node_path3.join)(paths.di(), "providers.ts"), "\u{1F9E9} DI providers template prepared"),
-      this.copyTemplate(paths, "runner.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test.cjs"), "\u{1F9EA} Native test runner prepared"),
-      this.copyTemplate(paths, "test-generator.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "generator.cjs"), "\u{1F9EA} Automatic test generator prepared"),
-      this.copyTemplate(paths, "write.cjs", (0, import_node_path3.join)(paths.write(), "write.cjs"), "\u270F\uFE0F Project file editor prepared")
+      this.copyTemplate(paths, "di/di.cjs", (0, import_node_path3.join)(paths.di(), "install.cjs"), "\u{1F9E9} Optional DI command prepared"),
+      this.copyTemplate(paths, "di/dependency-injection.ts", (0, import_node_path3.join)(paths.di(), "container.ts"), "\u{1F9E9} DI template prepared"),
+      this.copyTemplate(paths, "di/dependency-injection.d.ts", (0, import_node_path3.join)(paths.di(), "container.d.ts"), "\u{1F9E9} DI types prepared"),
+      this.copyTemplate(paths, "di/di-transformer.cjs", (0, import_node_path3.join)(paths.di(), "transformer.cjs"), "\u{1F9E9} DI transformer prepared"),
+      this.copyTemplate(paths, "di/di-compiler.cjs", (0, import_node_path3.join)(paths.di(), "di-compiler.cjs"), "\u{1F9E9} DI compiler adapter prepared"),
+      this.copyTemplate(paths, "build/dev.cjs", (0, import_node_path3.join)(paths.build(), "dev.cjs"), "\u26A1 esbuild development runner prepared"),
+      this.copyTemplate(paths, "build/type.cjs", (0, import_node_path3.join)(paths.build(), "type.cjs"), "\u{1F50E} TypeScript checker prepared"),
+      this.copyTemplate(paths, "di/providers.ts", (0, import_node_path3.join)(paths.di(), "providers.ts"), "\u{1F9E9} DI providers template prepared"),
+      this.copyTemplate(paths, "test/runner.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test.cjs"), "\u{1F9EA} Native test runner prepared"),
+      this.copyTemplate(paths, "test/test-generator.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "generator.cjs"), "\u{1F9EA} Automatic test generator prepared"),
+      this.copyTemplate(paths, "test/test-syntax.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test-syntax.cjs"), "\u{1F9EA} Test syntax parser prepared"),
+      this.copyTemplate(paths, "test/test-paths.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test-paths.cjs"), "\u{1F9EA} Test path resolver prepared"),
+      this.copyTemplate(paths, "write/write.cjs", (0, import_node_path3.join)(paths.write(), "write.cjs"), "\u270F\uFE0F Project file editor prepared")
     ]);
   }
   async createDirectory(directory) {

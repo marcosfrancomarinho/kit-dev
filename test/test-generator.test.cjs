@@ -4,7 +4,7 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const test = require('node:test');
 
-const { generateTest } = require('../src/templates/files/test-generator.cjs');
+const { generateTest } = require('../src/templates/files/test/test-generator.cjs');
 
 async function fixture(context, name = 'kit-dev-test-generator-') {
   const root = await mkdtemp(join(tmpdir(), name));

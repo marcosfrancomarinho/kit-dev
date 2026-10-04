@@ -19,7 +19,7 @@ const {
   openWithMicro,
   renderMicroTips,
   renderSelection,
-} = require('../src/templates/files/write.cjs');
+} = require('../src/templates/files/write/write.cjs');
 
 describe('project file writer', () => {
   it('maps supported platforms to the correct Micro release asset', () => {
@@ -251,6 +251,7 @@ describe('project file writer', () => {
       'src',
       'templates',
       'files',
+      'write',
       'write.cjs',
     );
     const result = spawnSync(
@@ -298,7 +299,7 @@ describe('project file writer', () => {
 
     assert.match(
       scaffolder,
-      /copyTemplate\(paths, 'write\.cjs', join\(paths\.write\(\), 'write\.cjs'\)/,
+      /copyTemplate\(paths, 'write\/write\.cjs', join\(paths\.write\(\), 'write\.cjs'\)/,
     );
     assert.match(paths, /write\(\): string/);
     assert.match(

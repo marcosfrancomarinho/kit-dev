@@ -19,6 +19,7 @@ const runnerTemplate = join(
   'src',
   'templates',
   'files',
+  'test',
   'runner.cjs',
 );
 
@@ -28,7 +29,28 @@ const generatorTemplate = join(
   'src',
   'templates',
   'files',
+  'test',
   'test-generator.cjs',
+);
+
+const generatorSyntaxTemplate = join(
+  __dirname,
+  '..',
+  'src',
+  'templates',
+  'files',
+  'test',
+  'test-syntax.cjs',
+);
+
+const generatorPathsTemplate = join(
+  __dirname,
+  '..',
+  'src',
+  'templates',
+  'files',
+  'test',
+  'test-paths.cjs',
 );
 
 test('executa testes TypeScript e permanece em watch com --watch', async (context) => {
@@ -153,6 +175,8 @@ export class CreateUser {
     ),
     copyFile(runnerTemplate, join(testToolPath, 'test.cjs')),
     copyFile(generatorTemplate, join(testToolPath, 'generator.cjs')),
+    copyFile(generatorSyntaxTemplate, join(testToolPath, 'test-syntax.cjs')),
+    copyFile(generatorPathsTemplate, join(testToolPath, 'test-paths.cjs')),
   ]);
 
   const generation = spawn(

@@ -12,6 +12,7 @@ const containerTemplate = join(
   'src',
   'templates',
   'files',
+  'di',
   'dependency-injection.ts',
 );
 

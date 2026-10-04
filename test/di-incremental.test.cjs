@@ -13,7 +13,7 @@ const test = require('node:test');
 const { context: createBuildContext, transform } = require('esbuild');
 const {
   kitDevDiPlugin,
-} = require('../src/templates/files/di-transformer.cjs');
+} = require('../src/templates/files/di/di-transformer.cjs');
 
 const templateFilesPath = join(
   __dirname,
@@ -21,6 +21,7 @@ const templateFilesPath = join(
   'src',
   'templates',
   'files',
+  'di',
 );
 
 test('atualiza a DI entre rebuilds sem recriar o plugin', async (context) => {

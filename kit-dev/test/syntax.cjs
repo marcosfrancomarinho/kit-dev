@@ -1,5 +1,3 @@
-const syntaxFactories = new Set(['create', 'from', 'of', 'build', 'make']);
-
 function membersOf(body) {
   const result = [];
   let depth = 0;

@@ -294,7 +294,7 @@ export class Tree {
 
   assert.match(
     generated,
-    /const input = \{ child: undefined as never \};/,
+    /const input = \{ child: undefined as never \/\* TODO: replace fallback \*\/ \};/,
   );
 });
 
@@ -321,10 +321,34 @@ export class Deep {
 
   assert.match(
     generated,
-    /const input = \{ two: \{ three: \{ four: undefined as never \} \} \};/,
+    /const input = \{ two: \{ three: \{ four: undefined as never \/\* TODO: replace fallback \*\/ \} \} \};/,
   );
 });
 
+
+test('marks unresolved direct values as generated fallbacks', async (context) => {
+  const root = await fixture(context);
+
+  await writeFile(
+    join(root, 'src', 'service.ts'),
+    `
+type External<T> = { value: T }
+
+export class Service {
+  execute(input: External<string>): void {}
+}
+`,
+    'utf8',
+  );
+
+  const result = await generateTest('service', root);
+  const generated = await readFile(result.destinationPath, 'utf8');
+
+  assert.match(
+    generated,
+    /undefined as unknown as Parameters<typeof sut\.execute>\[0\] \/\* TODO: replace fallback \*\//,
+  );
+});
 
 test('creates a concrete dependency instead of mocking its methods', async (context) => {
   const root = await fixture(context);

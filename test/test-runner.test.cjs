@@ -33,6 +33,16 @@ const generatorTemplate = join(
   'test-generator.cjs',
 );
 
+const generatorAnalyzerTemplate = join(
+  __dirname,
+  '..',
+  'src',
+  'templates',
+  'files',
+  'test',
+  'test-analyzer.cjs',
+);
+
 const generatorSyntaxTemplate = join(
   __dirname,
   '..',
@@ -175,6 +185,7 @@ export class CreateUser {
     ),
     copyFile(runnerTemplate, join(testToolPath, 'test.cjs')),
     copyFile(generatorTemplate, join(testToolPath, 'generator.cjs')),
+    copyFile(generatorAnalyzerTemplate, join(testToolPath, 'test-analyzer.cjs')),
     copyFile(generatorSyntaxTemplate, join(testToolPath, 'test-syntax.cjs')),
     copyFile(generatorPathsTemplate, join(testToolPath, 'test-paths.cjs')),
   ]);

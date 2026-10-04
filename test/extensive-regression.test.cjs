@@ -8,6 +8,7 @@ describe('distributed file synchronization', () => {
     ['src/templates/files/build/dev.cjs', 'kit-dev/build/dev.cjs'],
     ['src/templates/files/build/type.cjs', 'kit-dev/build/type.cjs'],
     ['src/templates/files/test/test-generator.cjs', 'kit-dev/test/generator.cjs'],
+    ['src/templates/files/test/test-analyzer.cjs', 'kit-dev/test/test-analyzer.cjs'],
     ['src/templates/files/test/test-syntax.cjs', 'kit-dev/test/test-syntax.cjs'],
     ['src/templates/files/test/test-paths.cjs', 'kit-dev/test/test-paths.cjs'],
     ['src/templates/files/di/di-transformer.cjs', 'kit-dev/di/transformer.cjs'],

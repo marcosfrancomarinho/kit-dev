@@ -6,12 +6,13 @@ const extensions = ['.ts', '.tsx', '.mts', '.cts'];
 const factories = new Set(['create', 'from', 'of', 'build', 'make']);
 const maxGeneratedObjectDepth = 3;
 const { matching, membersOf, objectProperties, paramsOf } = require('./test-syntax.cjs');
+const { analyzeClass } = require('./test-analyzer.cjs');
 const { importPath, resolveSourceFile, testPath } = require('./test-paths.cjs');
 
 async function generateTest(target, projectRoot = process.cwd()) {
   const sourcePath = await resolveSourceFile(projectRoot, target);
   const source = await readFile(sourcePath, 'utf8');
-  const metadata = analyzeClass(source);
+  const metadata = await analyzeClass(sourcePath, projectRoot);
   if (!metadata) throw new Error('No class was found in ' + relative(projectRoot, sourcePath) + '.');
   if (metadata.abstract) throw new Error(metadata.className + ' is abstract. Test a concrete implementation instead.');
 
@@ -32,54 +33,6 @@ async function generateTest(target, projectRoot = process.cwd()) {
   return { sourcePath, destinationPath, metadata };
 }
 
-function analyzeClass(source) {
-  const pattern = /\b(export\s+(?:default\s+)?)?(abstract\s+)?class\s+([A-Za-z_$][\w$]*)/g;
-  let first, chosen, match;
-  while ((match = pattern.exec(source))) {
-    const item = { index: match.index, end: pattern.lastIndex, exported: !!match[1], abstract: !!match[2], className: match[3] };
-    first ||= item;
-    if (item.exported) { chosen = item; break; }
-  }
-  chosen ||= first;
-  if (!chosen) return null;
-
-  const open = source.indexOf('{', chosen.end);
-  if (open < 0) return null;
-  const close = matching(source, open, '{', '}');
-  if (close < 0) return null;
-  const body = source.slice(open + 1, close);
-  const exportedTypes = exportedTypeNames(source);
-  const members = membersOf(body);
-  const ctor = members.find((m) => m.name === 'constructor');
-  const constructorParameters = paramsOf(ctor?.parameters || '');
-  const constructorPrivate = !!ctor && (ctor.modifiers.has('private') || ctor.modifiers.has('protected'));
-  const dependencyMethods = new Map(constructorParameters.map((p) => [p.name, callsOf(body, p.name)]));
-  const methods = members.filter((m) => m.name !== 'constructor' && !m.modifiers.has('private') && !m.modifiers.has('protected'));
-  const factory = constructorPrivate
-    ? methods.find((m) => m.modifiers.has('static') && factories.has(m.name))
-    : null;
-  if (constructorPrivate && !factory) throw new Error(chosen.className + ' has a non-public constructor and no create/from/of/build/make factory.');
-
-  return {
-    className: chosen.className,
-    exportedTypes,
-    abstract: chosen.abstract,
-    constructorParameters,
-    dependencyMethods,
-    factory,
-    methods: methods.filter((m) => m !== factory),
-  };
-}
-
-
-function exportedTypeNames(source) {
-  const names = new Set();
-  const pattern = /\bexport\s+(?:default\s+)?(?:(?:abstract\s+)?class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g;
-  let match;
-  while ((match = pattern.exec(source))) names.add(match[1]);
-  return names;
-}
-
 function directTypeName(parameter, meta) {
   const type = parameter.type.trim();
   return /^[A-Za-z_$][\w$]*$/.test(type) &&
@@ -91,7 +44,7 @@ function directTypeName(parameter, meta) {
 
 function directTypeImports(meta) {
   const parameters = meta.factory
-    ? paramsOf(meta.factory.parameters)
+    ? meta.factory.parameterMetadata || paramsOf(meta.factory.parameters)
     : meta.constructorParameters;
   return [...new Set(
     parameters
@@ -144,7 +97,9 @@ function render(meta) {
 
 function subject(meta) {
   const factory = meta.factory;
-  const parameters = factory ? paramsOf(factory.parameters) : meta.constructorParameters;
+  const parameters = factory
+    ? factory.parameterMetadata || paramsOf(factory.parameters)
+    : meta.constructorParameters;
   const lines = [], names = [];
   const setups = parameters.map((parameter) => {
     const fallbackType = factory
@@ -245,7 +200,7 @@ function mockName(parameterName, methodName) {
 
 function methodArgs(method, target, meta) {
   const lines = [], names = [];
-  paramsOf(method.parameters).forEach((p) => {
+  (method.parameterMetadata || paramsOf(method.parameters)).forEach((p) => {
     let name = p.name;
     while (names.includes(name)) name += '2';
     lines.push(
@@ -347,9 +302,11 @@ function inlineObjectProperties(typeText) {
 }
 
 function fallbackValue(typeRef, depth) {
-  return depth > 0
+  const value = depth > 0
     ? 'undefined as never'
     : `undefined as unknown as ${typeRef}`;
+
+  return value + ' /* TODO: replace fallback */';
 }
 
 function primitiveValue(typeText) {

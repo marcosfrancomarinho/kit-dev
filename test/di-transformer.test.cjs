@@ -147,11 +147,23 @@ class ProjectFixtureGenerator {
         join(templateFilesPath, 'di-transformer.cjs'),
         join(diPath, 'transformer.cjs'),
       ),
+      copyFile(
+        join(templateFilesPath, 'di-compiler.cjs'),
+        join(diPath, 'compiler.cjs'),
+      ),
       copyFile(join(templateFilesPath, 'providers.ts'), join(diPath, 'providers.ts')),
       copyFile(join(templateFilesPath, 'runner.cjs'), join(testRuntimePath, 'test.cjs')),
       copyFile(
         join(templateFilesPath, 'test-generator.cjs'),
         join(testRuntimePath, 'generator.cjs'),
+      ),
+      copyFile(
+        join(templateFilesPath, 'test-syntax.cjs'),
+        join(testRuntimePath, 'syntax.cjs'),
+      ),
+      copyFile(
+        join(templateFilesPath, 'test-paths.cjs'),
+        join(testRuntimePath, 'paths.cjs'),
       ),
     ]);
   }
@@ -198,7 +210,7 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   );
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'test'))).sort(),
-    ['generator.cjs', 'test.cjs'],
+    ['generator.cjs', 'paths.cjs', 'syntax.cjs', 'test.cjs'],
   );
   assert.deepEqual(await readdir(join(projectPath, 'test')), [
     'example.test.ts',
@@ -218,6 +230,7 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'di'))).sort(),
     [
+      'compiler.cjs',
       'container.d.ts',
       'container.ts',
       'install.cjs',

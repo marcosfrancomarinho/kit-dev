@@ -19,7 +19,7 @@ const {
   openWithMicro,
   renderMicroTips,
   renderSelection,
-} = require('../src/templates/files/write.cjs');
+} = require('../src/templates/files/write/write.cjs');
 
 describe('project file writer', () => {
   it('maps supported platforms to the correct Micro release asset', () => {

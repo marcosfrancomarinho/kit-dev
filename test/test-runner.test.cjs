@@ -19,6 +19,7 @@ const runnerTemplate = join(
   'src',
   'templates',
   'files',
+  'test',
   'runner.cjs',
 );
 
@@ -28,6 +29,7 @@ const generatorTemplate = join(
   'src',
   'templates',
   'files',
+  'test',
   'test-generator.cjs',
 );
 
@@ -37,6 +39,7 @@ const generatorSyntaxTemplate = join(
   'src',
   'templates',
   'files',
+  'test',
   'test-syntax.cjs',
 );
 
@@ -46,6 +49,7 @@ const generatorPathsTemplate = join(
   'src',
   'templates',
   'files',
+  'test',
   'test-paths.cjs',
 );
 

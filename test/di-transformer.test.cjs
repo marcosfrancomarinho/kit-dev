@@ -158,6 +158,10 @@ class ProjectFixtureGenerator {
         join(testRuntimePath, 'generator.cjs'),
       ),
       copyFile(
+        join(templateFilesPath, 'test/test-analyzer.cjs'),
+        join(testRuntimePath, 'test-analyzer.cjs'),
+      ),
+      copyFile(
         join(templateFilesPath, 'test/test-syntax.cjs'),
         join(testRuntimePath, 'test-syntax.cjs'),
       ),
@@ -210,7 +214,7 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   );
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'test'))).sort(),
-    ['generator.cjs', 'test-paths.cjs', 'test-syntax.cjs', 'test.cjs'],
+    ['generator.cjs', 'test-analyzer.cjs', 'test-paths.cjs', 'test-syntax.cjs', 'test.cjs'],
   );
   assert.deepEqual(await readdir(join(projectPath, 'test')), [
     'example.test.ts',

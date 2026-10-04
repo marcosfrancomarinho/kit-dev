@@ -527,6 +527,7 @@ var NodeProjectScaffolder = class {
       this.copyTemplate(paths, "di/providers.ts", (0, import_node_path3.join)(paths.di(), "providers.ts"), "\u{1F9E9} DI providers template prepared"),
       this.copyTemplate(paths, "test/runner.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test.cjs"), "\u{1F9EA} Native test runner prepared"),
       this.copyTemplate(paths, "test/test-generator.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "generator.cjs"), "\u{1F9EA} Automatic test generator prepared"),
+      this.copyTemplate(paths, "test/test-analyzer.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test-analyzer.cjs"), "\u{1F9EA} TypeScript test analyzer prepared"),
       this.copyTemplate(paths, "test/test-syntax.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test-syntax.cjs"), "\u{1F9EA} Test syntax parser prepared"),
       this.copyTemplate(paths, "test/test-paths.cjs", (0, import_node_path3.join)(paths.kitDevTest(), "test-paths.cjs"), "\u{1F9EA} Test path resolver prepared"),
       this.copyTemplate(paths, "write/write.cjs", (0, import_node_path3.join)(paths.write(), "write.cjs"), "\u270F\uFE0F Project file editor prepared")

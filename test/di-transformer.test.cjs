@@ -230,9 +230,9 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'di'))).sort(),
     [
-      'di-compiler.cjs',
       'container.d.ts',
       'container.ts',
+      'di-compiler.cjs',
       'install.cjs',
       'providers.ts',
       'transformer.cjs',
@@ -496,6 +496,7 @@ test('instala o container interno fora de src', async (context) => {
   assert.deepEqual((await readdir(diPath)).sort(), [
     'container.d.ts',
     'container.js',
+    'di-compiler.cjs',
     'transformer.cjs',
   ]);
 

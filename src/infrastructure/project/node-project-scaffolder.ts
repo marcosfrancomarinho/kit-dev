@@ -62,11 +62,14 @@ export class NodeProjectScaffolder implements ProjectScaffolder {
       this.copyTemplate(paths, 'dependency-injection.ts', join(paths.di(), 'container.ts'), '🧩 DI template prepared'),
       this.copyTemplate(paths, 'dependency-injection.d.ts', join(paths.di(), 'container.d.ts'), '🧩 DI types prepared'),
       this.copyTemplate(paths, 'di-transformer.cjs', join(paths.di(), 'transformer.cjs'), '🧩 DI transformer prepared'),
+      this.copyTemplate(paths, 'di-compiler.cjs', join(paths.di(), 'compiler.cjs'), '🧩 DI compiler adapter prepared'),
       this.copyTemplate(paths, 'dev.cjs', join(paths.build(), 'dev.cjs'), '⚡ esbuild development runner prepared'),
       this.copyTemplate(paths, 'type.cjs', join(paths.build(), 'type.cjs'), '🔎 TypeScript checker prepared'),
       this.copyTemplate(paths, 'providers.ts', join(paths.di(), 'providers.ts'), '🧩 DI providers template prepared'),
       this.copyTemplate(paths, 'runner.cjs', join(paths.kitDevTest(), 'test.cjs'), '🧪 Native test runner prepared'),
       this.copyTemplate(paths, 'test-generator.cjs', join(paths.kitDevTest(), 'generator.cjs'), '🧪 Automatic test generator prepared'),
+      this.copyTemplate(paths, 'test-syntax.cjs', join(paths.kitDevTest(), 'syntax.cjs'), '🧪 Test syntax parser prepared'),
+      this.copyTemplate(paths, 'test-paths.cjs', join(paths.kitDevTest(), 'paths.cjs'), '🧪 Test path resolver prepared'),
       this.copyTemplate(paths, 'write.cjs', join(paths.write(), 'write.cjs'), '✏️ Project file editor prepared'),
     ]);
   }

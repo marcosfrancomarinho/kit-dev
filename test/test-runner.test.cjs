@@ -31,6 +31,24 @@ const generatorTemplate = join(
   'test-generator.cjs',
 );
 
+const generatorSyntaxTemplate = join(
+  __dirname,
+  '..',
+  'src',
+  'templates',
+  'files',
+  'test-syntax.cjs',
+);
+
+const generatorPathsTemplate = join(
+  __dirname,
+  '..',
+  'src',
+  'templates',
+  'files',
+  'test-paths.cjs',
+);
+
 test('executa testes TypeScript e permanece em watch com --watch', async (context) => {
   const projectPath = await mkdtemp(join(tmpdir(), 'kit-dev-test-runner-'));
   const runnerPath = join(projectPath, 'kit-dev', 'test', 'test.cjs');
@@ -153,6 +171,8 @@ export class CreateUser {
     ),
     copyFile(runnerTemplate, join(testToolPath, 'test.cjs')),
     copyFile(generatorTemplate, join(testToolPath, 'generator.cjs')),
+    copyFile(generatorSyntaxTemplate, join(testToolPath, 'test-syntax.cjs')),
+    copyFile(generatorPathsTemplate, join(testToolPath, 'test-paths.cjs')),
   ]);
 
   const generation = spawn(

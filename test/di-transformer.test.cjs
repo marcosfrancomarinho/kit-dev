@@ -149,7 +149,7 @@ class ProjectFixtureGenerator {
       ),
       copyFile(
         join(templateFilesPath, 'di-compiler.cjs'),
-        join(diPath, 'compiler.cjs'),
+        join(diPath, 'di-compiler.cjs'),
       ),
       copyFile(join(templateFilesPath, 'providers.ts'), join(diPath, 'providers.ts')),
       copyFile(join(templateFilesPath, 'runner.cjs'), join(testRuntimePath, 'test.cjs')),
@@ -159,11 +159,11 @@ class ProjectFixtureGenerator {
       ),
       copyFile(
         join(templateFilesPath, 'test-syntax.cjs'),
-        join(testRuntimePath, 'syntax.cjs'),
+        join(testRuntimePath, 'test-syntax.cjs'),
       ),
       copyFile(
         join(templateFilesPath, 'test-paths.cjs'),
-        join(testRuntimePath, 'paths.cjs'),
+        join(testRuntimePath, 'test-paths.cjs'),
       ),
     ]);
   }
@@ -210,7 +210,7 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   );
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'test'))).sort(),
-    ['generator.cjs', 'paths.cjs', 'syntax.cjs', 'test.cjs'],
+    ['generator.cjs', 'test-paths.cjs', 'test-syntax.cjs', 'test.cjs'],
   );
   assert.deepEqual(await readdir(join(projectPath, 'test')), [
     'example.test.ts',
@@ -230,7 +230,7 @@ test('gera as pastas visíveis de build e DI', async (context) => {
   assert.deepEqual(
     (await readdir(join(projectPath, 'kit-dev', 'di'))).sort(),
     [
-      'compiler.cjs',
+      'di-compiler.cjs',
       'container.d.ts',
       'container.ts',
       'install.cjs',
@@ -291,7 +291,7 @@ test('executa o modo dev com esbuild antes da DI', async (context) => {
     ),
     copyFile(
       join(templateFilesPath, 'di-compiler.cjs'),
-      join(diPath, 'compiler.cjs'),
+      join(diPath, 'di-compiler.cjs'),
     ),
   ]);
 
@@ -376,7 +376,7 @@ test('gera build com logs e sourcemap externo', async (context) => {
     ),
     copyFile(
       join(templateFilesPath, 'di-compiler.cjs'),
-      join(diPath, 'compiler.cjs'),
+      join(diPath, 'di-compiler.cjs'),
     ),
   ]);
 
@@ -468,7 +468,7 @@ test('instala o container interno fora de src', async (context) => {
     ),
     copyFile(
       join(templateFilesPath, 'di-compiler.cjs'),
-      join(diPath, 'compiler.cjs'),
+      join(diPath, 'di-compiler.cjs'),
     ),
     copyFile(
       join(templateFilesPath, 'providers.ts'),

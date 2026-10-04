@@ -17,7 +17,7 @@ const test = require('node:test');
 const { build, transform } = require('esbuild');
 const {
   kitDevDiPlugin,
-} = require('../src/templates/files/di-transformer.cjs');
+} = require('../src/templates/files/di/di-transformer.cjs');
 
 const templateFilesPath = join(
   __dirname,
@@ -26,10 +26,10 @@ const templateFilesPath = join(
   'templates',
   'files',
 );
-const containerTemplate = join(templateFilesPath, 'dependency-injection.ts');
+const containerTemplate = join(templateFilesPath, 'di/dependency-injection.ts');
 const containerTypesTemplate = join(
   templateFilesPath,
-  'dependency-injection.d.ts',
+  'di/dependency-injection.d.ts',
 );
 
 class ProjectFixtureTemplates {
@@ -132,37 +132,37 @@ class ProjectFixtureGenerator {
         this.templates.esbuildConfig(),
       ),
       writeProjectFile(projectPath, '.gitignore', 'node_modules/\ndist/\n'),
-      copyFile(join(templateFilesPath, 'dev.cjs'), join(buildPath, 'dev.cjs')),
-      copyFile(join(templateFilesPath, 'type.cjs'), join(buildPath, 'type.cjs')),
-      copyFile(join(templateFilesPath, 'di.cjs'), join(diPath, 'install.cjs')),
+      copyFile(join(templateFilesPath, 'build/dev.cjs'), join(buildPath, 'dev.cjs')),
+      copyFile(join(templateFilesPath, 'build/type.cjs'), join(buildPath, 'type.cjs')),
+      copyFile(join(templateFilesPath, 'di/di.cjs'), join(diPath, 'install.cjs')),
       copyFile(
-        join(templateFilesPath, 'dependency-injection.ts'),
+        join(templateFilesPath, 'di/dependency-injection.ts'),
         join(diPath, 'container.ts'),
       ),
       copyFile(
-        join(templateFilesPath, 'dependency-injection.d.ts'),
+        join(templateFilesPath, 'di/dependency-injection.d.ts'),
         join(diPath, 'container.d.ts'),
       ),
       copyFile(
-        join(templateFilesPath, 'di-transformer.cjs'),
+        join(templateFilesPath, 'di/di-transformer.cjs'),
         join(diPath, 'transformer.cjs'),
       ),
       copyFile(
-        join(templateFilesPath, 'di-compiler.cjs'),
+        join(templateFilesPath, 'di/di-compiler.cjs'),
         join(diPath, 'di-compiler.cjs'),
       ),
-      copyFile(join(templateFilesPath, 'providers.ts'), join(diPath, 'providers.ts')),
-      copyFile(join(templateFilesPath, 'runner.cjs'), join(testRuntimePath, 'test.cjs')),
+      copyFile(join(templateFilesPath, 'di/providers.ts'), join(diPath, 'providers.ts')),
+      copyFile(join(templateFilesPath, 'test/runner.cjs'), join(testRuntimePath, 'test.cjs')),
       copyFile(
-        join(templateFilesPath, 'test-generator.cjs'),
+        join(templateFilesPath, 'test/test-generator.cjs'),
         join(testRuntimePath, 'generator.cjs'),
       ),
       copyFile(
-        join(templateFilesPath, 'test-syntax.cjs'),
+        join(templateFilesPath, 'test/test-syntax.cjs'),
         join(testRuntimePath, 'test-syntax.cjs'),
       ),
       copyFile(
-        join(templateFilesPath, 'test-paths.cjs'),
+        join(templateFilesPath, 'test/test-paths.cjs'),
         join(testRuntimePath, 'test-paths.cjs'),
       ),
     ]);
@@ -284,13 +284,13 @@ test('executa o modo dev com esbuild antes da DI', async (context) => {
       'src/main.ts',
       "console.log('Hello from esbuild');\n",
     ),
-    copyFile(join(templateFilesPath, 'dev.cjs'), join(buildPath, 'dev.cjs')),
+    copyFile(join(templateFilesPath, 'build/dev.cjs'), join(buildPath, 'dev.cjs')),
     copyFile(
-      join(templateFilesPath, 'di-transformer.cjs'),
+      join(templateFilesPath, 'di/di-transformer.cjs'),
       join(diPath, 'transformer.cjs'),
     ),
     copyFile(
-      join(templateFilesPath, 'di-compiler.cjs'),
+      join(templateFilesPath, 'di/di-compiler.cjs'),
       join(diPath, 'di-compiler.cjs'),
     ),
   ]);
@@ -371,11 +371,11 @@ test('gera build com logs e sourcemap externo', async (context) => {
       "console.log('Production build');\n",
     ),
     copyFile(
-      join(templateFilesPath, 'di-transformer.cjs'),
+      join(templateFilesPath, 'di/di-transformer.cjs'),
       join(diPath, 'transformer.cjs'),
     ),
     copyFile(
-      join(templateFilesPath, 'di-compiler.cjs'),
+      join(templateFilesPath, 'di/di-compiler.cjs'),
       join(diPath, 'di-compiler.cjs'),
     ),
   ]);
@@ -452,26 +452,26 @@ test('instala o container interno fora de src', async (context) => {
       'kit-dev/build/esbuild.config.cjs',
       projectTemplates.esbuildConfig(),
     ),
-    copyFile(join(templateFilesPath, 'di.cjs'), join(diPath, 'install.cjs')),
+    copyFile(join(templateFilesPath, 'di/di.cjs'), join(diPath, 'install.cjs')),
     copyFile(
-      join(templateFilesPath, 'dependency-injection.ts'),
+      join(templateFilesPath, 'di/dependency-injection.ts'),
       join(diPath, 'container.ts'),
     ),
     copyFile(
-      join(templateFilesPath, 'dependency-injection.d.ts'),
+      join(templateFilesPath, 'di/dependency-injection.d.ts'),
       join(diPath, 'container.d.ts'),
     ),
-    copyFile(join(templateFilesPath, 'dev.cjs'), join(buildPath, 'dev.cjs')),
+    copyFile(join(templateFilesPath, 'build/dev.cjs'), join(buildPath, 'dev.cjs')),
     copyFile(
-      join(templateFilesPath, 'di-transformer.cjs'),
+      join(templateFilesPath, 'di/di-transformer.cjs'),
       join(diPath, 'transformer.cjs'),
     ),
     copyFile(
-      join(templateFilesPath, 'di-compiler.cjs'),
+      join(templateFilesPath, 'di/di-compiler.cjs'),
       join(diPath, 'di-compiler.cjs'),
     ),
     copyFile(
-      join(templateFilesPath, 'providers.ts'),
+      join(templateFilesPath, 'di/providers.ts'),
       join(diPath, 'providers.ts'),
     ),
   ]);

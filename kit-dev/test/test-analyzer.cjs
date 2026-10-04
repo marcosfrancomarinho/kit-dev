@@ -1,11 +1,15 @@
+const { existsSync } = require('node:fs');
 const { resolve } = require('node:path');
+const { pathToFileURL } = require('node:url');
 
 const factories = new Set(['create', 'from', 'of', 'build', 'make']);
 
 async function analyzeClass(sourcePath, projectRoot) {
+  const syncModule = require.resolve('typescript/unstable/sync');
+  const astModule = require.resolve('typescript/unstable/ast');
   const [{ API }, ast] = await Promise.all([
-    import('typescript/unstable/sync'),
-    import('typescript/unstable/ast'),
+    import(pathToFileURL(syncModule).href),
+    import(pathToFileURL(astModule).href),
   ]);
 
   const tsconfigPath = resolve(projectRoot, 'tsconfig.json');
@@ -13,12 +17,18 @@ async function analyzeClass(sourcePath, projectRoot) {
   let snapshot;
 
   try {
-    snapshot = api.updateSnapshot({ openProjects: [tsconfigPath] });
+    const hasTsconfig = existsSync(tsconfigPath);
+    snapshot = api.updateSnapshot(
+      hasTsconfig
+        ? { openProjects: [tsconfigPath] }
+        : { openFiles: [sourcePath] },
+    );
     const project =
-      snapshot.getProject(tsconfigPath) || snapshot.getProjects()[0];
+      (hasTsconfig && snapshot.getProject(tsconfigPath)) ||
+      snapshot.getProjects()[0];
 
     if (!project) {
-      throw new Error('tsconfig.json was not found for test generation.');
+      throw new Error('TypeScript could not create a project for test generation.');
     }
 
     const sourceFile =

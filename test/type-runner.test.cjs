@@ -5,7 +5,7 @@ const { tmpdir } = require('node:os');
 const { dirname, join } = require('node:path');
 const { test } = require('node:test');
 
-const template = join(__dirname, '..', 'src/templates/files/type.cjs');
+const template = join(__dirname, '..', 'src/templates/files/build/type.cjs');
 
 async function fixture(t) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'kit dev type ')));

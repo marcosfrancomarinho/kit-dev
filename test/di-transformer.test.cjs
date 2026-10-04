@@ -276,6 +276,10 @@ test('executa o modo dev com esbuild antes da DI', async (context) => {
       join(templateFilesPath, 'di-transformer.cjs'),
       join(diPath, 'transformer.cjs'),
     ),
+    copyFile(
+      join(templateFilesPath, 'di-compiler.cjs'),
+      join(diPath, 'compiler.cjs'),
+    ),
   ]);
 
   let stderr = '';
@@ -356,6 +360,10 @@ test('gera build com logs e sourcemap externo', async (context) => {
     copyFile(
       join(templateFilesPath, 'di-transformer.cjs'),
       join(diPath, 'transformer.cjs'),
+    ),
+    copyFile(
+      join(templateFilesPath, 'di-compiler.cjs'),
+      join(diPath, 'compiler.cjs'),
     ),
   ]);
 
@@ -444,6 +452,10 @@ test('instala o container interno fora de src', async (context) => {
     copyFile(
       join(templateFilesPath, 'di-transformer.cjs'),
       join(diPath, 'transformer.cjs'),
+    ),
+    copyFile(
+      join(templateFilesPath, 'di-compiler.cjs'),
+      join(diPath, 'compiler.cjs'),
     ),
     copyFile(
       join(templateFilesPath, 'providers.ts'),

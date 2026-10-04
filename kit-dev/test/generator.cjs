@@ -5,8 +5,8 @@ const { dirname, relative, resolve } = require('node:path');
 const extensions = ['.ts', '.tsx', '.mts', '.cts'];
 const factories = new Set(['create', 'from', 'of', 'build', 'make']);
 const maxGeneratedObjectDepth = 3;
-const { matching, membersOf, objectProperties, paramsOf } = require('./syntax.cjs');
-const { importPath, resolveSourceFile, testPath } = require('./paths.cjs');
+const { matching, membersOf, objectProperties, paramsOf } = require('./test-syntax.cjs');
+const { importPath, resolveSourceFile, testPath } = require('./test-paths.cjs');
 
 async function generateTest(target, projectRoot = process.cwd()) {
   const sourcePath = await resolveSourceFile(projectRoot, target);

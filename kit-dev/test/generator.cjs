@@ -1,6 +1,6 @@
-const { access, mkdir, readdir, readFile, writeFile } = require('node:fs/promises');
-const { constants, existsSync, readFileSync } = require('node:fs');
-const { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } = require('node:path');
+const { mkdir, readFile, writeFile } = require('node:fs/promises');
+const { existsSync, readFileSync } = require('node:fs');
+const { dirname, relative, resolve } = require('node:path');
 
 const extensions = ['.ts', '.tsx', '.mts', '.cts'];
 const factories = new Set(['create', 'from', 'of', 'build', 'make']);
